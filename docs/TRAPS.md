@@ -11,16 +11,20 @@ are truthy. Easy to get wrong in every conditional opcode.
 language semantics once (Q10) and implement it explicitly so the two builds agree.
 *Test the release build.*
 
-**Equality vs. identity.** `Rc` comparison is a pointer test; language `=` is
-structural across collection types. Deriving `PartialEq` on `Value` silently gives
-the wrong answer.
+**Equality vs. identity.** Derived `PartialEq` on `Value` follows Rust's variant
+and payload equality — `Rc<T>` compares its *pointee*, not its address. That is
+still the wrong answer for the language, most obviously because a derived compare
+can never make a list equal a vector. Language `=` is structural and crosses
+representations; `Rc::ptr_eq` is the only pointer test, and it is for explicit
+identity only.
 
 **Hash/equality agreement.** If `1` and `1.0` compare equal, they must hash equal
 — or they must not compare equal. Pick one, write it down (Q13).
 
-**Symbols vs. strings.** Symbols are interned and compare by id. Strings are not,
-and compare by value. Mixing these is a whole bug class. Keywords, if they exist
-(Q3), join this list.
+**Symbols vs. strings vs. keywords.** Symbols and keywords are interned and
+compare by id; strings are not, and compare by value. Symbols and keywords share
+an intern table but are distinct variants (ADR-025), so an id alone does not tell
+you which one you have. Mixing any two of the three is a whole bug class.
 
 **Metadata loss through expansion.** A macro that rebuilds a form without carrying
 spans forward produces errors that point at the expansion instead of the source.

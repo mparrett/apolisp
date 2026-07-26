@@ -11,11 +11,15 @@ terms are in `GLOSSARY.md`.
 
 ADR-001 through ADR-015 are ported from SPEC v0.1 Part III (commit `c494f2a`).
 ADR-016 through ADR-020 are ported from SPEC v0.1 Part II, where they were
-settled design that had never been written up as decisions. ADR-021 is new.
+settled design that had never been written up as decisions. ADR-021 through
+ADR-029 are new. Factual corrections to entries whose decision still stands are
+in **Errata** at the end, not in the entries themselves.
 
 ---
 
 ### ADR-001 — Rust as the host language
+
+*Decision stands; evidence rescoped by errata E-2, E-3, E-4.*
 
 **Decision.** Rust, single-threaded core, no async runtime in the VM.
 
@@ -97,6 +101,9 @@ suspension.
 
 ### ADR-005 — Serializable machine state is a first-class property
 
+*Superseded by ADR-029. The property stands; the state tuple below is incomplete
+and the boundary is now Vm / Execution / Image.*
+
 **Decision.** VM state is plain data with a canonical encoding. Suspension,
 async, and migration are one mechanism, built once.
 
@@ -125,6 +132,8 @@ a populated VM, are unresolved — Q5, Q9.
 ---
 
 ### ADR-006 — Slot-based bytecode, no register allocator
+
+*Decision stands; one claim corrected by erratum E-5.*
 
 **Decision.** Numbered operand slots per function, allocated monotonically. No
 liveness analysis, no reuse in v1.
@@ -177,7 +186,11 @@ that feeling as a signal to look harder at the macro.
 **Rejected.** An extensible special-form registry — it blocks inline caching and
 makes the compiler no longer authoritative about the language.
 
-**Open.** `loop`/`recur` (Q4), and how globals are created at all (Q11).
+**Open.** `loop`/`recur` (Q5).
+
+*Amended by ADR-027: the closed core gains one top-level create-or-rebind
+operation, making it 13 forms. ADR-028 fixes `finally` as part of `try`'s shape
+rather than a separate form.*
 
 ---
 
@@ -203,7 +216,9 @@ table — Q1.
 
 ### ADR-009 — Metadata on forms from day one
 
-*Refined by ADR-023 (how spans are stored). Hygiene half superseded by ADR-024.*
+*Superseded by ADR-026 (spans) and ADR-024 (capture avoidance). "Every form
+carries metadata" is not the decision that survived — origins belong to positions
+in a tree, not to values.*
 
 **Decision.** Every form carries metadata. Source spans are populated by the
 reader and preserved through macroexpansion.
@@ -220,6 +235,10 @@ ADR is unimplementable until that is settled.
 ---
 
 ### ADR-010 — `Value` is a concrete enum; its size is asserted
+
+*Superseded by ADR-025. The asserted size survives; the enum below is missing
+`Keyword`, `Bytes`, and `Buffer`, and its `Cell(Rc<Cell>)` is unimplementable
+alongside ADR-020.*
 
 **Decision.** Plain Rust enum, `Rc` payloads, no NaN-boxing. A test asserts
 `size_of::<Value>() <= 24`. Construction goes through constructor functions so
@@ -272,6 +291,8 @@ badly with ADR-012.
 ---
 
 ### ADR-012 — Eager sequences; no laziness
+
+*Decision stands; one claim corrected by erratum E-6.*
 
 **Decision.** No lazy seqs. Transducers for composition.
 
@@ -382,6 +403,9 @@ lifetime must be written out.
 
 ### ADR-017 — Async and migration are the same mechanism
 
+*Superseded by ADR-029. One representation still serves all three, but "cost:
+none beyond ADR-004" was false.*
+
 *(Ported from SPEC v0.1 Part II.)*
 
 **Decision.** One mechanism serves suspension, async, and migration.
@@ -436,6 +460,8 @@ bugs live.
 ---
 
 ### ADR-019 — Wasm via linear memory, not WasmGC
+
+*Decision stands; rationale corrected by erratum E-1.*
 
 *(Ported from SPEC v0.1 Part II.)*
 
@@ -544,6 +570,10 @@ bumps* — see above.
 
 ### ADR-023 — Spans live on the parent, indexed by child; and on code, indexed by instruction
 
+*Forms-are-values stands and is load-bearing. The span mechanism is superseded by
+ADR-026, which found it is not closed under macro construction; the
+serialization argument below is corrected in ADR-029.*
+
 *(New, 2026-07-25. Resolves Q2. Refines ADR-009.)*
 
 **Decision.** Forms **are** `Value`s. There is no separate `Form` type and no
@@ -605,6 +635,8 @@ code* — Clojure says yes and pays for it everywhere; nothing in v1 needs it.
 
 ### ADR-024 — Hygiene rides on symbol naming, not on metadata
 
+*Read as "Clojure-style capture avoidance" — see erratum E-7.*
+
 *(New, 2026-07-25. Supersedes the hygiene half of ADR-009.)*
 
 **Decision.** Macro hygiene is a property of symbol *identity*, not of form
@@ -628,3 +660,317 @@ so the reader is namespace-aware — a real coupling, and it lands on Q12.
 **Rejected.** Full hygienic macro expansion in the `syntax-rules` sense. Clojure's
 resolve-plus-gensym is weaker, well-understood, and the surface we said we would
 inherit.
+
+---
+
+### ADR-025 — Cells are VM-owned ids; the v1 `Value` enum
+
+*(New, 2026-07-26. Supersedes ADR-010. Refines ADR-003, ADR-020. From the
+pre-project review, P0.1 and P1.3.)*
+
+**Decision.** A cell is an index into a VM-owned generational arena, not a shared
+pointer. All cell reads and writes go through `&mut Vm`.
+
+```rust
+enum Value {
+    Nil,
+    Bool(bool),
+    Int(i64),
+    Float(f64),
+    Str(Rc<StrObj>),
+    Bytes(Rc<BytesObj>),
+    Sym(SymId),          // interned
+    Keyword(KwId),       // interned in the same table, distinct variant
+    List(Rc<ListObj>),
+    Vec(Rc<VecObj>),
+    Map(Rc<MapObj>),
+    Fn(Rc<Closure>),
+    Cell(CellId),        // index into Vm.cells
+    Handle(HandleId),    // opaque host resource
+    Buffer(BufferId),    // mutable, VM- or host-owned
+}
+```
+
+Immutable values — strings, bytes, collections, closures — stay `Rc`-backed.
+`size_of::<Value>() <= 24` remains asserted (ADR-010's one surviving clause). The
+listing is the v1 enum, not an illustration; adding a variant is an ADR.
+
+For v1, arena cells are retained for the lifetime of the VM. Instrument the live
+count rather than reclaiming.
+
+**Why.** The previous text specified three incompatible ownership models at once:
+`Value::Cell(Rc<Cell>)` (ADR-010), no `RefCell` anywhere with all mutable state
+behind `&mut Vm` (ADR-020), and a VM-owned cell heap in the state tuple
+(ADR-005). `Rc<T>` grants shared *immutable* access; mutating through it requires
+interior mutability, which ADR-020 forbids. Only the arena satisfies all three
+constraints as written.
+
+It also pays off twice. Logical cycles become ordinary id edges rather than `Rc`
+cycles, so ADR-003's accepted leak narrows from "reference graphs leak silently"
+to "cells are retained, and the count is on screen." And an id-keyed arena is
+already the shape a snapshot wants (ADR-029), so constraint #2 stops fighting the
+value representation.
+
+Keywords get their own variant rather than a flag bit inside `SymId`: the flag
+saves one word and makes type predicates, printing, and host conversion all
+slightly worse. `Bytes` and `Buffer` were settled by ADR-018 and simply missing
+from the enum.
+
+**Cost.** A cell read is an arena index through the VM rather than a pointer
+deref — fine on a slot VM where the VM is already in hand, awkward anywhere that
+only has a `Value`. Retention until VM teardown is a real leak for a long-running
+simulator; if that bites, the answer is a small tracing pass over the cell arena
+alone, not `RefCell` through every environment.
+
+**Rejected.** `Rc<RefCell<Value>>` — the standard Rust shape, and what `../let-rs`
+adopted, but it requires superseding ADR-020's no-`RefCell` rule and budgeting an
+identity-aware graph serializer, and it reproduces let-rs's unfixable `letrec`
+cycle (`PRIOR-ART.md`). *`Rc<Cell>` with `UnsafeCell` inside* — same aliasing
+question, less legibility, no serialization benefit.
+
+**Resolves** Q3. **Narrows** Q17 and Q19: with id edges there is no `Rc` cycle to
+leak, so the case against refcounting loses most of its force.
+
+---
+
+### ADR-026 — Span origins: positional, total, and explicit about generated code
+
+*(New, 2026-07-26. Supersedes ADR-009. Supersedes the span mechanism in ADR-023;
+its forms-are-values decision stands. From the pre-project review, P0.3.)*
+
+**Decision.** Forms remain `Value`s (ADR-023). Spans live *outside* the value
+graph, in a carrier the reader and expander thread alongside any value they treat
+as code:
+
+```text
+LocatedForm { root: Value, origin: SpanOrigin }
+SpanOrigin  = Source(Span) | Generated(Span) | Unknown
+```
+
+- Every aggregate — list, vector, **and map** — holds one origin per syntactic
+  child. The carrier holds the root's origin, so an immediate at the root is
+  covered.
+- Nodes a macro constructed receive `Generated(call_site)`. A node the expander
+  can still identify as passed through unchanged keeps its `Source`. Anything
+  else is `Unknown`, which prints as such rather than as a plausible lie.
+- The compiler emits `lines` parallel to the bytecode, mapping instruction to
+  origin (retained from ADR-023). Without it, runtime errors and backtraces have
+  no position to report.
+- Language code can neither read nor attach an origin in v1.
+
+Verification splits into four, replacing the single round-trip claim:
+
+1. print/read equality **ignores** origins and tests that data round-trips;
+2. a span-invariants property: every `Source` span lies within its file, and
+   child-origin arity matches child count;
+3. `.forms` and `.expanded` snapshots render origins in a debug mode;
+4. one macro diagnostic test pins call-site attribution.
+
+**Why.** Parent-indexed storage was not closed under the operations macros
+actually use. Macros build output with ordinary `list`, `cons`, and quasiquote,
+and language code cannot attach metadata — so under ADR-023 as written, macro
+output would have carried *no* spans at all, which is worse than Clojure, where
+expansion at least inherits the call site. Four cases had no defined behavior: an
+immediate at the root, maps, language-constructed aggregates, and a macro
+returning one of its arguments unchanged.
+
+The property test was also unsatisfiable as stated. `read(print(read(s))) ==
+read(s)` either includes spans, in which case printing moves columns and it
+always fails, or excludes them, in which case it cannot catch the metadata loss
+it was introduced to catch.
+
+Naming `Generated` and `Unknown` makes degradation explicit and testable instead
+of silent — which is what `TRAPS.md` says the dangerous version looks like.
+
+**Cost.** The expander threads a carrier rather than reading metadata off a
+value; every path that treats a `Value` as code has to carry origins with it.
+That is the price of keeping spans out of the value graph, and the value graph is
+what serializes.
+
+**Rejected.** Metadata fields on heap objects (Clojure's `IObj`) — cannot cover
+immediates, and `Sym(Rc<SymObj>)` to fix that costs an allocation per symbol
+occurrence. Parent-indexed `child_spans` stored in the graph (ADR-023 as written)
+— see above. Language-visible metadata and `with-meta` — Clojure pays for these
+everywhere and nothing in v1 needs them.
+
+---
+
+### ADR-027 — The v1 boot model: one namespace, VM-owned globals, one rebind operation
+
+*(New, 2026-07-26. From the pre-project review, P0.4. Resolves Q11 and Q17.)*
+
+**Decision.** The smallest thing that lets the language define anything:
+
+- **One** current module/namespace in v1. Not a module system.
+- Global names are interned fully qualified.
+- The VM owns the global table; each entry is a `CellId` (ADR-025).
+- **One** explicit top-level create-or-rebind operation in the core. `def` and
+  `defmacro` are library macros over it.
+- Self-recursion resolves through the current function's own identity, never
+  through a captured cell.
+- Mutual recursion is module-level only in v1, via the global table.
+- The reader-configuration preamble is fixed built-in syntax. A declaration that
+  changes the reader cannot itself require the changed reader to parse it.
+
+**Why.** Milestone 3 requires a recursive function and milestone 5 requires
+in-language `defmacro`, but the closed core could *read* a `global` and had no way
+to create one — the language could not bootstrap itself. Separately, ADR-024 has
+syntax-quote resolving symbols against a current namespace at read time, which
+requires a namespace to exist before any module system does.
+
+Module-level-only mutual recursion is the rule rather than a hedge for the reason
+`../let-rs` documents: the VM outlives every closure, so a global cell has an
+unambiguous owner, and `letrec`-style cells do not. That is the shape whose cycle
+can be broken.
+
+**Cost.** No `require`, no aliasing, no multiple namespaces in v1. Q12 becomes a
+question about when that stops being enough, not a blocker.
+
+**Correcting Q17.** The earlier claim that "every `defn` leaks" was wrong: it
+assumed a self-recursive closure captures its own cell, which this ADR and
+ADR-002 both forbid. Under ADR-025 there is no `Rc` cycle in the first place.
+
+---
+
+### ADR-028 — Proper tail calls, with a handler stack that survives them
+
+*(New, 2026-07-26. From the pre-project review, P0.5. Resolves Q4.)*
+
+**Decision.** Tail calls reuse the caller's frame. `try` carries `finally`, and
+active handlers and finalizers live in an explicit handler stack in VM-owned
+memory, reachable from the execution image. The invariants, which bind before
+frame layout is chosen:
+
+1. Every nonlocal exit runs pending `finally` blocks exactly once.
+2. A tail call first discharges cleanups for the scopes it exits. **A call in
+   tail position inside a `try` with a `finally` is therefore not a tail call** —
+   it becomes an ordinary call, because the frame is still needed.
+3. Cleanup may itself throw. The cleanup error wins; the original is retained on
+   it as suppressed.
+4. Suspension is permitted only at instruction boundaries where handler state is
+   inside the `Execution` image (ADR-029).
+5. Rust panics are host bugs. They never become language unwinding and never
+   cross the VM loop.
+
+**Why.** These were three questions with one answer. `with-open` was promised as
+`try`/`finally` lowering while the core-form list had only `try` and no document
+said where handlers lived; tail calls were unspecified; and suspension needs to
+know what state is live. All three turn on the same structure, and picking frame
+layout before deciding it would have meant picking twice.
+
+Tail calls themselves are close to table stakes for a Lisp — a loop that dies at a
+fixed depth is a bad surprise, and with eager sequences (ADR-012) iteration *is*
+recursion. `../wallisp` measured the throughput cost of TCO at +7% on one
+toolchain and −5% on a later one, i.e. within noise and not stable in sign; it
+kept TCO on correctness grounds. It also found that TCO fixes the stack and not
+the heap — each iteration still allocated a frame that was never reclaimed. Under
+ADR-025 frames drop on reuse, so we get that half.
+
+**Cost.** Rule 2 makes tail-call elimination conditional on dynamic extent, which
+the compiler must track and the disassembler should show. This is the honest
+version; the alternative silently skips cleanup.
+
+**Open.** Whether `loop`/`recur` is expressible as a macro over this (Q5) is now
+answerable — attempt it.
+
+---
+
+### ADR-029 — `Vm` / `Execution` / `Image`: the v1 snapshot boundary
+
+*(New, 2026-07-26. Supersedes ADR-005 and ADR-017. From the pre-project review,
+P0.2, P1.1, P1.2, P1.6. Resolves Q7 and Q9.)*
+
+**Decision.** Three named things, replacing ADR-005's single tuple:
+
+```text
+Vm        = intern table + globals/modules + cell arena + handle table
+            + host registry config
+Execution = code identity + frames + slots + pc + handler stack + status + fuel
+Image     = serializable DTO for one Vm plus one suspended Execution
+```
+
+v1 constraints, each of which is a promise *not* made:
+
+- Snapshots are taken **only at VM instruction boundaries in already-compiled
+  code**. No mid-read, mid-expand, or mid-compile snapshot.
+- The suspension trigger is **fuel exhaustion** — a step limit checked at
+  instruction boundaries.
+- An `Image` is **same-build, fresh-VM only**. Snapshots are disposable.
+- Live handles are **refused**: taking an image with a live handle is a typed
+  `SnapshotHasLiveHandles` error. Adapter checkpointing is a later opt-in.
+- The DTO is explicitly **object-id based**. Serde is format plumbing over it,
+  never the graph model — serde's `rc` feature serializes the pointee at every
+  reference and does not preserve identity.
+- Caches and host registry entries are declared either reconstructible or
+  excluded. Nothing is implicitly in the image.
+
+The capability grows in four steps, not four promises: pause/resume on fuel →
+serde checkpoint against a buffered in-memory host → multiple tasks once a
+nonblocking adapter exists → migration once a real use case justifies handle and
+effect policy.
+
+**Why.** ADR-005 said machine state was "exactly" seven things, and the list
+omitted task and scheduler state, handler state, globals and modules,
+deterministic counters, and any record of effects. ADR-017 then claimed async and
+migration cost "none beyond ADR-004," which contradicts ADR-005's own cost
+paragraph. Explicit frames make the continuation *representable*; they do not
+make graph encoding, external effects, scheduling, or reacquisition free.
+
+The `Vm`/`Execution` split is what makes the promise checkable: an `Image` is one
+of each, and anything not in either is out of scope by construction rather than
+by oversight.
+
+**Correcting ADR-023.** Its argument that forms-as-values gives free serialization
+"because a snapshot can contain forms mid-expansion" was wrong — macroexpansion
+is a Rust-side walk, and running a macro *in* the VM does not make the surrounding
+walk serializable. The surviving true claim is narrower and still sufficient:
+forms are values, so they serialize with the same encoder and need no second one.
+
+**Cost.** Fuel checks on the dispatch loop. No mid-expansion snapshots. The
+resume oracle runs against a buffered host, so the first serialization property
+proves determinism of pure computation plus captured effects — not that a live
+socket survives a move, which is not being claimed.
+
+---
+
+## Errata
+
+Factual corrections to entries whose **decision still stands**. A wrong reason is
+worth fixing even when it reaches the right conclusion, because the reason is
+what gets reused. Superseding an entry over a mistaken sentence would be
+ceremony; errata are the cheaper mechanism, and the affected entry carries a
+pointer line. Where a correction changes a decision, it gets an ADR instead.
+
+**E-1 — ADR-019, WasmGC.** The stated reason is false. WasmGC provides managed
+struct and array references; it does not require lowering guest calls onto the
+WebAssembly call stack, and an interpreter can hold explicit frames in
+GC-managed arrays exactly as it can in linear memory. WasmGC therefore does not
+inherently forfeit constraint #2. The decision stands on different grounds:
+Rust toolchain support, control over layout, ease of producing a canonical
+byte-oriented image, and not depending on host GC behavior.
+
+**E-2 — ADR-001, binary size.** The ~2MB figure is the *standard* Go toolchain's
+wasm floor. TinyGo commonly produces much smaller binaries, so the size gap is
+against one of Go's two toolchains, not Go.
+
+**E-3 — ADR-001, Asyncify.** "TinyGo drags in Asyncify" is too categorical.
+TinyGo uses Asyncify for goroutines on wasm, and its scheduler can be disabled.
+The decision stands — Rust is the working toolchain and the legibility argument
+is independent — but this was never the load-bearing reason.
+
+**E-4 — ADR-001, line count.** "~30% more lines than Go" is a projection, not a
+measurement. No comparable pair has been built.
+
+**E-5 — ADR-006, operand width.** The entry claims monotonic slots avoid a wider
+encoding. They can do the opposite: no reuse raises the maximum live slot index,
+which can push operand fields wider. The decision stands, and the optional
+last-use reuse pass is the fix if it ever bites.
+
+**E-6 — ADR-012, transducers.** "Transducers are faster" is inherited folklore
+here, not something measured on this implementation.
+
+**E-7 — ADR-024, terminology.** "Hygiene" overstates what read-time resolution
+plus gensym provides. Clojure macros are not hygienic in the `syntax-rules`
+sense — a macro author can still construct a capturing symbol deliberately. Read
+the entry as *Clojure-style capture avoidance*, which is what its rejection
+clause already says.

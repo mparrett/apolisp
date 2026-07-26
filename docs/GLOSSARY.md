@@ -9,19 +9,20 @@ project — not a Lisp tutorial.
 **form** vs **value**
 A *form* is a piece of source after reading: the tree the reader produces, which
 carries source metadata (spans) and is what macros consume and produce. A *value*
-is a thing the VM computes with at runtime — the `Value` enum in ADR-010.
+is a thing the VM computes with at runtime — the `Value` enum in ADR-025.
 
 The confusion is legitimate, because in a Lisp they overlap: macros are ordinary
-language functions, so a macro receives a form *as a runtime value*. Whether
-`Form` and `Value` are literally the same Rust type is **Q2, unresolved**. Until
-it is settled, read "form" as *source-shaped data with metadata* and "value" as
-*whatever `Value` is at that moment*.
+language functions, so a macro receives a form *as a runtime value*. **Settled:
+they are the same type** — forms *are* `Value`s (ADR-023). What distinguishes a
+form is not its representation but its company: a value being treated as code
+travels with a span origin beside it (ADR-026). So "form" means *a value the
+reader produced or the expander is treating as code*.
 
 **snapshot** (two unrelated meanings)
 1. *Golden-file snapshot* — a committed expected-output file in `tests/corpus/`.
    Testing sense (`BUILD.md`, rung 3).
-2. *VM snapshot* — serialized machine state from ADR-005: constants, code, frame
-   stack, value slots, cell heap, handle table, intern table.
+2. *VM snapshot* — a serialized `Image`: one `Vm` plus one suspended
+   `Execution` (ADR-029).
 
 They meet in exactly one place: the serialization round-trip property test, which
 compares a resumed VM snapshot's output against golden-file snapshots. Elsewhere,
@@ -63,27 +64,32 @@ code runs; may **not** add VM primitives.
 since macros are language code — which is why compilation is not a pure function
 of source (ADR-004).
 
-**hygiene** — Keeping a macro's introduced symbols from colliding with the call
-site's. Here it rides on symbol *naming* — syntax-quote resolves to qualified
-names at read time — not on form metadata (ADR-024).
+**capture avoidance** — Keeping a macro's introduced symbols from colliding with
+the call site's. Rides on symbol *naming*: syntax-quote resolves to qualified
+names at read time, and gensym supplies the rest (ADR-024). Deliberately *not*
+called hygiene — Clojure-style resolution is weaker than `syntax-rules`, and a
+macro author can still construct a capturing symbol on purpose (erratum E-7).
 
 **span** — A source position: line, column, length. Reader-owned and
-compiler-consumed; language code cannot read or attach one (ADR-023).
+compiler-consumed; language code can neither read nor attach one (ADR-026).
 
-**child_spans** — How spans are stored on forms: a list or vector node holds one
-span per child, so a node's position comes from its parent rather than from
-itself. Covers immediates and heap objects with one mechanism (ADR-023).
+**span origin** — Where a span came from: `Source` (read from a file),
+`Generated` (built by a macro, carrying the call site), or `Unknown`. Origins
+live *outside* the value graph, in a carrier the expander threads alongside code,
+with one origin per syntactic child of every aggregate. Naming `Generated` and
+`Unknown` is what keeps span loss visible instead of silent (ADR-026).
 
 **lineinfo** — Lua's name for the other half: an array parallel to the bytecode
 where `lines[i]` is the span of instruction *i*. What lets a runtime error or
 backtrace report a position at all.
 
-**gensym** — A generated unique symbol, used for hygiene. Must be deterministic
-per compilation unit or golden files flap (`BUILD.md`).
+**gensym** — A generated unique symbol, used for capture avoidance. Must be
+deterministic per compilation unit or golden files flap (`BUILD.md`).
 
 **quasiquote** — Templated form construction (`` ` ``, `~`, `~@`).
 
-**core form** — One of the ~12 closed special forms the compiler knows (ADR-007).
+**core form** — One of the 13 closed special forms the compiler knows (ADR-007,
+ADR-027).
 "Special form" means the same thing; prefer "core form" for the closed set.
 
 **core AST** — The closed representation after macroexpansion, made only of core
@@ -123,24 +129,39 @@ that is the whole simplification.
 enclosing scope, requiring open/closed tracking. Appears in these docs **only as
 the thing ADR-002 deletes**.
 
-**cell** — The one mutable language object (`Value::Cell`). Backs atoms, globals,
-recursive bindings, and hot redefinition. *Not* Rust's `RefCell` — the core uses
-no `RefCell` at all, and the collision is unfortunate.
+**cell** — The one mutable language object. `Value::Cell(CellId)` is an index
+into a VM-owned generational arena, not a pointer; reads and writes go through
+`&mut Vm` (ADR-025). Backs atoms, globals, recursive bindings, and hot
+redefinition. *Not* Rust's `RefCell` — the core uses none, and the name collision
+is unfortunate.
 
 **identity cell** — A cell used to give something a stable identity before its
 value exists; how mutual recursion is resolved (ADR-002).
 
 **task** — A unit of execution with its own frame stack, cycling `Running →
-Waiting(h) → Runnable → Completed | Failed` (ADR-017).
+Waiting(h) → Runnable → Completed | Failed` (ADR-017). v1 has exactly one; the
+scheduler arrives only when a nonblocking adapter does (ADR-029).
 
-**suspend / resume** — Stopping a task at an instruction boundary and continuing
-it later. Because frames are plain data, this is a move, not a capture.
+**suspend / resume** — Stopping execution at an instruction boundary and
+continuing later. Because frames are plain data, this is a move, not a capture.
 
-**migrate** — Serializing a suspended task and resuming it elsewhere. Same
-mechanism as suspension; that identity is the point of ADR-017.
+**fuel** — A budget of instructions. Exhaustion is the v1 suspension trigger, and
+it is what lets a snapshot be taken at an *arbitrary* boundary rather than one
+built for the purpose (ADR-029).
 
-**step limit** — A cap on instructions executed before returning to the host.
-Proposed as the v1 suspension trigger (Q7).
+**Vm / Execution / Image** — The snapshot boundary. `Vm` is the durable
+world (intern table, globals, cell and handle arenas, registry). `Execution` is
+one running computation (frames, slots, pc, handler stack, status, fuel). An
+`Image` is a serializable DTO for one of each — same build, fresh VM, no live
+handles (ADR-029).
+
+**migrate** — Serializing a suspended execution and resuming it elsewhere. The
+same representation as suspension, but not the same capability: v1 stops at
+same-build, fresh-VM resume with live handles refused (ADR-029).
+
+**handler stack** — Where active `try` handlers and pending `finally` blocks
+live: VM-owned, inside the `Execution` image, and discharged before a tail call
+reuses a frame (ADR-028).
 
 ## Host boundary
 
@@ -154,7 +175,8 @@ cannot do itself: files, terminal, network, clocks, randomness.
 silently alias a dead resource. From `slotmap`.
 
 **handle table** — The VM-owned map from handles to live host resources. The one
-part of machine state that is not directly serializable.
+part of VM state that is not serializable — an `Image` containing a live handle
+is refused outright in v1 (ADR-029).
 
 **reacquisition** — What an adapter does to make a handle meaningful again after
 a snapshot moves: reopen the file, redial the socket, or refuse. Every adapter
@@ -170,14 +192,19 @@ many registered functions.
 
 **symbol** — An interned name; compares by `SymId`, not by text.
 
+**CellId / HandleId / BufferId** — Generational arena indices, not pointers. A
+stale one is a typed error rather than a silent alias, and they serialize as
+integers, which is what makes an `Image` ordinary data.
+
 **`SymId`** — A symbol's interned index. Meaningful only relative to the intern
 table it came from, which is why snapshots carry that table (Q9).
 
 **intern table** — The map between symbol text and `SymId`. VM-owned, part of a
 VM snapshot; omitting it is a silent corruption (`TRAPS.md`).
 
-**keyword** — A self-evaluating named constant (`:read`). Used in examples,
-**absent from the `Value` enum** — that is Q3.
+**keyword** — A self-evaluating named constant (`:read`). Its own `Value`
+variant, interned in the same table as symbols but distinct from them, so type
+predicates and printing stay obvious (ADR-025).
 
 **structural equality** — Language `=`: compares contents across collection types.
 Distinct from `Rc` pointer equality, which is identity. Deriving `PartialEq` on
@@ -273,6 +300,10 @@ on optimization work, replacing "profile first" (ADR-021).
 
 **ADR** — Architecture Decision Record: a settled decision with its reasoning,
 cost, and rejected alternatives. Append-only (ADR-022).
+
+**erratum** — A factual correction to an ADR whose decision still stands. Lives
+in `ADR.md`'s Errata section; the entry gets a pointer line. A correction that
+changes the decision gets a superseding ADR instead.
 
 **supersede** — How an ADR changes: write a new entry that replaces it and mark
 the old one. Never edit in place, never bump a version.

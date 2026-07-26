@@ -1,140 +1,121 @@
 # Open questions
 
-Undecided. When one resolves, it becomes an ADR and leaves this file. Sources:
-SPEC v0.1 Part V, plus the spec review of 2026-07-25.
+Undecided, ordered by **the milestone that forces the answer**. When one
+resolves, it becomes an ADR and leaves this file; the number is retired, not
+reused, so gaps are expected.
+
+Sources: SPEC v0.1 Part V, the spec review of 2026-07-25, and the pre-project
+design review of 2026-07-25.
+
+*Resolved: Q1 (→ADR-008 stands, REPL clause deferred), Q2 (→ADR-023, ADR-026),
+Q3 (→ADR-025), Q4 (→ADR-028), Q7 (→ADR-029), Q9 (→ADR-029), Q11 (→ADR-027),
+Q17 (→ADR-027).*
 
 ---
 
-## Blocking now
+## Before milestone 1 — reader, printer, forms
 
-**Q2 — Are forms `Value`s?** *Resolved 2026-07-25 → ADR-023, ADR-024.*
+**Q20 — The v1 semantic surface.**
+"A small Lisp in the Clojure dialect" orients but does not decide. Unspecified
+and about to be filled in differently by whoever writes the code first:
+evaluation order, arity behavior on under/over-supply, duplicate map keys, which
+collection literals exist, characters, sets, variadic functions, exception
+values, and cross-type collection equality.
 
-**Q3 — Keywords.**
-`Value` has no `Keyword` variant, and ADR-016's own example is `(io/open path
-:read)`. Keyword-keyed maps are the most common idiom in the dialect being
-inherited. Separate variant, or interned symbols with a flag bit? Interacts with
-the symbols-vs-strings trap.
+Wanted: **one compact table** — in v1 / deliberately different from Clojure /
+deferred — covering only the edges milestones 1–6 actually hit. Explicitly not a
+grammar, not a standard-library plan. If it starts becoming either, stop.
 
-**Q4 — Tail calls.**
-Never mentioned anywhere in v0.1. No laziness (ADR-012) means iteration is
-recursion; `loop`/`recur` as a macro lowers to a self-call, which is constant
-space only with frame reuse. Under ADR-004 frame reuse is nearly free, but it has
-to be an actual decision. **Blocks Q5.**
+## Before milestone 3 — VM, calls, closures
 
-**Q5 — `loop`/`recur` as macro or core form.**
-Attempt it as a macro first; admit it as a core form only on evidence, from a real
-attempt rather than in advance. Cannot be settled before Q4.
-
----
-
-## Blocking a milestone
-
-**Q1 — Reader table scope in the REPL.** *(Milestone 9)*
-ADR-008 freezes reader config per file. Is a REPL *session* its own parse unit,
-with a freely mutable table? Proposed: yes — mutate freely at the REPL, declare
-at the top of a file. Nothing snapshots a REPL session, so the oracle is
-unaffected, and it is a smaller rule than the current one.
-
-Deliberately left open. ADR-008 as written is sufficient to build the reader:
-what milestone 1 needs is that config is *per parse unit* and frozen for the
-duration, and the code is identical either way — a table parameterized by parse
-unit rather than a global. Only an outright overrule of ADR-008 would change
-milestone 1, and that costs order-dependent `.forms` snapshots, which is the
-failure mode ADR-008 exists to prevent. Answer it with eight milestones of use
-behind you.
-
-**Q6 — Collection representation and transients.** *(Milestone 6)*
-ADR-011 says one representation each and never names it. With ADR-012 making
-reduce-into-a-collection the default idiom, an assoc-vec map with copy-on-`assoc`
-and no transients is O(n²) for the most common operation in the language. Name the
-representation; decide whether transients exist, even if the answer is "not yet."
-
-**Q7 — What does the suspension test suspend on?** *(Milestone 8)*
-v1 is blocking I/O only, so ADR-017 never produces a `Pending`. Proposed: a step
-limit that suspends at an arbitrary instruction boundary — free under ADR-004, and
-a far stronger test than suspending at points built for it. Without this, the
-property test quietly becomes "suspend at the one place we designed for."
-
-**Q8 — Serialization: sharing and cycles.** *(Milestone 8)*
-"Plain data" hides two things. `Rc` graphs mean the canonical encoding must
-preserve DAG structure — a tree walk blows up exponentially on shared structure
-and breaks identity semantics for cells and atoms. And ADR-003 explicitly permits
-cell cycles, on which a tree walk does not terminate.
-
-**Q9 — Migration across builds and into populated VMs.** *(Milestone 8)*
-`SymId` identity is intern-order dependent. Deserializing into a *fresh* VM works
-because the intern table travels; resuming into a *populated* VM needs remapping.
-Separately: must a snapshot survive a bytecode format change? Proposed for both:
-same-build, fresh-VM only. Snapshots are disposable. This is the only place a
-compatibility contract exists at all, so state it rather than inheriting it by
-accident.
-
-**Q10 — Integer overflow semantics.** *(Milestone 3)*
-Wrap, saturate, or throw. Rust panics in debug and wraps in release, so this must
-be explicit or the two builds disagree. Test the release build.
-
-**Q11 — How globals are created.**
-Core forms include `global` (a reference) but nothing that makes one. Presumably
-`def` lowers to a cell write — say which, since it interacts with hot redefinition
-and with what "module-level bindings" means in ADR-002's recursion exception.
-
-**Q12 — Namespaces and modules.**
-`global`, "modules" in VM-owned state (ADR-020), and namespace-qualified symbols
-for hygiene (ADR-009) all presuppose a namespace system that has no design, no
-ADR, and no line in the budget. For a Clojure-alike this is a subsystem.
+**Q10 — Integer overflow semantics.**
+Wrap, saturate, or throw. Rust panics in debug and wraps in release, so this
+must be explicit or the two builds disagree. Test the release build.
 
 **Q13 — Numeric equality and hashing.**
-Does `1` equal `1.0`? Decide with hashing in the same breath — if they compare
-equal they must hash equal, or they must not compare equal.
+Does `1` equal `1.0`? Decide with hashing in the same breath — equal values must
+hash equal. Include `NaN` and `-0.0`, which are where this actually bites.
 
----
+## Before milestone 5 — macros
 
-## Raised by prior art
+**Q12 — When does one namespace stop being enough?**
+ADR-027 fixes v1 at a single namespace with fully qualified interned globals,
+which is what read-time syntax-quote resolution (ADR-024) needs. The open part is
+what forces a real module system, and whether `require`/aliasing can stay a
+library concern over the global table.
 
-**Q17 — Is module-level-only mutual recursion a rule rather than a hedge?**
-ADR-002 says v1 *may* restrict mutual recursion to module-level bindings.
-`../let-rs` supplies the reason to make that binding: its ADR-021 traces the
-`letrec` cycle node by node and concludes no clean fix exists, and its ADR-015
-broke the *globals* cycle only because the Vm outlives every closure and can hold
-the owning reference. Module level is the one shape where the cycle has an owner.
-Related and unpleasant: under identity cells, every self-recursive closure held
-in its own cell is a two-node cycle, so ADR-003's accepted leak is systemic
-rather than exotic — every `defn` leaks unless the VM owns the binding.
+**Q5 — `loop`/`recur`: macro or core form?**
+ADR-028 settles proper tail calls, which is what this was waiting on — a
+self-call in tail position now runs in constant space, so the machinery exists.
+Attempt `loop`/`recur` as a macro over the core forms and admit it as a fourteenth
+special form only on evidence from a real attempt. Note the interaction from
+ADR-028 rule 2: a `recur` inside a `try` with a `finally` is not a tail call, so
+the macro has to either reject that shape or accept the frame.
+
+## Before milestone 6 — collections
+
+**Q6 — Collection representation and transients.**
+ADR-011 says one representation each and still does not name it. With ADR-012
+making reduce-into-a-collection the default idiom, an assoc-vec map with
+copy-on-`assoc` and no transients is O(n²) for the most common operation in the
+language. Name the representation; decide whether transients exist.
+
+## Before milestone 8 — serialization
+
+**Q8 — Sharing in the snapshot encoding.**
+ADR-029 makes the DTO object-id based, which handles cell cycles — they become
+ordinary id edges. What remains: `Rc`-shared immutable structure (strings,
+collections, closures) still needs identity preserved across a round-trip, or a
+snapshot expands shared structure into copies. Decide whether that is a
+correctness requirement or an accepted size cost in v1.
+
+## Before milestone 9 — REPL
+
+**Q1 — Reader table scope in the REPL.**
+ADR-008 freezes reader config per file. Is a REPL *session* its own parse unit,
+with a freely mutable table? Proposed: yes — mutate freely at the REPL, declare
+at the top of a file.
+
+Deliberately left open. ADR-008 as written is sufficient to build the reader:
+config is per parse unit and frozen for the duration, and the code is identical
+either way. Only an outright overrule would change milestone 1, and that costs
+order-dependent `.forms` snapshots — the failure mode ADR-008 exists to prevent.
+
+## No milestone — decide when evidence arrives
 
 **Q18 — Mutation checks as an oracle rung.**
 `../reg-lisp` found a mutant that never restored the compiler's line counter and
-*passed the entire suite*, because every test program had its subexpressions on
-the same line as the enclosing form. The corpus was green and the mechanism was
-dead. Its answer is a `verify.sh mutate` that deletes the load-bearing line and
-shows the test flipping. Our iron rule keeps golden files honest about changes;
-it says nothing about whether a test could ever fail. Cheap to add for a handful
-of load-bearing lines; not worth a general mutation-testing framework.
+*passed its entire suite*, because every test program had subexpressions on the
+same line as the enclosing form. Green corpus, dead mechanism. Its answer is a
+`verify.sh mutate` that deletes the load-bearing line and shows the test
+flipping. Our review-gated rule keeps golden files honest about changes; it says
+nothing about whether a test can fail at all. Worth doing for a handful of
+load-bearing lines — the span-restore path is the obvious first one. Not worth a
+general mutation-testing framework.
 
-**Q19 — Does `Rc` survive contact with the evidence?** *(Reopens ADR-003.)*
-`../wallisp` measured refcounting as the *slowest* of four GC strategies
+**Q19 — Does `Rc` survive contact with the evidence?** *(Would reopen ADR-003.)*
+`../wallisp` measured refcounting as the slowest of four GC strategies
 (~1.1–1.25× worse than mark-sweep, penalty tracking call volume rather than
-allocation), and its refcount engine was not smaller than its mark-sweep engine —
-560 lines against 596. ADR-003 justified `Rc` primarily on line count.
+allocation), and its refcount engine was not smaller — 560 lines against 596.
+ADR-003 justified `Rc` primarily on line count.
 
-Against reversing: in C every value is an arena cell, so tracing is cheap there in
-a way it is not in safe Rust, where the 500–2,000 lines come from walking
-Rust-owned structures. For reversing: ADR-004 hands us a precise root set for
-free, since an explicit frame stack *is* the root set — wallisp's tree-walker had
-to build a shadow stack at every `eval` entry to get what we already have.
+Weakened by ADR-025: with cells as arena ids there is no `Rc` cycle to leak, so
+the strongest practical complaint is gone and what remains is throughput on a
+workload we have not run. Against reversing: in C every value is an arena cell,
+so tracing is cheap there in a way it is not in safe Rust. For reversing: ADR-004
+hands us a precise root set for free.
 
-Under ADR-021 this is a change that reaches every subsystem, so it needs an
-argument rather than a benchmark. This is the beginning of one. Not for v1.
+Under ADR-021 this reaches every subsystem and needs an argument, not a
+benchmark. Not for v1.
 
-## Deferred
-
-**Q14 — The name.** `apolisp` is the repo; `lispylang` was the working name in
-SPEC v0.1; `.xs` is the working extension.
+**Q14 — The name.** `apolisp` is the repo; `lispylang` was the SPEC v0.1 working
+name; `.xs` is the working extension.
 
 **Q15 — Multimethods.** Likely the right dispatch mechanism — they subsume
 protocols and records at a cost recoverable via inline caching — but not scoped
 for v1.
 
-**Q16 — Differential testing against Babashka.** Worth scoping explicitly before
-building. With no laziness, no bignum promotion, and possibly no keywords, the
-overlapping subset shrinks fast; it may be worth it for arithmetic and core-fn
-edge cases only.
+**Q16 — Differential testing against Babashka.** Scope explicitly before
+building. With no laziness, no bignum promotion, and a deliberately different
+numeric tower, the overlapping subset shrinks fast; it may be worth it for
+arithmetic and core-fn edge cases only.

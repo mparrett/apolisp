@@ -115,6 +115,25 @@ hands us a precise root set for free.
 Under ADR-021 this reaches every subsystem and needs an argument, not a
 benchmark. Not for v1.
 
+**Q21 — What the line budget counts, and at what granularity.**
+Measured at milestone 1: `src/main.rs` is 902 lines total, 731 code, ~19%
+comments and blanks. The test counts every line, which matches constraint #1 as
+stated — it is a context-window constraint, and a comment occupies the window
+like anything else. Two consequences nobody has ruled on:
+
+- The per-layer targets in `BUILD.md` read like *code* estimates, so a 5,300
+  total budget is really ~4,300 lines of code. Either say "total, comments
+  included" out loud and accept it, or lift the total to restore the headroom.
+- Counting comments taxes exactly the why-comments that make the core holdable,
+  and a good one probably saves context by preventing a re-derivation. Not fatal
+  at 19%; it does argue against tightening the budget to force compression.
+
+Also: the printer has no budget row (100 lines with nowhere to live — it likely
+belongs with the reader, which the round-trip property already pairs it with),
+and the assertion is a single global total, so one layer could eat another's
+budget with the test green at 902/5,300. That is the same shape of dead check
+the Q18 mutation run found in the span tests.
+
 **Q14 — The name.** `apolisp` is the repo; `lispylang` was the SPEC v0.1 working
 name; `.xs` is the working extension.
 

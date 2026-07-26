@@ -15,14 +15,7 @@ and it is smaller than the current rule. The alternative under consideration was
 overruling ADR-008 outright; that makes `.forms` snapshots session-ordered, which
 is the failure mode ADR-008 exists to prevent.
 
-**Q2 — Are forms `Value`s?**
-`form` and `value` are separate modules, `Value` has no `Form` variant and no
-metadata slot — but macros are language functions running in the VM, so they
-receive and return forms *as values*. Either forms are `Value`s (and ADR-009's
-metadata needs a home in that enum or a side table), or there is a Form↔Value
-conversion at every macro boundary, which is exactly where source spans die.
-ADR-009 is unimplementable until this is settled, and it gets expensive to change
-once the reader and expander exist. **Decide first.**
+**Q2 — Are forms `Value`s?** *Resolved 2026-07-25 → ADR-023, ADR-024.*
 
 **Q3 — Keywords.**
 `Value` has no `Keyword` variant, and ADR-016's own example is `(io/open path
@@ -89,6 +82,42 @@ Does `1` equal `1.0`? Decide with hashing in the same breath — if they compare
 equal they must hash equal, or they must not compare equal.
 
 ---
+
+## Raised by prior art
+
+**Q17 — Is module-level-only mutual recursion a rule rather than a hedge?**
+ADR-002 says v1 *may* restrict mutual recursion to module-level bindings.
+`../let-rs` supplies the reason to make that binding: its ADR-021 traces the
+`letrec` cycle node by node and concludes no clean fix exists, and its ADR-015
+broke the *globals* cycle only because the Vm outlives every closure and can hold
+the owning reference. Module level is the one shape where the cycle has an owner.
+Related and unpleasant: under identity cells, every self-recursive closure held
+in its own cell is a two-node cycle, so ADR-003's accepted leak is systemic
+rather than exotic — every `defn` leaks unless the VM owns the binding.
+
+**Q18 — Mutation checks as an oracle rung.**
+`../reg-lisp` found a mutant that never restored the compiler's line counter and
+*passed the entire suite*, because every test program had its subexpressions on
+the same line as the enclosing form. The corpus was green and the mechanism was
+dead. Its answer is a `verify.sh mutate` that deletes the load-bearing line and
+shows the test flipping. Our iron rule keeps golden files honest about changes;
+it says nothing about whether a test could ever fail. Cheap to add for a handful
+of load-bearing lines; not worth a general mutation-testing framework.
+
+**Q19 — Does `Rc` survive contact with the evidence?** *(Reopens ADR-003.)*
+`../wallisp` measured refcounting as the *slowest* of four GC strategies
+(~1.1–1.25× worse than mark-sweep, penalty tracking call volume rather than
+allocation), and its refcount engine was not smaller than its mark-sweep engine —
+560 lines against 596. ADR-003 justified `Rc` primarily on line count.
+
+Against reversing: in C every value is an arena cell, so tracing is cheap there in
+a way it is not in safe Rust, where the 500–2,000 lines come from walking
+Rust-owned structures. For reversing: ADR-004 hands us a precise root set for
+free, since an explicit frame stack *is* the root set — wallisp's tree-walker had
+to build a shadow stack at every `eval` entry to get what we already have.
+
+Under ADR-021 this is a change that reaches every subsystem, so it needs an
+argument rather than a benchmark. This is the beginning of one. Not for v1.
 
 ## Deferred
 

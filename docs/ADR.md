@@ -203,6 +203,8 @@ table — Q1.
 
 ### ADR-009 — Metadata on forms from day one
 
+*Refined by ADR-023 (how spans are stored). Hygiene half superseded by ADR-024.*
+
 **Decision.** Every form carries metadata. Source spans are populated by the
 reader and preserved through macroexpansion.
 
@@ -537,3 +539,92 @@ cheap, that is a real signal and the answer is an index at the top, not a purge.
 a directory walk to answer any question that spans two of them. *Amending entries
 in place* — loses the trail, which is the only thing the log is for. *Version
 bumps* — see above.
+
+---
+
+### ADR-023 — Spans live on the parent, indexed by child; and on code, indexed by instruction
+
+*(New, 2026-07-25. Resolves Q2. Refines ADR-009.)*
+
+**Decision.** Forms **are** `Value`s. There is no separate `Form` type and no
+conversion at the macro boundary.
+
+Source position has two halves, and both are positional rather than attached:
+
+1. **Forms.** A list or vector node carries `child_spans: Rc<[Span]>`, one entry
+   per child. A node's span comes from its *parent*, indexed by its position; the
+   root carries its own. Immediates and heap objects are covered by one
+   mechanism, with no `Option` and no metadata field on `SymObj` or `StrObj`.
+2. **Code.** The compiler emits a `lines` array parallel to the bytecode:
+   `lines[i]` is the span of the instruction at `i`. Without this, runtime errors
+   and backtraces have no position to report and the disassembler has none to
+   print.
+
+Metadata is reader-owned and compiler-consumed. Language code cannot read a
+span or attach its own; there is no `with-meta` in v1.
+
+**Why.** Forms-are-values is what "inherit Clojure's surface" means for macros —
+quasiquote is list construction, `map` over a form works, and no accessor API has
+to be invented. It also serializes for free: macroexpansion runs in the VM
+(ADR-004), so a snapshot can contain forms mid-expansion, and a separate `Form`
+type would need a second encoder for constraint #2.
+
+The parent-indexed trick is what makes that affordable. The naive version of
+forms-are-values (Clojure's `IObj`, metadata on heap objects) cannot attach a
+span to `Sym(SymId)` or `Int(i64)`, because they are immediates — and a symbol
+occurrence is exactly what an unresolved-var or arity error wants to point at.
+The alternative, `Sym(Rc<SymObj>)`, buys that back at the price of an allocation
+per symbol occurrence and a deref on the hottest comparison in the compiler.
+Storing child spans on the parent gets symbol precision while `Value` stays 24
+bytes (ADR-010) and symbol equality stays an integer compare.
+
+The second half is not optional. reg-lisp carries `Line`/`Col` on its AST *and*
+a `lines` array parallel to bytecode, and needed both; we had specified only the
+first (`PRIOR-ART.md`).
+
+**Cost.** A form detached from its parent loses its span. This is not a new
+failure mode — anything a macro rebuilds already loses spans — but it makes the
+rule uniform rather than incidental, and it means "span" is a property of a
+position in a tree, not of a value.
+
+The compiler's input type is not closed: a macro can return a closure or a handle
+into code position, so the compiler needs a runtime check and a decent error for
+"this isn't code." Roughly a dozen match arms and one error message.
+
+**Rejected.** *A separate `Form` type with `Value::Form`* — every node gets a
+`Meta` slot with no `Option`, which is the best error story available, but it
+costs a second enum, a second printer, a second serializer, a quasiquote written
+against `Form`, and it abandons Clojure's macro surface. It also blows the
+600-line reader/forms budget. *Conversion at each macro boundary* — spans die on
+the return trip, plus a full tree conversion per macro call; reg-lisp's
+`valueToNode` had to become iterative on both axes and cap nesting depth
+(ADR-013 there). *`Sym(Rc<SymObj>)`* — see above. *Metadata visible to language
+code* — Clojure says yes and pays for it everywhere; nothing in v1 needs it.
+
+---
+
+### ADR-024 — Hygiene rides on symbol naming, not on metadata
+
+*(New, 2026-07-25. Supersedes the hygiene half of ADR-009.)*
+
+**Decision.** Macro hygiene is a property of symbol *identity*, not of form
+metadata. Syntax-quote resolves symbols to fully-qualified names at read time,
+and gensym supplies the rest. Form metadata carries spans and nothing else.
+
+**Why.** ADR-009 justified metadata with two requirements at once — error
+messages and namespace-qualified symbols for hygiene — and claimed they ride on
+the same mechanism. They do not. Clojure resolves syntax-quoted symbols at read
+time; hygiene is in the interned name before any metadata is consulted.
+
+Unbundling them matters because the two have different standards. Hygiene is
+load-bearing for correctness: a macro that captures a binding is broken, not
+merely unhelpful. Spans are best-effort and degrade gracefully. Fusing them made
+the metadata mechanism look like it had to be total and precise, which is what
+made the expensive options in Q2 look necessary.
+
+**Cost.** Read-time resolution means syntax-quote needs the current namespace,
+so the reader is namespace-aware — a real coupling, and it lands on Q12.
+
+**Rejected.** Full hygienic macro expansion in the `syntax-rules` sense. Clojure's
+resolve-plus-gensym is weaker, well-understood, and the surface we said we would
+inherit.

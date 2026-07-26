@@ -87,6 +87,17 @@ detail:
 - **Differential testing.** For the subset that overlaps Clojure semantics, diff
   against Babashka. Scope before building — see Q16.
 
+## Pre-registration
+
+Before running a benchmark, write down what you expect and why. Afterwards,
+record whether it was refuted. ADR-021 removes the gate on optimization work;
+pre-registration is what turns that freedom into knowledge rather than folklore —
+and the interesting results are the refutations. `../wallisp` runs this way, and
+several of its headline findings are its own hypotheses being falsified
+(`PRIOR-ART.md`).
+
+Two lines in a commit message is enough. This is a habit, not a document.
+
 ## Two rules
 
 **The oracle is append-only.** No golden file is regenerated to go green without a

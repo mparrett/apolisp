@@ -64,7 +64,19 @@ since macros are language code — which is why compilation is not a pure functi
 of source (ADR-004).
 
 **hygiene** — Keeping a macro's introduced symbols from colliding with the call
-site's. Here it rides on namespace-qualified symbols in form metadata (ADR-009).
+site's. Here it rides on symbol *naming* — syntax-quote resolves to qualified
+names at read time — not on form metadata (ADR-024).
+
+**span** — A source position: line, column, length. Reader-owned and
+compiler-consumed; language code cannot read or attach one (ADR-023).
+
+**child_spans** — How spans are stored on forms: a list or vector node holds one
+span per child, so a node's position comes from its parent rather than from
+itself. Covers immediates and heap objects with one mechanism (ADR-023).
+
+**lineinfo** — Lua's name for the other half: an array parallel to the bytecode
+where `lines[i]` is the span of instruction *i*. What lets a runtime error or
+backtrace report a position at all.
 
 **gensym** — A generated unique symbol, used for hygiene. Must be deterministic
 per compilation unit or golden files flap (`BUILD.md`).
@@ -235,6 +247,12 @@ divergence. Merge is not release.
 
 **flapping** — A golden file that changes without the code changing, usually from
 nondeterminism. Flapping files get disabled, and disabled files mean no oracle.
+
+**mutation check** — Deliberately breaking a load-bearing line to confirm a test
+actually fails. Proves a test *can* fail, which a passing suite does not (Q18).
+
+**pre-registration** — Writing down what you expect from a benchmark before
+running it, then recording whether it was refuted (`BUILD.md`).
 
 ## Project vocabulary
 

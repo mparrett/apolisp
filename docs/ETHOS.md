@@ -60,6 +60,7 @@ multithreaded execution within one VM.
 - Line budget, build order, and the oracle: `BUILD.md`.
 - Known semantic landmines: `TRAPS.md`.
 - Overloaded and unfamiliar terms: `GLOSSARY.md`.
+- What the sibling repos already measured: `PRIOR-ART.md`.
 
 The four-snapshot golden corpus is the load-bearing piece of process. It is what
 makes reckless optimization safe, and it is the mechanism behind being able to

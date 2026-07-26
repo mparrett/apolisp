@@ -45,3 +45,14 @@ panics must never cross the VM loop.
 
 **Laziness assumptions.** Ported Clojure idioms may assume lazy evaluation. Eager
 `map` over an infinite generator hangs rather than erroring.
+
+**Host-stack recursion does not fail cleanly.** If anything ever re-enters the VM
+by recursing instead of trampolining (ADR-004), the failure on wasm is not a
+depth limit. `../reg-lisp` documents a case where an interpreter overran a 64 KB
+wasm stack and wrote *past* it into adjacent static memory — it presented as the
+reader's macro map corrupting, and cost three sessions. Symptoms appear in an
+unrelated subsystem.
+
+**Tagged integers do not have the obvious range.** `../wallisp`'s fixnums turned
+out to be 30-bit rather than 32-bit, and it surfaced only under a benchmark. If
+integers are ever tagged, write down the real range and test its edges.

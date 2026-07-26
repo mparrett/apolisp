@@ -33,6 +33,11 @@ No code yet. What exists is the design, and it is meant to be read in this order
   choices. Useful for understanding *why* an ADR went the way it did; not
   required to implement anything.
 
+## Working notes
+
+- **`docs/notes/`** — retrospectives and process notes tied to a milestone.
+  Evidence about how the loop is going, not instruction about what to build.
+
 ## Not normative
 
 - **`docs/archive/`** — superseded reviews, kept for the reasoning trail. They

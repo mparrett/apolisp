@@ -1,0 +1,9 @@
+[package]
+name = "apolisp"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+
+[profile.release]
+overflow-checks = true   # Q10 is open; until it is decided, debug and release must not disagree

@@ -1,0 +1,15 @@
+44..47 nil nil
+48..52 bool true
+53..58 bool false
+59..60 int 0
+61..64 int -17
+65..68 float 1.5
+69..74 float -0.25
+75..85 string "a string"
+86..108 string "escapes: \" \\ \n \t"
+109..112 symbol sym
+113..114 symbol +
+115..129 symbol some/qualified
+130..138 keyword :keyword
+139..152 keyword :ns/qualified
+ok: span invariants hold

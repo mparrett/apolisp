@@ -1,0 +1,18 @@
+89..91 list (quote x)
+  89..90 symbol quote
+  90..91 symbol x
+92..100 list (quote (1 2 3))
+  92..93 symbol quote
+  93..100 list (1 2 3)
+    94..95 int 1
+    96..97 int 2
+    98..99 int 3
+101..109 list (quote (quote nested))
+  101..102 symbol quote
+  102..109 list (quote nested)
+    102..103 symbol quote
+    103..109 symbol nested
+110..119 list (quote x)
+  111..116 symbol quote
+  117..118 symbol x
+ok: span invariants hold

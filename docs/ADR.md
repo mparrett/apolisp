@@ -238,7 +238,7 @@ ADR is unimplementable until that is settled.
 
 *Superseded by ADR-025. The asserted size survives; the enum below is missing
 `Keyword`, `Bytes`, and `Buffer`, and its `Cell(Rc<Cell>)` is unimplementable
-alongside ADR-020.*
+alongside ADR-020. Size reasoning corrected by erratum E-8.*
 
 **Decision.** Plain Rust enum, `Rc` payloads, no NaN-boxing. A test asserts
 `size_of::<Value>() <= 24`. Construction goes through constructor functions so
@@ -737,7 +737,8 @@ leak, so the case against refcounting loses most of its force.
 ### ADR-026 — Span origins: positional, total, and explicit about generated code
 
 *(New, 2026-07-26. Supersedes ADR-009. Supersedes the span mechanism in ADR-023;
-its forms-are-values decision stands. From the pre-project review, P0.3.)*
+its forms-are-values decision stands. From the pre-project review, P0.3. Carrier
+shape corrected by erratum E-9.)*
 
 **Decision.** Forms remain `Value`s (ADR-023). Spans live *outside* the value
 graph, in a carrier the reader and expander thread alongside any value they treat
@@ -975,3 +976,23 @@ plus gensym provides. Clojure macros are not hygienic in the `syntax-rules`
 sense — a macro author can still construct a capturing symbol deliberately. Read
 the entry as *Clojure-style capture avoidance*, which is what its rejection
 clause already says.
+
+**E-8 — ADR-010/ADR-025, `Value` size.** The predicted 24 bytes assumed
+`Rc<str>` and `Rc<[T]>`, which are fat pointers. The implementation uses
+`Rc<StrObj>` and `Rc<ListObj>` — thin pointers to sized structs — so `Value` is
+**16 bytes**. The `<= 24` assertion stands and passes with room; the reasoning
+in ADR-010's cost paragraph does not. Measured at milestone 1, `apolisp sizes`.
+
+**E-9 — ADR-026, the shape of the carrier.** The sketch reads
+`LocatedForm { root: Value, origin: SpanOrigin }`, one origin, alongside "every
+aggregate holds one origin per syntactic child." Those cannot both be one
+struct. The implemented carrier is a tree mirroring the value tree:
+
+```rust
+struct Origins { origin: SpanOrigin, children: Vec<Origins> }
+struct LocatedForm { root: Value, origins: Origins }
+```
+
+A map contributes two children per pair, key then value. The decision is
+unchanged — origins live outside the value graph, positionally, covering
+immediates — but the single-field sketch was not implementable as written.

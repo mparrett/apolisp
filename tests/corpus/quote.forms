@@ -1,0 +1,4 @@
+(quote x)
+(quote (1 2 3))
+(quote (quote nested))
+(quote x)

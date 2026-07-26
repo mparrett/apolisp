@@ -1,0 +1,4 @@
+121..145 list (println "hello, world")
+  122..129 symbol println
+  130..144 string "hello, world"
+ok: span invariants hold

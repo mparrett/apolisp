@@ -238,25 +238,68 @@ fn forms_snapshots_match() {
 // --- Constraint #1 ----------------------------------------------------------
 
 /// The line budget is the only governing constraint with no test (BUILD.md).
-/// This is that test. It counts what the budget counts: core source, excluding
-/// tests and tooling.
+/// This is that test.
+///
+/// Every line counts, comments and blanks included: constraint #1 is about what
+/// has to be held at once (ADR-030). Only the total is asserted — per-layer
+/// numbers print, because a hard check at 300-line granularity would be false
+/// precision. The question a layer answers is "did this double," not "is this
+/// 40 over."
 #[test]
 fn core_stays_within_the_line_budget() {
-    const BUDGET: usize = 5_300;
+    // An order of magnitude, not a threshold. Over budget is an ADR, not a
+    // nudge to this constant.
+    const BUDGET: usize = 7_000;
+
     let mut src = repo_root();
     src.push("src");
+    let mut files: Vec<PathBuf> = std::fs::read_dir(&src)
+        .unwrap()
+        .filter_map(|e| e.ok().map(|e| e.path()))
+        .filter(|p| p.extension().is_some_and(|e| e == "rs"))
+        .collect();
+    files.sort();
+
     let mut total = 0;
-    for entry in std::fs::read_dir(&src).unwrap() {
-        let p = entry.unwrap().path();
-        if p.extension().is_some_and(|e| e == "rs") {
-            total += std::fs::read_to_string(&p).unwrap().lines().count();
+    let mut report = String::new();
+    for path in &files {
+        let text = std::fs::read_to_string(path).unwrap();
+        total += text.lines().count();
+        for (name, n) in layers(&text) {
+            report.push_str(&format!("  {name:<10} {n:5}\n"));
         }
     }
+    eprintln!("core: {total}/{BUDGET} lines (ADR-030)\n{report}");
+
     assert!(
         total <= BUDGET,
-        "core is {total} lines against a budget of {BUDGET} (BUILD.md)"
+        "core is {total} lines against a budget of ~{BUDGET} (BUILD.md, ADR-030).\n\
+         Raising this constant is an ADR, not an edit.\n{report}"
     );
-    eprintln!("core: {total}/{BUDGET} lines");
+}
+
+/// Split a file into its inline `pub mod` sections. Reporting only — the
+/// boundaries survive extraction into files, at which point this reads the
+/// filenames instead (ADR-015).
+fn layers(text: &str) -> Vec<(String, usize)> {
+    let lines: Vec<&str> = text.lines().collect();
+    let mut marks: Vec<(usize, String)> = Vec::new();
+    for (i, l) in lines.iter().enumerate() {
+        if let Some(rest) = l.strip_prefix("pub mod ") {
+            if let Some(name) = rest.strip_suffix(" {") {
+                marks.push((i, name.to_string()));
+            }
+        }
+    }
+    let mut out = Vec::new();
+    if let Some((first, _)) = marks.first() {
+        out.push(("(driver)".to_string(), *first));
+    }
+    for (k, (start, name)) in marks.iter().enumerate() {
+        let end = marks.get(k + 1).map(|(i, _)| *i).unwrap_or(lines.len());
+        out.push((name.clone(), end - start));
+    }
+    out
 }
 
 #[test]

@@ -2,24 +2,32 @@
 
 ## Line budget
 
+Every line counts — comments and blanks included, because constraint #1 is about
+what has to be held at once, and a comment occupies the window like anything else
+(ADR-030).
+
 | Layer | Target |
 |---|---:|
-| Reader, forms, metadata | 600 |
-| Macro expansion | 600 |
-| Core AST, lowering, bytecode compiler | 1,100 |
-| VM: frames, calls, closures, errors | 1,100 |
-| Values, collections, strings, bytes | 900 |
-| Host handle table + blocking I/O | 500 |
-| REPL, disassembler, diagnostics | 500 |
-| **Total core** | **5,300** |
+| Reader, printer, forms, metadata | 900 |
+| Macro expansion | 800 |
+| Core AST, lowering, bytecode compiler | 1,400 |
+| VM: frames, calls, closures, errors | 1,400 |
+| Values, collections, strings, bytes | 1,200 |
+| Host handle table + blocking I/O | 700 |
+| REPL, disassembler, diagnostics | 600 |
+| **Total core** | **~7,000** |
+
+**These are orders of magnitude.** ±1,000 on the total is noise; the rows are
+guidance. Only the total is asserted, and the per-layer numbers print on every
+run so the shape stays visible. The question a row answers is "did this subsystem
+double," never "is this 40 lines over."
+
+The budget is hard and amendable by ADR. Over budget is a decision to record in a
+new entry, not a number to nudge or a test to silence.
 
 Tests, host adapters (HTTP, terminal, JSON), and tooling live **outside** this
 budget. The boundary is the point: *substantial host capability is a Rust library
 behind the handle table, not a language subsystem.*
-
-Constraint #1 is the only governing constraint with no test. A per-module
-line-count assertion is ~20 lines and turns this table into an oracle rung; add it
-once there are two modules.
 
 ## Build order
 

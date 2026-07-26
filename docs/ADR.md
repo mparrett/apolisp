@@ -935,6 +935,52 @@ about a live socket surviving a move.
 
 ---
 
+### ADR-030 — The line budget counts every line, and is an order-of-magnitude target
+
+*(New, 2026-07-26. Amends the budget in `BUILD.md`. Resolves Q21.)*
+
+**Decision.** Three parts:
+
+1. **Everything counts.** Comments and blank lines are in the budget alongside
+   code. The unit is lines of file, not lines of code.
+2. **The number is an order of magnitude, not a threshold.** The core is a
+   single-digit-thousands artifact. The working total is **~7,000 lines**, and
+   ±1,000 is noise. Only the total is asserted; the per-layer rows are guidance
+   and are reported rather than enforced.
+3. **Budgets are hard, and amendable by ADR.** Going over is not a test to
+   silence or a number to nudge — it is a decision, made deliberately, in a new
+   entry that says what grew and why.
+
+**Why.** Constraint #1 is a context-window constraint, so the thing being
+measured is how much has to be held at once. A comment occupies the window like
+anything else, and counting code alone would make the number stop measuring the
+constraint it exists for.
+
+But the 3,000–5,000 figure this project started from assumed minimal comments.
+Counting comments against it without raising it was a silent ~20% cut that
+nobody chose — milestone 1 measured 19% comments and blanks, and denser
+subsystems will run higher. The revised total restores the code headroom the
+layer table always meant, and states the counting rule out loud.
+
+The order-of-magnitude framing is the part that matters most. Whether the core
+is 5,000 lines or 7,000 does not change whether one engineer and one model can
+hold it; whether it is 7,000 or 70,000 decides it. Precision past the nearest
+thousand is false, and a budget that reads as exact invites arguing about 40
+lines instead of noticing a subsystem that doubled.
+
+**Cost.** With only the total asserted, a bloated layer can hide inside a lean
+one. Accepted: per-layer assertions at 300-line granularity would be false
+precision, and would generate ADR churn for rebalancing that carries no meaning.
+Per-layer numbers are printed on every run, so the shape stays visible even
+though it is not enforced.
+
+**Rejected.** *Counting code only* — stops measuring the constraint. *Per-layer
+hard assertions* — see cost. *Keeping the total at 5,300 with comments counted*
+— a fifth of the budget removed by accident rather than by decision, and it
+taxes exactly the why-comments that make the core holdable.
+
+---
+
 ## Errata
 
 Factual corrections to entries whose **decision still stands**. A wrong reason is

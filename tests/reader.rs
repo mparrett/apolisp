@@ -157,6 +157,41 @@ fn span_invariants_hold_over_corpus() {
     }
 }
 
+/// The arity half of the span invariants is checkable structurally; the *values*
+/// are not, so they get pinned as goldens instead (ADR-026 point 3).
+///
+/// This exists because a mutation check proved the structural test alone was
+/// dead: making every origin `Unknown`, or forcing every span to start at 0,
+/// left the whole suite green. That is the `../reg-lisp` failure from
+/// `PRIOR-ART.md`, reproduced here before anything depended on it.
+#[test]
+fn spans_snapshots_match() {
+    let mut missing = Vec::new();
+    let mut diffs = Vec::new();
+
+    for path in corpus_files() {
+        let out = Command::new(bin())
+            .arg("spans")
+            .arg(&path)
+            .output()
+            .expect("failed to run apolisp");
+        assert!(out.status.success(), "{}: spans failed", path.display());
+        let actual = String::from_utf8_lossy(&out.stdout).into_owned();
+        let golden = path.with_extension("spans");
+        match std::fs::read_to_string(&golden) {
+            Err(_) => missing.push(golden),
+            Ok(expected) if expected != actual => diffs.push(format!(
+                "--- {}\nexpected:\n{expected}\nactual:\n{actual}",
+                golden.display()
+            )),
+            Ok(_) => {}
+        }
+    }
+
+    assert!(missing.is_empty(), "missing span goldens: {missing:?}");
+    assert!(diffs.is_empty(), "{}", diffs.join("\n"));
+}
+
 // --- Golden snapshots -------------------------------------------------------
 
 /// Rung 3 (BUILD.md). One phase per file; milestone 1 owns `.forms`.

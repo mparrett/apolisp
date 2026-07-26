@@ -83,7 +83,14 @@ order-dependent `.forms` snapshots — the failure mode ADR-008 exists to preven
 
 ## No milestone — decide when evidence arrives
 
-**Q18 — Mutation checks as an oracle rung.**
+**Q18 — Mutation checks as an oracle rung.** *(Evidence arrived — milestone 1.)*
+Run against milestone 1's own span tests, two of three mutants survived: every
+origin could be `Unknown`, or every span could start at byte 0, with the suite
+staying green. Only arity was actually checked. Fixed by adding `.spans`
+goldens, which ADR-026 had already specified and the implementation had skipped.
+See `docs/notes/milestone-1-pilot.md`. The question is now whether this becomes
+a standing rung rather than whether it is worth doing once.
+
 `../reg-lisp` found a mutant that never restored the compiler's line counter and
 *passed its entire suite*, because every test program had subexpressions on the
 same line as the enclosing form. Green corpus, dead mechanism. Its answer is a

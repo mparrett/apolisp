@@ -27,7 +27,7 @@ Each milestone is a runnable artifact.
 
 | # | Milestone | Exit condition |
 |---:|---|---|
-| 1 | Reader + printer + forms with span origins | Round-trip + span-invariants properties pass |
+| 1 | Reader + printer + forms with span origins | **Done** (`8149c8e`) — round-trip + span-invariants properties pass |
 | 2 | Core AST + slot compiler + disassembler | Golden `.disasm` for hand-written forms |
 | 3 | VM: frames, calls, closures, `if`/`let`/`fn`, tail calls | `smoke.sh` runs a recursive function; a tail loop runs in constant space |
 | 4 | Errors, `try`/`throw`/`finally`, handler stack | Failure transcripts in the corpus; cleanup runs exactly once |

@@ -55,10 +55,11 @@ multithreaded execution within one VM.
 ## What keeps this holdable
 
 - Settled decisions: `ADR.md`, append-only. Supersede, never amend. No version
-  bumps, no governance.
+  bumps, no governance (ADR-022).
 - Undecided decisions: `QUESTIONS.md`.
 - Line budget, build order, and the oracle: `BUILD.md`.
 - Known semantic landmines: `TRAPS.md`.
+- Overloaded and unfamiliar terms: `GLOSSARY.md`.
 
 The four-snapshot golden corpus is the load-bearing piece of process. It is what
 makes reckless optimization safe, and it is the mechanism behind being able to

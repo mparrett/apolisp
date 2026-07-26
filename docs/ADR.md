@@ -6,7 +6,8 @@ version bumps and no amendment procedure — the point is not stability, it is n
 re-deriving last month's reasoning badly.
 
 Each entry: **decision · why · cost · rejected**. Every entry below is Active
-unless marked otherwise.
+unless marked otherwise. The rationale for this format is ADR-022; unfamiliar
+terms are in `GLOSSARY.md`.
 
 ADR-001 through ADR-015 are ported from SPEC v0.1 Part III (commit `c494f2a`).
 ADR-016 through ADR-020 are ported from SPEC v0.1 Part II, where they were
@@ -501,3 +502,38 @@ acceptable price for not having to ask permission.
 
 **Rejected.** SPEC v0.1's flat "deferred until profiling names a specific
 pressure" list, which collapsed three different gates into one.
+
+---
+
+### ADR-022 — Decisions live in one append-only file
+
+*(New, 2026-07-25.)*
+
+**Decision.** This file. One document, entries appended in number order, never
+reordered. To change a decision, add a new entry that supersedes the old one and
+add a `Superseded by ADR-NNN` line to the old entry — that line is the only edit
+a past entry ever receives. No version bumps, no amendment procedure, no approval
+step.
+
+A decision earns an entry when reversing it would touch more than one subsystem,
+or when the reasoning is something we would otherwise re-derive badly in three
+months. Everything else is just code, and code is cheap to change.
+
+**Why.** One file is one read, with no directory to walk — the same reason the
+source is one file (ADR-015), and constraint #1 applied to prose. Append-only is
+what makes the freedom clause safe to exercise: breaking the language on a Tuesday
+costs nothing, but silently losing *why* Monday's version existed costs a
+re-derivation every time the question resurfaces. Supersession keeps that trail
+without acquiring a governance process, which is what SPEC v0.1's "amendments are
+deliberate acts with a version bump" was — governance language written for a
+language with users, of which there are none.
+
+**Cost.** The file grows monotonically and superseded entries stay in it, so
+reading front-to-back eventually means skimming past dead decisions. The status
+line at the top of a superseded entry is what keeps that cheap. If it stops being
+cheap, that is a real signal and the answer is an index at the top, not a purge.
+
+**Rejected.** *A `decisions/NNN-*.md` directory* — more files than decisions, and
+a directory walk to answer any question that spans two of them. *Amending entries
+in place* — loses the trail, which is the only thing the log is for. *Version
+bumps* — see above.

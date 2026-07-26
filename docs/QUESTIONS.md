@@ -7,14 +7,6 @@ SPEC v0.1 Part V, plus the spec review of 2026-07-25.
 
 ## Blocking now
 
-**Q1 — Reader table scope in the REPL.**
-ADR-008 freezes reader config per file. Is a REPL *session* its own parse unit,
-with a freely mutable table? Proposed: yes — mutate freely at the REPL, declare at
-the top of a file. Nothing snapshots a REPL session, so the oracle is unaffected,
-and it is smaller than the current rule. The alternative under consideration was
-overruling ADR-008 outright; that makes `.forms` snapshots session-ordered, which
-is the failure mode ADR-008 exists to prevent.
-
 **Q2 — Are forms `Value`s?** *Resolved 2026-07-25 → ADR-023, ADR-024.*
 
 **Q3 — Keywords.**
@@ -36,6 +28,20 @@ attempt rather than in advance. Cannot be settled before Q4.
 ---
 
 ## Blocking a milestone
+
+**Q1 — Reader table scope in the REPL.** *(Milestone 9)*
+ADR-008 freezes reader config per file. Is a REPL *session* its own parse unit,
+with a freely mutable table? Proposed: yes — mutate freely at the REPL, declare
+at the top of a file. Nothing snapshots a REPL session, so the oracle is
+unaffected, and it is a smaller rule than the current one.
+
+Deliberately left open. ADR-008 as written is sufficient to build the reader:
+what milestone 1 needs is that config is *per parse unit* and frozen for the
+duration, and the code is identical either way — a table parameterized by parse
+unit rather than a global. Only an outright overrule of ADR-008 would change
+milestone 1, and that costs order-dependent `.forms` snapshots, which is the
+failure mode ADR-008 exists to prevent. Answer it with eight milestones of use
+behind you.
 
 **Q6 — Collection representation and transients.** *(Milestone 6)*
 ADR-011 says one representation each and never names it. With ADR-012 making

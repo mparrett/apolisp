@@ -2,8 +2,8 @@
 
 **Append-only.** To change a decision, add a new entry that supersedes the old
 one. Do not edit a past entry except to add a `Superseded by` line. There are no
-version bumps and no amendment procedure — the point is not stability, it is not
-re-deriving last month's reasoning badly.
+version bumps and no amendment procedure. The point is not stability — it is
+never having to re-derive last month's reasoning.
 
 Each entry: **decision · why · cost · rejected**. Every entry below is Active
 unless marked otherwise. The rationale for this format is ADR-022; unfamiliar
@@ -510,8 +510,8 @@ ADR-005 possible — you cannot snapshot state you do not own.
 
 *(New, 2026-07-25, from the ethos review.)*
 
-**Decision.** "Measure before optimizing" is not the rule here. The gate on an
-optimization is how far it reaches and whether it is reversible:
+**Decision.** An optimization is gated by how far it reaches and whether it is
+reversible:
 
 | Class | Examples | Gate |
 |---|---|---|
@@ -519,7 +519,8 @@ optimization is how far it reaches and whether it is reversible:
 | Large but self-contained | tiered collections (~1,200 lines) | The line budget in `BUILD.md`. |
 | Reaches every subsystem or costs legibility | NaN-boxing, alternative `Value` layouts, numeric specialization | Constraint #1. Needs an argument, not a benchmark. |
 
-**Why.** "Profile first" is calibrated for people who owe someone stability. Here,
+**Why.** "Measure before optimizing" is calibrated for people who owe someone
+stability. Here,
 performance-per-line is constraint #3 *and* a reason the project exists; deferring
 it behind a measurement gate reclassifies the motivation as a risk. The golden
 corpus is what makes this safe: with four snapshots per program, a reckless
@@ -545,7 +546,7 @@ step.
 
 A decision earns an entry when reversing it would touch more than one subsystem,
 or when the reasoning is something we would otherwise re-derive badly in three
-months. Everything else is just code, and code is cheap to change.
+months. Everything else is code, and code is cheap to change.
 
 **Why.** One file is one read, with no directory to walk — the same reason the
 source is one file (ADR-015), and constraint #1 applied to prose. Append-only is
@@ -570,8 +571,8 @@ bumps* — see above.
 
 ### ADR-023 — Spans live on the parent, indexed by child; and on code, indexed by instruction
 
-*Forms-are-values stands and is load-bearing. The span mechanism is superseded by
-ADR-026, which found it is not closed under macro construction; the
+*Forms-are-values stands and everything later builds on it. The span mechanism is
+superseded by ADR-026, which found it is not closed under macro construction; the
 serialization argument below is corrected in ADR-029.*
 
 *(New, 2026-07-25. Resolves Q2. Refines ADR-009.)*
@@ -640,7 +641,7 @@ code* — Clojure says yes and pays for it everywhere; nothing in v1 needs it.
 *(New, 2026-07-25. Supersedes the hygiene half of ADR-009.)*
 
 **Decision.** Macro hygiene is a property of symbol *identity*, not of form
-metadata. Syntax-quote resolves symbols to fully-qualified names at read time,
+metadata. Syntax-quote resolves symbols to fully qualified names at read time,
 and gensym supplies the rest. Form metadata carries spans and nothing else.
 
 **Why.** ADR-009 justified metadata with two requirements at once — error
@@ -648,11 +649,11 @@ messages and namespace-qualified symbols for hygiene — and claimed they ride o
 the same mechanism. They do not. Clojure resolves syntax-quoted symbols at read
 time; hygiene is in the interned name before any metadata is consulted.
 
-Unbundling them matters because the two have different standards. Hygiene is
-load-bearing for correctness: a macro that captures a binding is broken, not
-merely unhelpful. Spans are best-effort and degrade gracefully. Fusing them made
-the metadata mechanism look like it had to be total and precise, which is what
-made the expensive options in Q2 look necessary.
+Unbundling them matters because the two are held to different standards.
+Capture avoidance is a correctness property — a macro that captures a binding is
+broken. Spans are best-effort and degrade gracefully. Fusing them made the
+metadata mechanism look like it had to be total and precise, which is what made
+the expensive options in Q2 look necessary.
 
 **Cost.** Read-time resolution means syntax-quote needs the current namespace,
 so the reader is namespace-aware — a real coupling, and it lands on Q12.
@@ -705,16 +706,16 @@ behind `&mut Vm` (ADR-020), and a VM-owned cell heap in the state tuple
 interior mutability, which ADR-020 forbids. Only the arena satisfies all three
 constraints as written.
 
-It also pays off twice. Logical cycles become ordinary id edges rather than `Rc`
-cycles, so ADR-003's accepted leak narrows from "reference graphs leak silently"
-to "cells are retained, and the count is on screen." And an id-keyed arena is
-already the shape a snapshot wants (ADR-029), so constraint #2 stops fighting the
-value representation.
+Two consequences fall out of the same change. Logical cycles become ordinary id
+edges rather than `Rc` cycles, so ADR-003's accepted leak narrows from "reference
+graphs leak silently" to "cells are retained, and the count is on screen." And an
+id-keyed arena is already the shape a snapshot wants (ADR-029), so constraint #2
+stops fighting the value representation.
 
 Keywords get their own variant rather than a flag bit inside `SymId`: the flag
 saves one word and makes type predicates, printing, and host conversion all
-slightly worse. `Bytes` and `Buffer` were settled by ADR-018 and simply missing
-from the enum.
+slightly worse. `Bytes` and `Buffer` were settled by ADR-018 and missing from the
+enum.
 
 **Cost.** A cell read is an arena index through the VM rather than a pointer
 deref — fine on a slot VM where the VM is already in hand, awkward anywhere that
@@ -766,8 +767,8 @@ Verification splits into four, replacing the single round-trip claim:
 3. `.forms` and `.expanded` snapshots render origins in a debug mode;
 4. one macro diagnostic test pins call-site attribution.
 
-**Why.** Parent-indexed storage was not closed under the operations macros
-actually use. Macros build output with ordinary `list`, `cons`, and quasiquote,
+**Why.** Parent-indexed storage was not closed under the operations macros use.
+Macros build output with ordinary `list`, `cons`, and quasiquote,
 and language code cannot attach metadata — so under ADR-023 as written, macro
 output would have carried *no* spans at all, which is worse than Clojure, where
 expansion at least inherits the call site. Four cases had no defined behavior: an
@@ -818,10 +819,10 @@ to create one — the language could not bootstrap itself. Separately, ADR-024 h
 syntax-quote resolving symbols against a current namespace at read time, which
 requires a namespace to exist before any module system does.
 
-Module-level-only mutual recursion is the rule rather than a hedge for the reason
+Module-level-only mutual recursion is a rule rather than a hedge, for the reason
 `../let-rs` documents: the VM outlives every closure, so a global cell has an
-unambiguous owner, and `letrec`-style cells do not. That is the shape whose cycle
-can be broken.
+unambiguous owner. `letrec`-style cells have none, which is why that shape's
+cycle cannot be broken and this one's can.
 
 **Cost.** No `require`, no aliasing, no multiple namespaces in v1. Q12 becomes a
 question about when that stops being enough, not a blocker.
@@ -867,8 +868,8 @@ the heap — each iteration still allocated a frame that was never reclaimed. Un
 ADR-025 frames drop on reuse, so we get that half.
 
 **Cost.** Rule 2 makes tail-call elimination conditional on dynamic extent, which
-the compiler must track and the disassembler should show. This is the honest
-version; the alternative silently skips cleanup.
+the compiler must track and the disassembler should show. The alternative
+silently skips cleanup.
 
 **Open.** Whether `loop`/`recur` is expressible as a macro over this (Q5) is now
 answerable — attempt it.
@@ -928,8 +929,8 @@ forms are values, so they serialize with the same encoder and need no second one
 
 **Cost.** Fuel checks on the dispatch loop. No mid-expansion snapshots. The
 resume oracle runs against a buffered host, so the first serialization property
-proves determinism of pure computation plus captured effects — not that a live
-socket survives a move, which is not being claimed.
+proves determinism of pure computation plus captured effects. It claims nothing
+about a live socket surviving a move.
 
 ---
 

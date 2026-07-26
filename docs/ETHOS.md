@@ -15,9 +15,9 @@ generality, ecosystem compatibility, or stability.
    effectively impossible to retrofit.
 3. **Performance punching above its weight.** Fast relative to implementation
    size, through concrete representations and good constants — never through JIT,
-   type inference, or speculative optimization. This is also *the fun part*, not
-   merely a metric: narrow, overfitted optimizations are a reason to build this
-   rather than run Babashka.
+   type inference, or speculative optimization. This is also *the fun part*:
+   narrow, overfitted optimizations are a reason to build this rather than run
+   Babashka.
 4. **Correctness > simplicity > efficiency > scale.** When they conflict, that
    order.
 
@@ -25,18 +25,18 @@ generality, ecosystem compatibility, or stability.
 
 Small readable line count → serializable state → raw speed → ergonomics.
 
-Directional, not a scoring function. It exists to name what gets sacrificed under
-pressure. It is not a licence to ship something unusable, and "ergonomics last"
-means *inherit Clojure's surface rather than invent one* — it does not mean bad
-errors. Error quality is not ergonomics; it is the feedback loop that everything
-else depends on.
+Directional, not a scoring function — it names what gets sacrificed under
+pressure. "Ergonomics last" means *inherit Clojure's surface rather than invent
+one*. Error quality sits outside the ranking entirely: it is the feedback loop
+everything else depends on.
 
 ## Seams exist for subtraction
 
-Not for organization. A boundary earns its place when a subsystem can be
-**deleted or lifted out**, never because code needs a proper home. One file until
-it hurts; inline `mod` blocks are the seams. The test is mechanical: cut the
-subsystem out — does it still build? (ADR-013, ADR-015.)
+A boundary earns its place when a subsystem can be **deleted or lifted out**.
+That is a different driver from modularity, and it is the one that applies here:
+needing a home for code is not a reason. One file until it hurts; inline `mod`
+blocks are the seams. The test is mechanical — cut the subsystem out and see
+whether it still builds (ADR-013, ADR-015).
 
 ## Freedom
 
@@ -44,8 +44,8 @@ No third-party users means no compatibility contract. That freedom is the entire
 compensation for giving up adoption — it is not a risk to be managed. The
 language may break on a Tuesday and be rebuilt on Wednesday.
 
-The one surface where past-you is a user is a serialized snapshot (ADR-005,
-Q9). Everywhere else, break it.
+The one surface where past-you is a user is a serialized snapshot, and ADR-029
+holds that to same-build, fresh-VM resume. Everywhere else, break it.
 
 **Non-goals:** third-party users · stable APIs · backward compatibility · package
 management · version negotiation · plugin architectures · generic compiler
@@ -62,6 +62,6 @@ multithreaded execution within one VM.
 - Overloaded and unfamiliar terms: `GLOSSARY.md`.
 - What the sibling repos already measured: `PRIOR-ART.md`.
 
-The four-snapshot golden corpus is the load-bearing piece of process. It is what
-makes reckless optimization safe, and it is the mechanism behind being able to
-talk about the whole system once the code is real.
+The four-snapshot golden corpus is the one piece of process that earns its
+weight: it makes reckless optimization safe, and it is how the whole system stays
+discussable once the code is real.

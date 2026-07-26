@@ -29,9 +29,9 @@ No code yet. What exists is the design, and it is meant to be read in this order
 
 ## Evidence, not instruction
 
-- **`docs/PRIOR-ART.md`** — what three sibling repos already measured about
-  these exact choices. Useful for understanding *why* an ADR went the way it
-  did; not required to implement anything.
+- **`docs/PRIOR-ART.md`** — what three sibling repos measured about these same
+  choices. Useful for understanding *why* an ADR went the way it did; not
+  required to implement anything.
 
 ## Not normative
 

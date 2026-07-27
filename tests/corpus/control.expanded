@@ -1,0 +1,7 @@
+(if (ready?) (go) (wait))
+(if (ready?) (go))
+(do (one) (two) 3)
+(try (throw {:kind :boom}) (catch e (report e)) (finally (cleanup)))
+(try (risky) (finally (cleanup)))
+(set-cell! (cell 0) 1)
+(set-global! answer 42)

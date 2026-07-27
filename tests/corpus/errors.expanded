@@ -1,0 +1,8 @@
+(println :one (try :body (finally (println :cleanup-1))))
+(println :two (try (throw :from-body) (catch e e) (finally (println :cleanup-2))))
+(println :three (try (try (throw :first) (catch e (throw :second)) (finally (println :cleanup-3))) (catch e e)))
+(println :four (try (try (throw :original) (finally (throw :from-cleanup))) (catch e e)))
+(println :five (try (no-such-global) (catch e e)))
+(set-global! deep (fn deep [n] (if (< n 1) (throw :from-the-bottom) (+ 0 (deep (- n 1))))))
+(println :six (try (deep 3) (catch e e) (finally (println :cleanup-6))))
+(try (throw :uncaught) (finally (println :cleanup-7) (throw :from-cleanup-7)))

@@ -1,0 +1,10 @@
+--- stdout
+:positive
+:not-negative
+42
+[:a :b] {:tag :k :value 1} [:all 1 2]
+(when a b)
+--- value
+nil
+--- exit
+0

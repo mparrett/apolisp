@@ -4,16 +4,8 @@
 //! anything about the language — if a change to this file changes what a
 //! program means, it is in the wrong file.
 
-use apolisp::{bytecode, compile, printer, reader, value, vm};
+use apolisp::{bytecode, compile, expand, printer, reader, value, vm};
 use std::process::ExitCode;
-
-/// A stage whose milestone has not landed, as distinct from a stage that ran
-/// and failed. `smoke.sh` needs to tell those apart: without it, the first gap
-/// in the pipeline hides every stage behind it, and the stages are not built in
-/// pipeline order (expand is milestone 5; compile and run are 2 and 3).
-///
-/// Keep in sync with `NOT_IMPLEMENTED` in `smoke.sh`.
-const EXIT_NOT_IMPLEMENTED: u8 = 3;
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().collect();
@@ -87,22 +79,33 @@ fn main() -> ExitCode {
                 }
             }
         }
-        // Milestone 2. Compilation is not yet a function of source alone — it
-        // acquires a VM dependency at milestone 5, when macros make it
-        // unavoidable (ADR-004) — so for now reading and compiling is the whole
-        // pipeline.
-        "compile" => {
-            let mut interner = value::Interner::new();
-            let forms = match reader::read_all(&src, &mut interner) {
-                Ok(forms) => forms,
-                Err(e) => {
-                    eprintln!("{}", e.render(path, &src));
-                    return ExitCode::FAILURE;
+        // Milestone 5: expansion, printed as forms exactly as `read` prints
+        // them. What each phase did is then a diff between two goldens.
+        "expand" => {
+            let mut vm = vm::Vm::new();
+            match pipeline(&src, path, &mut vm) {
+                Ok(forms) => {
+                    for f in &forms {
+                        println!("{}", printer::print(&f.root, &vm.interner));
+                    }
+                    ExitCode::SUCCESS
                 }
+                Err(code) => code,
+            }
+        }
+        // Milestone 2, and since milestone 5 the compiler is downstream of a
+        // VM: macros are language code, so compilation is not a function of
+        // source alone (ADR-004 said so before there was any).
+        "compile" => {
+            let mut vm = vm::Vm::new();
+            let forms = match pipeline(&src, path, &mut vm) {
+                Ok(forms) => forms,
+                Err(code) => return code,
             };
-            match compile::compile(&forms, &mut interner) {
+            let interner = &mut vm.interner;
+            match compile::compile(&forms, interner) {
                 Ok(chunk) => {
-                    print!("{}", bytecode::disassemble(&chunk, &interner, &src));
+                    print!("{}", bytecode::disassemble(&chunk, interner, &src));
                     ExitCode::SUCCESS
                 }
                 Err(e) => {
@@ -116,12 +119,9 @@ fn main() -> ExitCode {
         // cannot be pinned, and milestone 4 adds the thrown-value half.
         "run" => {
             let mut vm = vm::Vm::new();
-            let forms = match reader::read_all(&src, &mut vm.interner) {
+            let forms = match pipeline(&src, path, &mut vm) {
                 Ok(forms) => forms,
-                Err(e) => {
-                    eprintln!("{}", e.render(path, &src));
-                    return ExitCode::FAILURE;
-                }
+                Err(code) => return code,
             };
             let chunk = match compile::compile(&forms, &mut vm.interner) {
                 Ok(chunk) => chunk,
@@ -160,17 +160,24 @@ fn main() -> ExitCode {
                 }
             }
         }
-        // Stages whose milestone has not landed. They fail rather than no-op:
-        // a smoke test that silently skips a stage stops being an oracle.
-        "expand" => {
-            eprintln!("apolisp: `{cmd}` is not implemented yet (see BUILD.md)");
-            ExitCode::from(EXIT_NOT_IMPLEMENTED)
-        }
         _ => {
             eprintln!("apolisp: unknown command `{cmd}`");
             ExitCode::from(2)
         }
     }
+}
+
+/// Read and expand, which is what every stage from `expand` on starts with.
+/// Errors are rendered here so the three stages report them identically.
+fn pipeline(src: &str, path: &str, vm: &mut vm::Vm) -> Result<Vec<value::LocatedForm>, ExitCode> {
+    let forms = reader::read_all(src, &mut vm.interner).map_err(|e| {
+        eprintln!("{}", e.render(path, src));
+        ExitCode::FAILURE
+    })?;
+    expand::expand_all(forms, vm).map_err(|e| {
+        eprintln!("{}", e.render(path, src));
+        ExitCode::FAILURE
+    })
 }
 
 /// ADR-025: the size is asserted, not assumed. Reported here rather than in the

@@ -55,7 +55,7 @@ hooks:
 # the diff and says why. Generating is what *creates* the diff — so generate
 # deliberately, then justify every hunk before committing.
 bless:
-    for f in tests/corpus/*.xs; do cargo run --quiet -- read "$f" > "${f%.xs}.forms"; cargo run --quiet -- spans "$f" > "${f%.xs}.spans"; cargo run --quiet -- compile "$f" > "${f%.xs}.disasm"; done
+    for f in tests/corpus/*.xs; do cargo run --quiet -- read "$f" > "${f%.xs}.forms"; cargo run --quiet -- spans "$f" > "${f%.xs}.spans"; cargo run --quiet -- expand "$f" > "${f%.xs}.expanded"; cargo run --quiet -- compile "$f" > "${f%.xs}.disasm"; done
     # `.out` is updated where one exists and never created. Which programs run
     # is a decision the test asserts, not a set to infer. Exit 1 is a program
     # that failed, and since ADR-039 that is a transcript like any other — the

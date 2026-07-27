@@ -1,0 +1,88 @@
+proto 0  <top>  params 0  slots 50
+  constants
+    k0  42
+    k1  when
+    k2  twice
+    k3  unless
+    k4  pair
+    k5  tagged
+    k6  all
+    k7  (when a b)
+    k8  0
+    k9  :positive
+    k10  nil
+    k11  false
+    k12  true
+    k13  :not-negative
+    k14  21
+    k15  :a
+    k16  :b
+    k17  :tag
+    k18  :k
+    k19  :value
+    k20  1
+    k21  :all
+    k22  2
+  code
+    0000  CONST       r1 <- k0               generated 9:1
+    0001  SETGLOBAL   answer <- r1           generated 9:1
+    0002  CONST       r2 <- k1               generated 13:1
+    0003  CONST       r3 <- k2               generated 19:1
+    0004  CONST       r4 <- k3               generated 24:1
+    0005  CONST       r5 <- k4               generated 29:1
+    0006  CONST       r6 <- k5               generated 30:1
+    0007  CONST       r7 <- k6               generated 31:1
+    0008  CONST       r8 <- k7               35:18
+    0009  SETGLOBAL   quoted-call <- r8      generated 35:1
+    0010  GETGLOBAL   r10 <- println         37:2
+    0011  GETGLOBAL   r13 <- <               37:17
+    0012  CONST       r14 <- k8              37:19
+    0013  GETGLOBAL   r15 <- answer          37:21
+    0014  CALL        r12 <- r13(2)          37:16
+    0015  JUMPUNLESS  r12, 0018              generated 37:10
+    0016  CONST       r11 <- k9              generated 37:10
+    0017  JUMP        0019                   generated 37:10
+    0018  CONST       r11 <- k10             generated 37:10
+    0019  CALL        r9 <- r10(1)           37:1
+    0020  GETGLOBAL   r17 <- println         38:2
+    0021  GETGLOBAL   r21 <- <               38:19
+    0022  GETGLOBAL   r22 <- answer          38:21
+    0023  CONST       r23 <- k8              38:28
+    0024  CALL        r20 <- r21(2)          38:18
+    0025  JUMPUNLESS  r20, 0028              generated 38:10
+    0026  CONST       r19 <- k11             generated 38:10
+    0027  JUMP        0029                   generated 38:10
+    0028  CONST       r19 <- k12             generated 38:10
+    0029  JUMPUNLESS  r19, 0032              generated 38:10
+    0030  CONST       r18 <- k13             generated 38:10
+    0031  JUMP        0033                   generated 38:10
+    0032  CONST       r18 <- k10             generated 38:10
+    0033  CALL        r16 <- r17(1)          38:1
+    0034  GETGLOBAL   r25 <- println         39:2
+    0035  CONST       r27 <- k14             generated 39:10
+    0036  GETGLOBAL   r28 <- +               generated 39:10
+    0037  MOVE        r29 <- r27             generated 39:10
+    0038  MOVE        r30 <- r27             generated 39:10
+    0039  CALL        r26 <- r28(2)          generated 39:10
+    0040  CALL        r24 <- r25(1)          39:1
+    0041  GETGLOBAL   r32 <- println         40:2
+    0042  GETGLOBAL   r36 <- vector          generated 40:10
+    0043  CONST       r37 <- k15             generated 40:10
+    0044  CONST       r38 <- k16             generated 40:10
+    0045  CALL        r33 <- r36(2)          generated 40:10
+    0046  GETGLOBAL   r39 <- hash-map        generated 40:23
+    0047  CONST       r40 <- k17             generated 40:23
+    0048  CONST       r41 <- k18             generated 40:23
+    0049  CONST       r42 <- k19             generated 40:23
+    0050  CONST       r43 <- k20             generated 40:23
+    0051  CALL        r34 <- r39(4)          generated 40:23
+    0052  GETGLOBAL   r44 <- vector          generated 40:37
+    0053  CONST       r45 <- k21             generated 40:37
+    0054  CONST       r46 <- k20             generated 40:37
+    0055  CONST       r47 <- k22             generated 40:37
+    0056  CALL        r35 <- r44(3)          generated 40:37
+    0057  CALL        r31 <- r32(3)          40:1
+    0058  GETGLOBAL   r48 <- println         41:2
+    0059  GETGLOBAL   r49 <- quoted-call     41:10
+    0060  TAILCALL    r48(1)                 41:1
+    0061  RETURN      r0                     41:1

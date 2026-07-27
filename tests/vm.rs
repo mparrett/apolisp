@@ -104,9 +104,19 @@ fn value_of(src: &str) -> String {
 /// nothing defines, and `errors.xs` ends on an uncaught throw. The rest still
 /// have none, and the list is asserted rather than inferred so adding a corpus
 /// program forces the choice instead of silently skipping it.
+///
+/// `macros.xs` earns one for a reason the `.expanded` golden cannot cover: a
+/// macro can expand to something that reads correctly and computes the wrong
+/// answer, and only running it says which.
 #[test]
 fn out_transcripts_match() {
-    let runnable = ["control.xs", "errors.xs", "hello.xs", "recursion.xs"];
+    let runnable = [
+        "control.xs",
+        "errors.xs",
+        "hello.xs",
+        "macros.xs",
+        "recursion.xs",
+    ];
     let with_out: Vec<String> = common::corpus_files()
         .iter()
         .filter(|p| p.with_extension("out").exists())

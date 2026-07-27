@@ -523,29 +523,45 @@ pub mod reader {
                     ))
                 }
                 b'"' => self.read_string(start),
-                b'\'' => {
-                    self.pos += 1;
-                    let inner = self.read_form()?;
-                    let span = Span::new(start, self.pos);
-                    let quote = self.interner.sym("quote");
-                    // `'x` reads as `(quote x)`. The synthesized `quote` symbol
-                    // has no source text of its own, so it takes the span of
-                    // the sugar that produced it rather than claiming a
-                    // position it does not occupy.
-                    Ok(LocatedForm {
-                        root: Value::List(Rc::new(ListObj(vec![quote, inner.root]))),
-                        origins: Origins {
-                            origin: SpanOrigin::Source(span),
-                            children: vec![
-                                Origins::leaf(SpanOrigin::Source(Span::new(start, start + 1))),
-                                inner.origins,
-                            ],
-                        },
-                    })
+                // The four prefix sugars, all the same shape: `(name form)`.
+                // Quasiquote is *not* expanded here — the reader desugars the
+                // punctuation and the expander lowers the template, so each
+                // phase's golden shows its own job (ADR-039's sibling reasoning
+                // in ADR-040).
+                b'\'' => self.read_prefixed("quote", 1, start),
+                b'`' => self.read_prefixed("quasiquote", 1, start),
+                b'~' if self.src.as_bytes().get(start + 1) == Some(&b'@') => {
+                    self.read_prefixed("unquote-splicing", 2, start)
                 }
+                b'~' => self.read_prefixed("unquote", 1, start),
                 b':' => self.read_keyword(start),
                 _ => self.read_atom(start),
             }
+        }
+
+        /// `'x` reads as `(quote x)`, and the other three sugars the same way.
+        /// The synthesized head symbol has no source text of its own, so it
+        /// takes the span of the punctuation that produced it rather than
+        /// claiming a position it does not occupy.
+        fn read_prefixed(
+            &mut self,
+            name: &str,
+            len: usize,
+            start: usize,
+        ) -> Result<LocatedForm, LispErr> {
+            self.pos += len;
+            let head = self.interner.sym(name);
+            let inner = self.read_form()?;
+            Ok(LocatedForm {
+                root: Value::List(Rc::new(ListObj(vec![head, inner.root]))),
+                origins: Origins {
+                    origin: SpanOrigin::Source(Span::new(start, self.pos)),
+                    children: vec![
+                        Origins::leaf(SpanOrigin::Source(Span::new(start, start + len))),
+                        inner.origins,
+                    ],
+                },
+            })
         }
 
         fn read_seq(
@@ -755,7 +771,7 @@ pub mod reader {
                 if b.is_ascii_whitespace()
                     || matches!(
                         b,
-                        b'(' | b')' | b'[' | b']' | b'{' | b'}' | b'"' | b';' | b','
+                        b'(' | b')' | b'[' | b']' | b'{' | b'}' | b'"' | b';' | b',' | b'`' | b'~'
                     )
                 {
                     break;
@@ -2262,6 +2278,10 @@ pub mod vm {
         cells: Vec<CellEntry>,
         natives: Vec<Native>,
         kws: Kws,
+        /// ADR-040: reset per compilation unit by the expander, never here.
+        /// A counter that survived a unit would make the same source expand
+        /// differently on its second run, and a golden cannot pin that.
+        gensym: u64,
         /// The buffered in-memory host BUILD.md's serialization property needs:
         /// emitted effects are part of the comparison rather than escaping it.
         out: String,
@@ -2290,6 +2310,7 @@ pub mod vm {
                 cells: Vec::new(),
                 natives: Vec::new(),
                 kws,
+                gensym: 0,
                 out: String::new(),
             };
             vm.install_primitives();
@@ -2319,6 +2340,18 @@ pub mod vm {
     }
 
     impl Vm {
+        /// A fresh symbol name. Deterministic within a compilation unit and
+        /// reset between units, which is what keeps `.expanded` goldens from
+        /// flapping (BUILD.md, determinism).
+        pub fn gensym_name(&mut self, prefix: &str) -> String {
+            self.gensym += 1;
+            format!("{prefix}__{}", self.gensym)
+        }
+
+        pub fn reset_gensym(&mut self) {
+            self.gensym = 0;
+        }
+
         pub fn take_output(&mut self) -> String {
             std::mem::take(&mut self.out)
         }
@@ -2442,6 +2475,15 @@ pub mod vm {
     }
 
     impl Execution {
+        fn new() -> Execution {
+            Execution {
+                frames: Vec::new(),
+                slots: Vec::new(),
+                handlers: Vec::new(),
+                pending: Vec::new(),
+            }
+        }
+
         /// The deepest the frame stack reached, and the largest the slot stack
         /// grew. A tail loop keeps both flat, which is milestone 3's exit
         /// condition and not otherwise observable from outside.
@@ -2465,12 +2507,7 @@ pub mod vm {
             proto: 0,
             captures: Rc::from(Vec::new()),
         });
-        let mut ex = Execution {
-            frames: Vec::new(),
-            slots: Vec::new(),
-            handlers: Vec::new(),
-            pending: Vec::new(),
-        };
+        let mut ex = Execution::new();
         let slots = chunk.protos[0].slots as usize;
         ex.slots.resize(slots, Value::Nil);
         ex.frames.push(Frame {
@@ -2481,8 +2518,41 @@ pub mod vm {
             ret_len: 0,
             closure: top,
         });
+        drive(vm, chunk, ex)
+    }
 
-        let mut peak = (1usize, ex.slots.len());
+    /// Call a closure from Rust, inside the chunk it was compiled in.
+    ///
+    /// The chunk is a parameter and not a detail: a `Closure` names its proto by
+    /// index (ADR-034), so it means nothing without the chunk those indices are
+    /// into. The expander therefore keeps a macro's chunk beside the macro
+    /// (ADR-040), and this is the only way into the VM that is not "run a
+    /// program from the top".
+    pub fn call_in(
+        vm: &mut Vm,
+        chunk: &Chunk,
+        f: Value,
+        args: &[Value],
+        at: SpanOrigin,
+    ) -> Result<Value, Unwind> {
+        let mut ex = Execution::new();
+        // The callee and its arguments in the window the call protocol expects
+        // (ADR-034): callee at `base`, arguments directly above it.
+        ex.slots.push(f);
+        ex.slots.extend(args.iter().cloned());
+        match call(vm, &mut ex, chunk, 0, args.len() as u32, 0, at)? {
+            // A native answers without a frame; there is nothing to drive.
+            Some(v) => Ok(v),
+            None => match drive(vm, chunk, ex).0 {
+                Outcome::Returned(v) => Ok(v),
+                Outcome::Threw(u) => Err(u),
+            },
+        }
+    }
+
+    /// The dispatch loop, over an `Execution` someone else set up.
+    fn drive(vm: &mut Vm, chunk: &Chunk, mut ex: Execution) -> (Outcome, (usize, usize)) {
+        let mut peak = (ex.frames.len(), ex.slots.len());
         loop {
             let fi = ex.frames.len() - 1;
             let (pidx, pc) = {
@@ -3010,6 +3080,27 @@ pub mod vm {
                 vm.out.push('\n');
                 Ok(Value::Nil)
             });
+            // ADR-040: the explicit half of capture avoidance. Auto-gensym
+            // (`x#`) covers the common case in a template; this is for a name
+            // a macro has to compute.
+            self.native("gensym", 0, true, |vm, a| {
+                let prefix = match a.first() {
+                    None => "G".to_string(),
+                    Some(Value::Str(s)) => s.0.clone(),
+                    Some(Value::Sym(s)) => vm.interner.name(s.0).to_string(),
+                    Some(other) => {
+                        return Err(fault(
+                            Kind::Type,
+                            format!(
+                                "`gensym` needs a string or symbol prefix, not a {}",
+                                crate::value::kind_name(other)
+                            ),
+                        ))
+                    }
+                };
+                let name = vm.gensym_name(&prefix);
+                Ok(vm.interner.sym(&name))
+            });
             self.native("list", 0, true, |_, a| {
                 Ok(Value::List(Rc::new(ListObj(a.to_vec()))))
             });
@@ -3017,6 +3108,42 @@ pub mod vm {
             // collection literal mean anything. The representation itself is
             // still Q6's, and `hash-map` keeps duplicate keys because Q20 has
             // not said what to do with them.
+            // Quasiquote's `~@` lowers to this (ADR-040). Deliberately minimal:
+            // it takes the sequential collections that exist and yields a list.
+            // Q6 owns the general one at milestone 6.
+            self.native("concat", 0, true, |_, a| {
+                let mut out = Vec::new();
+                for v in a {
+                    match v {
+                        Value::List(l) => out.extend(l.0.iter().cloned()),
+                        Value::Vec(x) => out.extend(x.0.iter().cloned()),
+                        Value::Nil => {}
+                        other => {
+                            return Err(fault(
+                                Kind::Type,
+                                format!(
+                                    "`concat` needs lists or vectors, not a {}",
+                                    crate::value::kind_name(other)
+                                ),
+                            ))
+                        }
+                    }
+                }
+                Ok(Value::List(Rc::new(ListObj(out))))
+            });
+            // The other half of a vector template's lowering: build a list,
+            // then convert. Also Q6's, eventually.
+            self.native("vec", 1, false, |_, a| match &a[0] {
+                Value::List(l) => Ok(Value::Vec(Rc::new(VecObj(l.0.clone())))),
+                Value::Vec(x) => Ok(Value::Vec(x.clone())),
+                other => Err(fault(
+                    Kind::Type,
+                    format!(
+                        "`vec` needs a list or vector, not a {}",
+                        crate::value::kind_name(other)
+                    ),
+                )),
+            });
             self.native("vector", 0, true, |_, a| {
                 Ok(Value::Vec(Rc::new(VecObj(a.to_vec()))))
             });
@@ -3069,5 +3196,591 @@ pub mod vm {
             acc = op(acc, int_arg(v, name)?).ok_or_else(|| overflow(name))?;
         }
         Ok(Value::Int(acc))
+    }
+}
+
+// ---------------------------------------------------------------------------
+
+/// Macro expansion, quasiquote, and gensym (ADR-024 as amended by ADR-040).
+///
+/// This is where ADR-004's predicted coupling arrives: a macro is language
+/// code, so expanding a form means *running* one — compiling the macro's
+/// function, calling it with the unexpanded argument forms as values, and
+/// walking whatever it hands back. Compilation therefore stops being a pure
+/// function of source, exactly as that entry said it would.
+///
+/// The macro table lives here rather than on the `Vm`, because a macro is a
+/// property of a compilation unit and not of the machine. Nothing about it
+/// reaches an `Image` (ADR-029), and two units compiled by one VM cannot see
+/// each other's macros.
+pub mod expand {
+    use crate::bytecode::Chunk;
+    use crate::compile;
+    use crate::error::{LispErr, SpanOrigin};
+    use crate::printer;
+    use crate::reader::{self, MAX_NESTING};
+    use crate::value::{Interner, ListObj, LocatedForm, MapObj, Origins, SymId, Value, VecObj};
+    use crate::vm::{self, Outcome, Vm};
+    use std::collections::HashMap;
+    use std::rc::Rc;
+
+    /// `def` and `defmacro`, written in the language (ADR-027, ADR-040).
+    const PRELUDE: &str = include_str!("prelude.xs");
+
+    /// A macro that rewrites to itself makes no progress and would otherwise
+    /// hang. The bound is per form and generous; hitting it is a bug in the
+    /// macro, and the diagnostic says so.
+    const MAX_EXPANSIONS: usize = 512;
+
+    /// The names the expander compares against, interned once. Everything else
+    /// it sees is a call or a datum.
+    struct Names {
+        quote: SymId,
+        quasiquote: SymId,
+        unquote: SymId,
+        unquote_splicing: SymId,
+        set_macro: SymId,
+        list: SymId,
+        concat: SymId,
+        vec: SymId,
+        vector: SymId,
+        hash_map: SymId,
+    }
+
+    impl Names {
+        fn new(i: &mut Interner) -> Names {
+            let mut s = |n: &str| SymId(i.intern(n));
+            Names {
+                quote: s("quote"),
+                quasiquote: s("quasiquote"),
+                unquote: s("unquote"),
+                unquote_splicing: s("unquote-splicing"),
+                set_macro: s("set-macro!"),
+                list: s("list"),
+                concat: s("concat"),
+                vec: s("vec"),
+                vector: s("vector"),
+                hash_map: s("hash-map"),
+            }
+        }
+    }
+
+    /// A macro is a closure plus the chunk it was compiled in, because a
+    /// closure names its proto by index and means nothing without it
+    /// (ADR-034).
+    struct Macro {
+        chunk: Rc<Chunk>,
+        f: Value,
+    }
+
+    struct Expander<'a> {
+        vm: &'a mut Vm,
+        names: Names,
+        /// Looked up, never iterated — so no ordering of this map can reach
+        /// output (BUILD.md, determinism).
+        macros: HashMap<SymId, Macro>,
+        depth: usize,
+    }
+
+    /// Expand one compilation unit: the prelude first, then the unit's own
+    /// forms in order.
+    ///
+    /// Order is load-bearing and is ADR-033's sequential top level applied one
+    /// phase earlier: a `set-macro!` has to have run before a later form can be
+    /// a call to it.
+    pub fn expand_all(forms: Vec<LocatedForm>, vm: &mut Vm) -> Result<Vec<LocatedForm>, LispErr> {
+        // Per compilation unit, so the same source expands the same way twice
+        // and a golden can pin it (BUILD.md, determinism).
+        vm.reset_gensym();
+        let names = Names::new(&mut vm.interner);
+        let mut ex = Expander {
+            vm,
+            names,
+            macros: HashMap::new(),
+            depth: 0,
+        };
+        ex.prelude();
+        forms.into_iter().map(|f| ex.form(f)).collect()
+    }
+
+    impl Expander<'_> {
+        /// The prelude is our own file, so a failure in it is a host bug rather
+        /// than a diagnostic for the user (ADR-028 rule 5's spirit). Its output
+        /// forms are discarded: everything it does, it does by installing
+        /// macros.
+        fn prelude(&mut self) {
+            let forms = reader::read_all(PRELUDE, &mut self.vm.interner).unwrap_or_else(|e| {
+                panic!("prelude does not read: {}", e.render("prelude.xs", PRELUDE))
+            });
+            for f in forms {
+                self.form(f).unwrap_or_else(|e| {
+                    panic!(
+                        "prelude does not expand: {}",
+                        e.render("prelude.xs", PRELUDE)
+                    )
+                });
+            }
+        }
+
+        /// Expand one form to a fixed point, then its children.
+        ///
+        /// ADR-036 puts the nesting bound in the reader and gives this phase the
+        /// forms *it* produces — the second entry point that entry allows, not a
+        /// second mechanism. The counter is here rather than in the walk because
+        /// macro output is where unbounded nesting can appear without any source
+        /// text to have been read.
+        fn form(&mut self, f: LocatedForm) -> Result<LocatedForm, LispErr> {
+            if self.depth >= MAX_NESTING {
+                return Err(LispErr::at_origin(
+                    f.origins.origin,
+                    format!("expansion nested more than {MAX_NESTING} deep (ADR-036)"),
+                ));
+            }
+            self.depth += 1;
+            let out = self.form_inner(f);
+            self.depth -= 1;
+            out
+        }
+
+        fn form_inner(&mut self, f: LocatedForm) -> Result<LocatedForm, LispErr> {
+            let mut f = f;
+            for _ in 0..MAX_EXPANSIONS {
+                let head = match head_sym(&f.root) {
+                    None => return self.children(f),
+                    Some(h) => h,
+                };
+                // `quote` is the one head whose contents are data rather than
+                // code. Descending into it would expand a macro call the
+                // program is only talking *about*.
+                if head == self.names.quote {
+                    return Ok(f);
+                }
+                if head == self.names.quasiquote {
+                    let out = self.quasiquote(&f)?;
+                    return self.form(out);
+                }
+                if head == self.names.unquote || head == self.names.unquote_splicing {
+                    return Err(LispErr::at_origin(
+                        f.origins.origin,
+                        format!("`{}` outside a quasiquote", self.vm.interner.name(head.0)),
+                    ));
+                }
+                if head == self.names.set_macro {
+                    return self.set_macro(f);
+                }
+                match self.macros.contains_key(&head) {
+                    false => return self.children(f),
+                    true => f = self.invoke(head, &f)?,
+                }
+            }
+            Err(LispErr::at_origin(
+                f.origins.origin,
+                format!("expanded {MAX_EXPANSIONS} times without settling — a macro is rewriting to itself"),
+            ))
+        }
+
+        /// Rebuild an aggregate with expanded children, keeping origins paired
+        /// with the nodes they describe.
+        fn children(&mut self, f: LocatedForm) -> Result<LocatedForm, LispErr> {
+            let LocatedForm { root, origins } = f;
+            let Origins { origin, children } = origins;
+            let (root, children) = match root {
+                Value::List(l) => {
+                    let (vs, os) = self.each(l.0.clone(), children)?;
+                    (Value::List(Rc::new(ListObj(vs))), os)
+                }
+                Value::Vec(x) => {
+                    let (vs, os) = self.each(x.0.clone(), children)?;
+                    (Value::Vec(Rc::new(VecObj(vs))), os)
+                }
+                Value::Map(m) => {
+                    let flat: Vec<Value> =
+                        m.0.iter()
+                            .flat_map(|(k, v)| [k.clone(), v.clone()])
+                            .collect();
+                    let (vs, os) = self.each(flat, children)?;
+                    let pairs = vs.chunks(2).map(|p| (p[0].clone(), p[1].clone())).collect();
+                    (Value::Map(Rc::new(MapObj(pairs))), os)
+                }
+                other => (other, children),
+            };
+            Ok(LocatedForm {
+                root,
+                origins: Origins { origin, children },
+            })
+        }
+
+        /// Every child of an aggregate, expanded, with its origin travelling
+        /// beside it — the pairing is the whole point (ADR-026).
+        fn each(
+            &mut self,
+            items: Vec<Value>,
+            origins: Vec<Origins>,
+        ) -> Result<(Vec<Value>, Vec<Origins>), LispErr> {
+            let mut vs = Vec::with_capacity(items.len());
+            let mut os = Vec::with_capacity(items.len());
+            for (v, o) in items.into_iter().zip(origins) {
+                let out = self.form(LocatedForm {
+                    root: v,
+                    origins: o,
+                })?;
+                vs.push(out.root);
+                os.push(out.origins);
+            }
+            Ok((vs, os))
+        }
+
+        /// `(set-macro! name expr)` — the one form the expander knows about
+        /// defining things (ADR-040). The expression is compiled and run *now*,
+        /// and the closure it yields becomes a macro for the rest of the unit.
+        ///
+        /// The form itself expands to `(quote name)`: it has already had its
+        /// entire effect, and leaving it as something with a value keeps the
+        /// top level a sequence of expressions.
+        fn set_macro(&mut self, f: LocatedForm) -> Result<LocatedForm, LispErr> {
+            let items = match &f.root {
+                Value::List(l) if l.0.len() == 3 => l.0.clone(),
+                _ => {
+                    return Err(LispErr::at_origin(
+                        f.origins.origin,
+                        "`set-macro!` takes a name and an expression",
+                    ))
+                }
+            };
+            let name = match items[1] {
+                Value::Sym(s) => s,
+                ref other => {
+                    return Err(LispErr::at_origin(
+                        f.origins.children[1].origin,
+                        format!(
+                            "`set-macro!` needs a name, not a {}",
+                            crate::value::kind_name(other)
+                        ),
+                    ))
+                }
+            };
+            let body = self.form(LocatedForm {
+                root: items[2].clone(),
+                origins: f.origins.children[2].clone(),
+            })?;
+            let at = body.origins.origin;
+            let chunk = compile::compile(&[body], &mut self.vm.interner)?;
+            let value = match vm::run(self.vm, &chunk) {
+                Outcome::Returned(v) => v,
+                Outcome::Threw(u) => {
+                    return Err(LispErr::at_origin(
+                        at,
+                        format!(
+                            "defining macro `{}` threw {}",
+                            self.vm.interner.name(name.0),
+                            printer::print(&u.value, &self.vm.interner)
+                        ),
+                    ))
+                }
+            };
+            if !matches!(value, Value::Fn(_)) {
+                return Err(LispErr::at_origin(
+                    at,
+                    format!(
+                        "a macro must be a function, not a {}",
+                        crate::value::kind_name(&value)
+                    ),
+                ));
+            }
+            self.macros.insert(
+                name,
+                Macro {
+                    chunk: Rc::new(chunk),
+                    f: value,
+                },
+            );
+            let quote = Value::Sym(self.names.quote);
+            Ok(LocatedForm {
+                root: Value::List(Rc::new(ListObj(vec![quote, items[1].clone()]))),
+                origins: Origins {
+                    origin: f.origins.origin,
+                    children: vec![f.origins.children[0].clone(), f.origins.children[1].clone()],
+                },
+            })
+        }
+
+        /// Run a macro over its *unexpanded* arguments and give the result
+        /// origins (ADR-026): a node identifiable as one of the arguments keeps
+        /// its `Source` position, and everything the macro built carries
+        /// `Generated(call site)`.
+        fn invoke(&mut self, name: SymId, f: &LocatedForm) -> Result<LocatedForm, LispErr> {
+            let items = match &f.root {
+                Value::List(l) => l.0.clone(),
+                _ => unreachable!("a macro call is a list"),
+            };
+            let args: Vec<Value> = items[1..].to_vec();
+            let m = &self.macros[&name];
+            let (chunk, closure) = (m.chunk.clone(), m.f.clone());
+            let at = f.origins.origin;
+            let out = vm::call_in(self.vm, &chunk, closure, &args, at).map_err(|u| {
+                LispErr::at_origin(
+                    at,
+                    format!(
+                        "macro `{}` threw {}",
+                        self.vm.interner.name(name.0),
+                        printer::print(&u.value, &self.vm.interner)
+                    ),
+                )
+            })?;
+            // Positions the arguments brought with them, indexed by object
+            // identity so a *sub*form the macro passed through keeps its own
+            // position and not just a whole argument.
+            let mut known = HashMap::new();
+            for (v, o) in items[1..].iter().zip(&f.origins.children[1..]) {
+                index_origins(v, o, &mut known);
+            }
+            let generated = match at.span() {
+                Some(s) => SpanOrigin::Generated(s),
+                // A macro call with no position of its own — expansion of
+                // already-generated code. There is nothing better to say.
+                None => SpanOrigin::Unknown,
+            };
+            Ok(LocatedForm {
+                origins: origins_for(&out, generated, &known),
+                root: out,
+            })
+        }
+
+        /// Lower `` `x `` to the calls that build it: `list`, `concat`, `vec`,
+        /// and `hash-map`, all ordinary globals (ADR-038).
+        fn quasiquote(&mut self, f: &LocatedForm) -> Result<LocatedForm, LispErr> {
+            let inner = match &f.root {
+                Value::List(l) if l.0.len() == 2 => l.0[1].clone(),
+                _ => {
+                    return Err(LispErr::at_origin(
+                        f.origins.origin,
+                        "`quasiquote` takes one form",
+                    ))
+                }
+            };
+            let at = f.origins.origin;
+            let mut auto = HashMap::new();
+            let built = self.template(&inner, at, &mut auto)?;
+            Ok(LocatedForm {
+                origins: generated_origins(&built, at),
+                root: built,
+            })
+        }
+
+        /// One level of template. Returns a form that *constructs* the input.
+        fn template(
+            &mut self,
+            v: &Value,
+            at: SpanOrigin,
+            auto: &mut HashMap<SymId, Value>,
+        ) -> Result<Value, LispErr> {
+            match v {
+                Value::List(l) => {
+                    if let Some(h) = head_sym(v) {
+                        if h == self.names.quasiquote {
+                            return Err(LispErr::at_origin(
+                                at,
+                                "a quasiquote inside a quasiquote is not supported (ADR-040)",
+                            ));
+                        }
+                        if h == self.names.unquote {
+                            return self.unquoted(l, at);
+                        }
+                        if h == self.names.unquote_splicing {
+                            return Err(LispErr::at_origin(
+                                at,
+                                "`~@` has nothing to splice into here",
+                            ));
+                        }
+                    }
+                    Ok(match self.sequence(&l.0, at, auto)? {
+                        Items::Plain(vs) => call(Value::Sym(self.names.list), vs),
+                        Items::Spliced(c) => c,
+                    })
+                }
+                // A spliced vector goes through a list, because splicing is a
+                // list operation; an unspliced one is a direct `vector` call,
+                // because that is what it means and it reads that way in the
+                // golden.
+                Value::Vec(x) => Ok(match self.sequence(&x.0, at, auto)? {
+                    Items::Plain(vs) => call(Value::Sym(self.names.vector), vs),
+                    Items::Spliced(c) => call(Value::Sym(self.names.vec), vec![c]),
+                }),
+                Value::Map(m) => {
+                    let flat: Vec<Value> =
+                        m.0.iter()
+                            .flat_map(|(k, v)| [k.clone(), v.clone()])
+                            .collect();
+                    match self.sequence(&flat, at, auto)? {
+                        Items::Plain(vs) => Ok(call(Value::Sym(self.names.hash_map), vs)),
+                        // Splicing pairs into a map needs `apply`, which v1
+                        // does not have. Refused rather than half-supported.
+                        Items::Spliced(_) => Err(LispErr::at_origin(
+                            at,
+                            "`~@` inside a map template is not supported (ADR-040)",
+                        )),
+                    }
+                }
+                // `x#` is one fresh name per template, so two occurrences in
+                // one template are the same symbol and two templates never
+                // collide (ADR-040).
+                Value::Sym(s) => {
+                    let name = self.vm.interner.name(s.0);
+                    if name.len() > 1 && name.ends_with('#') {
+                        let fresh = match auto.get(s) {
+                            Some(v) => v.clone(),
+                            None => {
+                                let base = name.trim_end_matches('#').to_string();
+                                let generated = self.vm.gensym_name(&base);
+                                let sym = self.vm.interner.sym(&generated);
+                                auto.insert(*s, sym.clone());
+                                sym
+                            }
+                        };
+                        return Ok(quoted(Value::Sym(self.names.quote), fresh));
+                    }
+                    Ok(quoted(Value::Sym(self.names.quote), v.clone()))
+                }
+                // Everything else evaluates to itself, so quoting it would be
+                // noise in every expansion anybody reads. A symbol is the only
+                // atom that means something else in code position.
+                other => Ok(other.clone()),
+            }
+        }
+
+        fn unquoted(&mut self, l: &Rc<ListObj>, at: SpanOrigin) -> Result<Value, LispErr> {
+            match l.0.len() {
+                2 => Ok(l.0[1].clone()),
+                _ => Err(LispErr::at_origin(at, "`~` takes one form")),
+            }
+        }
+
+        /// The items of a template aggregate: either the item forms themselves,
+        /// or — once anything is spliced — one form that concatenates the
+        /// groups. Which one it is decides how the caller builds its own shape,
+        /// and it is the only thing that differs between a list, a vector, and
+        /// a map template.
+        fn sequence(
+            &mut self,
+            items: &[Value],
+            at: SpanOrigin,
+            auto: &mut HashMap<SymId, Value>,
+        ) -> Result<Items, LispErr> {
+            let mut groups: Vec<Value> = Vec::new();
+            let mut plain: Vec<Value> = Vec::new();
+            let mut spliced = false;
+            for item in items {
+                let splice = match head_sym(item) {
+                    Some(h) if h == self.names.unquote_splicing => match item {
+                        Value::List(l) if l.0.len() == 2 => Some(l.0[1].clone()),
+                        _ => return Err(LispErr::at_origin(at, "`~@` takes one form")),
+                    },
+                    _ => None,
+                };
+                match splice {
+                    Some(e) => {
+                        spliced = true;
+                        if !plain.is_empty() {
+                            groups.push(call(
+                                Value::Sym(self.names.list),
+                                std::mem::take(&mut plain),
+                            ));
+                        }
+                        groups.push(e);
+                    }
+                    None => plain.push(self.template(item, at, auto)?),
+                }
+            }
+            if !spliced {
+                return Ok(Items::Plain(plain));
+            }
+            if !plain.is_empty() {
+                groups.push(call(Value::Sym(self.names.list), plain));
+            }
+            Ok(Items::Spliced(call(Value::Sym(self.names.concat), groups)))
+        }
+    }
+
+    /// What a template's items came to. `Spliced` already carries a form that
+    /// builds the whole sequence; `Plain` leaves that to the caller.
+    enum Items {
+        Plain(Vec<Value>),
+        Spliced(Value),
+    }
+
+    fn call(head: Value, mut args: Vec<Value>) -> Value {
+        let mut items = vec![head];
+        items.append(&mut args);
+        Value::List(Rc::new(ListObj(items)))
+    }
+
+    fn quoted(quote: Value, v: Value) -> Value {
+        Value::List(Rc::new(ListObj(vec![quote, v])))
+    }
+
+    fn head_sym(v: &Value) -> Option<SymId> {
+        match v {
+            Value::List(l) => match l.0.first() {
+                Some(Value::Sym(s)) => Some(*s),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+
+    /// The address of a value's heap object, for recognizing a form the macro
+    /// passed through rather than built. Immediates have no identity to
+    /// compare, so they are simply not recognized — which costs a position
+    /// nobody had a better answer for.
+    fn identity(v: &Value) -> Option<usize> {
+        match v {
+            Value::List(l) => Some(Rc::as_ptr(l) as usize),
+            Value::Vec(x) => Some(Rc::as_ptr(x) as usize),
+            Value::Map(m) => Some(Rc::as_ptr(m) as usize),
+            Value::Str(s) => Some(Rc::as_ptr(s) as usize),
+            _ => None,
+        }
+    }
+
+    fn index_origins(v: &Value, o: &Origins, out: &mut HashMap<usize, Origins>) {
+        if let Some(id) = identity(v) {
+            out.insert(id, o.clone());
+        }
+        for (c, co) in crate::value::children(v).iter().zip(&o.children) {
+            index_origins(c, co, out);
+        }
+    }
+
+    /// ADR-026, for macro output: a node the expander can still identify keeps
+    /// the position it was read at; everything else is `Generated` at the call
+    /// site. Nothing becomes `Unknown` here — a macro call always has a call
+    /// site, and reporting it beats reporting nothing.
+    fn origins_for(v: &Value, generated: SpanOrigin, known: &HashMap<usize, Origins>) -> Origins {
+        if let Some(o) = identity(v).and_then(|id| known.get(&id)) {
+            return o.clone();
+        }
+        Origins {
+            origin: generated,
+            children: crate::value::children(v)
+                .iter()
+                .map(|c| origins_for(c, generated, known))
+                .collect(),
+        }
+    }
+
+    /// Origins for a form the expander built out of nothing but the template it
+    /// was given: all of it is generated, at the template's own position.
+    fn generated_origins(v: &Value, at: SpanOrigin) -> Origins {
+        let origin = match at.span() {
+            Some(s) => SpanOrigin::Generated(s),
+            None => SpanOrigin::Unknown,
+        };
+        Origins {
+            origin,
+            children: crate::value::children(v)
+                .iter()
+                .map(|c| generated_origins(c, at))
+                .collect(),
+        }
     }
 }

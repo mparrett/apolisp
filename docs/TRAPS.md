@@ -47,6 +47,13 @@ Every adapter declares its reacquisition semantics or refuses.
 hand-written. A Rust `?` early-return that skips frame cleanup leaks frames. Rust
 panics must never cross the VM loop.
 
+**Variadic rest is an empty list, not `nil`.** Clojure binds a rest parameter to
+`nil` when nothing extra was supplied; ADR-033 binds it to an empty list. This is
+the deviation most likely to be typed from muscle memory: an empty list is
+*truthy* (see Truthiness above), so ported code testing `(if more ...)` or
+`(nil? more)` takes the opposite branch — and takes it silently, with no error
+anywhere. The compiler emitting `nil` here instead would be equally silent.
+
 **Laziness assumptions.** Ported Clojure idioms may assume lazy evaluation. Eager
 `map` over an infinite generator hangs rather than erroring.
 

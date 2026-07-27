@@ -1072,6 +1072,84 @@ equality; a printer emitting unreadable tokens is a defect now.
 
 ---
 
+### ADR-033 — Evaluation order, arity, and variadic `fn`
+
+*(New, 2026-07-26. Resolves the part of Q20 that milestone 2 forces. Q20 stays
+open for the rest.)*
+
+**Decision.** The compact table Q20 asked for, scoped to the three edges a
+compiler cannot avoid answering:
+
+| Edge | v1 | Clojure |
+|---|---|---|
+| Argument evaluation | strict left to right, operator first | same |
+| `let` binding order | sequential, left to right | same |
+| Collection literal order | left to right; in maps, key before value | same |
+| Under-supply | throws — no implicit `nil` filling | same |
+| Over-supply | throws — no silent discard | same |
+| Where arity is checked | callee prologue, at call time | runtime |
+| Rest marker | `&` | same |
+| Rest with no extra args | **empty list** | **`nil`** — deliberate deviation |
+| Multiple arity bodies per `fn` | **not in v1** | supported |
+
+Stated as rules:
+
+1. **Evaluation is strict left to right everywhere**, and the operator position
+   is evaluated before the arguments.
+2. **Arity is checked once, at runtime, in the callee's prologue** — never at
+   the call site, never at compile time. Under- and over-supply both throw.
+3. **`fn` takes one parameter list**, optionally ending in `& rest`. `rest`
+   binds to a list, empty when nothing extra was supplied — never `nil`.
+
+**Why.**
+
+*Left to right* is what a slot compiler emits anyway: argument *i* evaluates
+into slot base+i under ADR-006's monotonic allocation, so the decision ratifies
+the obvious implementation rather than constraining it. Writing it down is what
+makes a later reordering "optimization" visible as the semantic change it is —
+`throw` is a core form (ADR-007) and cells are mutable (ADR-020), so which of
+two side-effecting arguments runs first is observable, not a compiler liberty.
+
+*Arity in the callee* falls out of ADR-027: globals are rebindable `CellId`
+entries, so a global's arity at compile time is not its arity at call time. A
+call-site check would need invalidation machinery on every rebind, or an
+assumption that is quietly false. One check, in one place, on entry — and the
+prologue is already the path tail calls pass through (ADR-028).
+
+*Empty list rather than `nil`* is the one deviation here, taken on the
+correctness clause of constraint #4. Clojure's nil rest argument forces every
+variadic body to handle two types for one parameter, and an empty list is truthy
+while `nil` is not — so the two spellings of "no extra arguments" take different
+branches. That is a `TRAPS.md` entry we would be creating deliberately. There is
+no code to port and no users to break, and widening to accept `nil` later is
+safe.
+
+*One parameter list* keeps the prologue to a check rather than a switch.
+Multi-arity dispatch is a second mechanism for a convenience a macro can supply
+later over a single variadic `fn`; ergonomics is last (`ETHOS.md`).
+
+**Cost.** Fixed evaluation order forecloses argument reordering — which ADR-021
+already makes a semantic change requiring an entry, so the cost is naming it.
+The arity check is one comparison per call that a compile-time check could
+sometimes elide; measure before caring. No multi-arity means Clojure code using
+it needs a rewrite or the deferred macro, and the rest-argument deviation means
+ported code testing `(nil? more)` reads differently. Both are the kind of break
+the freedom clause exists for.
+
+**Rejected.** *Unspecified evaluation order* — standard for C-family compilers
+and wrong here: with `throw` in the core the order is observable, and
+"unspecified" in practice means the first implementation decides it silently,
+which is the failure Q20 exists to prevent. *Compile-time arity checking* —
+unsound against ADR-027's rebindable globals without invalidation machinery.
+*Implicit `nil` for missing arguments* — turns a caught error into a wrong
+answer. *Clojure's `nil` rest argument* — see why. *Multi-arity bodies* —
+deferred, not refused.
+
+**Open.** Maximum arity is a bytecode-encoding question, not a semantic one, and
+belongs with the instruction format in milestone 2 rather than here.
+
+---
+
 ## Errata
 
 Factual corrections to entries whose **decision still stands**. A wrong reason is

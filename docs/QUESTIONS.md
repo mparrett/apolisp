@@ -15,12 +15,18 @@ Q17 (→ADR-027), Q21 (→ADR-030).*
 
 ## Before milestone 1 — reader, printer, forms
 
-**Q20 — The v1 semantic surface.**
+**Q20 — The v1 semantic surface.** *(Partly resolved by ADR-033.)*
 "A small Lisp in the Clojure dialect" orients but does not decide. Unspecified
-and about to be filled in differently by whoever writes the code first:
-evaluation order, arity behavior on under/over-supply, duplicate map keys, which
-collection literals exist, characters, sets, variadic functions, exception
-values, and cross-type collection equality.
+and about to be filled in differently by whoever writes the code first.
+
+**Answered — ADR-033**, because milestone 2 forces them: evaluation order, arity
+behaviour on under/over-supply, and variadic functions. A compiler has to emit
+*something* for each, so whichever got written first would have become the
+answer by default.
+
+**Still open:** duplicate map keys, which collection literals exist, characters,
+sets, and cross-type collection equality. Exception values now sit with **Q23**,
+which is the same question from the host side.
 
 Wanted: **one compact table** — in v1 / deliberately different from Clojure /
 deferred — covering only the edges milestones 1–6 actually hit. Explicitly not a

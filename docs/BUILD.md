@@ -35,7 +35,7 @@ Each milestone is a runnable artifact.
 
 | # | Milestone | Exit condition |
 |---:|---|---|
-| 1 | Reader + printer + forms with span origins | **Done** (`8149c8e`) — round-trip + span-invariants properties pass |
+| 1 | Reader + printer + forms with span origins | **Done** (`ffcefa7`) — round-trip + span-invariants properties pass |
 | 2 | Core AST + slot compiler + disassembler | Golden `.disasm` for hand-written forms |
 | 3 | VM: frames, calls, closures, `if`/`let`/`fn`, tail calls | `smoke.sh` runs a recursive function; a tail loop runs in constant space |
 | 4 | Errors, `try`/`throw`/`finally`, handler stack | Failure transcripts in the corpus; cleanup runs exactly once |
@@ -60,23 +60,29 @@ Climb in this order:
 program end to end; exit nonzero on failure. Write this *before* the reader is
 finished — a failing smoke test is a better queue than an empty one.
 
-**Rung 3 — behavior is pinned.** A corpus of `.xs` programs, each with four
-committed snapshots:
+**Rung 3 — behavior is pinned.** A corpus of `.xs` programs, each with a committed
+snapshot per phase:
 
 ```
 tests/corpus/<name>.xs
 tests/corpus/<name>.forms      # reader output, printed
+tests/corpus/<name>.spans      # the same forms with their origins (ADR-026)
 tests/corpus/<name>.expanded   # post-macroexpansion forms
 tests/corpus/<name>.disasm     # bytecode disassembly
 tests/corpus/<name>.out        # execution transcript (see below)
 ```
+
+`.spans` is the fifth, added by ADR-026 point 3. It exists because origins live
+outside the value graph, so the printed form cannot show them, and a mutation
+check proved the structural invariant alone was dead without it — see
+`notes/milestone-1-pilot.md`.
 
 `.out` is a canonical transcript, not just stdout: exit status, the final value
 *or* the thrown value, stdout, and any diagnostics. Milestone 4 puts failures in
 the corpus, and a failure with no defined record is a failure that cannot be
 pinned.
 
-Four snapshots per program localizes a regression to a phase before anyone reads
+A snapshot per phase localizes a regression to one phase before anyone reads
 a diff. This is the highest-leverage thing in the project and should exist by the
 end of week one. It is also what makes reckless optimization safe (ADR-021) and
 what keeps the system discussable once the code is real.
@@ -93,8 +99,14 @@ detail:
 - **Reader round-trip.** `read(print(read(s))) == read(s)`, comparing data and
   **ignoring span origins** — printing moves columns, so a span-sensitive
   equality here can only fail. Catches printer/reader drift. Span behavior is
-  pinned separately by the span-invariants property and the debug-mode `.forms`
-  snapshots (ADR-026).
+  pinned separately by the span-invariants property and the `.spans` snapshots
+  (ADR-026).
+
+  Compared on **values, not on printed strings** (ADR-031). String comparison
+  looks like the same test and is not: it cannot see a round trip that changes
+  type while printing identically, which is exactly how `1e400` escaped
+  (ADR-032). Floats compare by bit pattern, so `##NaN` and `-0.0` mean what
+  they should here regardless of how Q13 settles language `=`.
 - **Serialization round-trip.** Run to fuel exhaustion at an instruction
   boundary, take an `Image`, resume it in a fresh VM of the same build, and
   compare the full transcript against uninterrupted execution. Runs against a

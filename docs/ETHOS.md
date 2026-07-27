@@ -62,6 +62,6 @@ multithreaded execution within one VM.
 - Overloaded and unfamiliar terms: `GLOSSARY.md`.
 - What the sibling repos already measured: `PRIOR-ART.md`.
 
-The four-snapshot golden corpus is the one piece of process that earns its
+The per-phase golden corpus is the one piece of process that earns its
 weight: it makes reckless optimization safe, and it is how the whole system stays
 discussable once the code is real.

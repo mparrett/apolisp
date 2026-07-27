@@ -4,7 +4,8 @@ A small Lisp in the Clojure dialect with its own VM, in Rust. Substrate for
 terminal applications, web services, and simulators. One user; the language may
 break on a Tuesday.
 
-No code yet. What exists is the design, and it is meant to be read in this order.
+Milestone 1 is in: reader, printer, and forms with span origins. Everything
+after it is still design, and the design is meant to be read in this order.
 
 ## Normative — read to implement
 

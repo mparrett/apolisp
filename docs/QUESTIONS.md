@@ -26,6 +26,13 @@ Wanted: **one compact table** — in v1 / deliberately different from Clojure /
 deferred — covering only the edges milestones 1–6 actually hit. Explicitly not a
 grammar, not a standard-library plan. If it starts becoming either, stop.
 
+Note the cost of one entry in that list. **Characters** are cheap to answer and
+expensive to answer late: ADR-025 froze the `Value` enum without a `Char`
+variant, and the size is asserted. The original design conversation recommended
+including one — "it gives reader and Unicode APIs a clear scalar-value type" —
+and no entry records rejecting it, so this is an omission rather than a
+decision. Answering "yes, characters exist" means superseding ADR-025.
+
 ## Before milestone 3 — VM, calls, closures
 
 **Q10 — Integer overflow semantics.**
@@ -52,6 +59,30 @@ special form only on evidence from a real attempt. Note the interaction from
 ADR-028 rule 2: a `recur` inside a `try` with a `finally` is not a tail call, so
 the macro has to either reject that shape or accept the frame.
 
+## Before milestone 4 — errors
+
+**Q23 — What is an error, as a value?**
+`ETHOS.md` puts error quality outside the priority ranking entirely, and ADR-014
+lists error semantics as owned outright and never delegated. Neither says what an
+error *is*. Milestone 4 puts failure transcripts in the corpus, and a `.out` file
+cannot pin a thrown value whose shape is undecided.
+
+The original design conversation proposed structured values with a small closed
+vocabulary of kinds rather than formatted strings:
+
+```clojure
+{:type :io-error :operation :open :path "data.txt" :kind :not-found}
+```
+
+with `:not-found :permission-denied :closed :timeout :interrupted :invalid-data
+:would-block :connection-reset :other`, and the raw host code preserved as
+metadata so programs do not depend on platform-specific numbers. None of that is
+recorded anywhere. Q20 parks "exception values" as part of the v1 surface, which
+is the language half; this is the host half and it lands at milestones 4 and 7.
+
+Decide whether the taxonomy is closed, and whether host errors and language
+`throw` produce the same shape.
+
 ## Before milestone 6 — collections
 
 **Q6 — Collection representation and transients.**
@@ -68,6 +99,30 @@ ordinary id edges. What remains: `Rc`-shared immutable structure (strings,
 collections, closures) still needs identity preserved across a round-trip, or a
 snapshot expands shared structure into copies. Decide whether that is a
 correctness requirement or an accepted size cost in v1.
+
+**Q22 — Where do clock and randomness enter, and can a run be replayed?**
+Simulators are one of the three workloads this substrate exists for
+(`ETHOS.md`), and the only trace of this in the decisions is ADR-013 listing RNG
+among the gateable host capabilities. Nothing says where nondeterminism enters
+or how it is reproduced.
+
+This is not only a simulator concern. **It is load-bearing for the serialization
+round-trip property**, which `BUILD.md` calls the oracle for constraint #2: that
+property runs to fuel exhaustion, resumes in a fresh VM, and compares the full
+transcript against uninterrupted execution. A program that reads a wall clock or
+an unseeded RNG produces two different transcripts for reasons that have nothing
+to do with the snapshot, so the oracle flaps and — per `BUILD.md`'s own warning
+about flapping goldens — gets disabled. ADR-029 already lists "deterministic
+counters" among the state ADR-005 omitted; this is the same requirement, one
+level up.
+
+The original design conversation proposed passing nondeterministic inputs
+explicitly through runtime services — `clock/monotonic`, `clock/wall`, `rng/new`,
+`rng/next`, `sim/yield` — with a seeded RNG and virtual clock available so a run
+is reproducible, and ADR-014 already budgets `rand` as a dependency.
+
+Decide: are clock and RNG injected capabilities that a snapshot captures, and is
+a seeded, virtual-clock profile a first-class execution mode or a convention?
 
 ## Before milestone 9 — REPL
 

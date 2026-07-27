@@ -1133,3 +1133,16 @@ struct LocatedForm { root: Value, origins: Origins }
 A map contributes two children per pair, key then value. The decision is
 unchanged — origins live outside the value graph, positionally, covering
 immediates — but the single-field sketch was not implementable as written.
+
+**E-10 — ADR-031, which step this is.** The entry calls the library/driver split
+"the second step of ADR-015's stated progression." It is the third. ADR-015's
+progression is *one file → one crate with file modules → library + binaries →
+workspace*, and the split went from the first straight to the third: `lib.rs`
+still holds inline `mod` blocks, so the file-modules step was skipped, not
+taken. The decision stands and the reasoning is unaffected — the trigger was the
+test boundary, not file size, which is exactly why the intermediate step was not
+the one that helped.
+
+The original design conversation (`archive/lispy-language-vm-convo-2026-07-25.md`)
+lists a five-stage version with *one crate with inline modules* as its own step;
+ADR-015 compressed that to four. Under either count, file modules were skipped.

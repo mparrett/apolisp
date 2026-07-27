@@ -1302,6 +1302,56 @@ range table is a size question for milestone 8 and changes nothing semantic.
 
 ---
 
+### ADR-035 — A collection literal in code position is a call
+
+*(New, 2026-07-26. Answers the part of Q20 milestone 2 forces. Q20 stays open
+for the rest.)*
+
+**Decision.** `[a b]` in code position compiles as `(vector a b)`, and `{k v}`
+as `(hash-map k v)`. `()` evaluates to itself, as in Clojure; `[]` and `{}` are
+zero-argument calls like any other empty literal.
+
+The constructor is resolved as a **global, bypassing lexical scope**: `[x]` is a
+vector literal even where a local named `vector` is in scope.
+
+**Why.** ADR-033 already decided that collection literals evaluate their elements,
+left to right, key before value. ADR-007 already decided the core is closed at 13
+forms. Those two together leave exactly one option that does not break either.
+
+A `Vector(Vec<Expr>)` node in the core AST would be a fourteenth core form — the
+compiler would no longer be authoritative about a closed list, which is the whole
+of ADR-007's "read the compiler, know the language." Lowering to a call keeps the
+list at 13 and gets ADR-033's evaluation order for free, because it is then
+ordinary argument evaluation and there is no second rule to keep in agreement
+with the first.
+
+Clojure emits direct construction rather than a call here. It can afford to:
+its special-form set is not closed by decision, and its compiler already knows
+about persistent collection types. Ours does not, and milestone 6 is where
+collections get a representation at all (Q6).
+
+**Cost.** Rebinding the global `vector` or `hash-map` changes what a literal
+means, everywhere, silently. That is a real wart and it is the price of the
+closed core. It is also self-inflicted by construction — one user, no
+compatibility contract — and the alternative is a permanent fourteenth form.
+Second cost: a literal of constants is built at run time rather than folded into
+the constant pool. Folding it later is a compiler-local optimization that changes
+no semantics (ADR-021), and doing it now would mean a literal's meaning depended
+on whether its elements happened to be constant.
+
+**Rejected.** *A `MakeVec`/`MakeMap` instruction pair* — the instructions are
+free, but the core AST node they need is not; see why. *Constant-folding literals
+whose elements are all constants* — a special case that makes the same syntax
+mean two different things, for a saving nothing has asked for. *Resolving the
+constructor through lexical scope* — makes `[x]` mean something different inside
+a `let` that happens to bind `vector`, which is worse than the global wart in
+every way.
+
+**Open.** Which collection literals exist at all — sets, and whether map literals
+survive contact with Q6's representation — is still Q20's.
+
+---
+
 ## Errata
 
 Factual corrections to entries whose **decision still stands**. A wrong reason is

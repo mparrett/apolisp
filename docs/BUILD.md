@@ -148,6 +148,12 @@ several of its headline findings are its own hypotheses being falsified
 
 Two lines in a commit message is enough. This is a habit, not a document.
 
+When a pass outgrows a commit message it goes in `notes/`, one file per
+milestone, named `milestone-N-<topic>.md`. A pass belongs to the milestone whose
+code it mutated rather than to the session that ran it — milestone 3's was filed
+under milestone 2 for a while, and the cross-reference in a later note is what
+found it.
+
 ## Two rules
 
 **The oracle is review-gated.** No golden file is regenerated to go green without

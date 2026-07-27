@@ -42,10 +42,10 @@ place a frame is released, called by both returning and unwinding, so "unwinding
 forgets to give the slots back" is no longer expressible as a local change —
 writing it means breaking returning too, and that is caught by eight tests.
 
-**The contrast with milestone 3's M6 is the useful part.** That mutant —
-*returning truncates the slot stack to the callee's base* — failed two tests,
-because it discards the caller's own slots and produces wrong values. This one
-truncates nothing. Same line, two directions: the direction that corrupts is
+**The contrast with milestone 3's M6 is the useful part**
+(`milestone-3-mutants.md`). That mutant — *returning truncates the slot stack to
+the callee's base* — failed two tests, because it discards the caller's own slots
+and produces wrong values. This one truncates nothing. Same line, two directions: the direction that corrupts is
 covered, the direction that merely retains is not covered by anything, and was
 not covered for milestone 3 either. Nobody noticed because the mutant nobody
 wrote is the one that survives.

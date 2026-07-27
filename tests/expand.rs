@@ -80,10 +80,11 @@ fn defmacro_comes_from_the_prelude_in_the_language() {
 /// the top level is a sequence, one phase earlier than ADR-033 says it.
 #[test]
 fn a_macro_is_available_after_its_definition_and_not_before() {
-    // Used before it is defined, `when` is an ordinary call and stays one.
+    // Used before it is defined, `later` is an ordinary call and stays one.
+    // (The name matters: a prelude macro would already be defined here.)
     assert_eq!(
-        expand_ok("(when a b)\n(defmacro when [t & b] `(if ~t (do ~@b) nil))"),
-        "(when a b)\n(quote when)"
+        expand_ok("(later a b)\n(defmacro later [t & b] `(if ~t (do ~@b) nil))"),
+        "(later a b)\n(quote later)"
     );
 }
 
@@ -137,19 +138,62 @@ fn template_errors_say_where() {
 #[test]
 fn auto_gensym_is_one_fresh_name_per_template() {
     let out = expand_ok("(defmacro twice [e] `(let [v# ~e] (+ v# v#)))\n(twice 21)");
-    assert!(out.contains("(let [v__1 21] (+ v__1 v__1))"), "got {out}");
+    let name = auto_name(&out);
+    assert!(
+        out.contains(&format!("(let [{name} 21] (+ {name} {name}))")),
+        "got {out}"
+    );
 
     // Two templates never collide, even for the same written name.
     let out = expand_ok(
         "(defmacro a [e] `(let [v# ~e] v#))\n(defmacro b [e] `(let [v# ~e] v#))\n(a 1)\n(b 2)",
     );
-    assert!(out.contains("(let [v__1 1] v__1)"), "got {out}");
-    assert!(out.contains("(let [v__2 2] v__2)"), "got {out}");
+    let names: Vec<&str> = out.matches("v__").map(|_| "").collect();
+    assert_eq!(names.len(), 4, "two templates, two uses each: {out}");
+    let first = auto_name(&out);
+    assert!(
+        !out.contains(&format!("(let [{first} 2] {first})")),
+        "the second template reused the first template's name: {out}"
+    );
 
     // The caller's own `v` is untouched by the macro's.
+    let out = expand_ok("(defmacro twice [e] `(let [v# ~e] (+ v# v#)))\n(let [v 1] (twice v))");
+    let name = auto_name(&out);
     assert_eq!(
-        expand_ok("(defmacro twice [e] `(let [v# ~e] (+ v# v#)))\n(let [v 1] (twice v))"),
-        "(quote twice)\n(let [v 1] (let [v__1 v] (+ v__1 v__1)))"
+        out,
+        format!("(quote twice)\n(let [v 1] (let [{name} v] (+ {name} {name})))")
+    );
+}
+
+/// The first generated name in an expansion, whatever number it got.
+///
+/// The number is deliberately not asserted: the prelude's own templates consume
+/// the counter first, so adding a macro there shifts every later name. What
+/// matters is that the names are fresh and distinct, not what they are called —
+/// and the counter being *shared* with the prelude is what makes that true (see
+/// the test below).
+fn auto_name(out: &str) -> String {
+    let at = out.find("v__").expect("a generated name");
+    out[at..]
+        .chars()
+        .take_while(|c| c.is_alphanumeric() || *c == '_')
+        .collect()
+}
+
+/// The gensym counter is shared with the prelude, and that is load-bearing.
+///
+/// Reset it after the prelude and user names would start at 1 again — which is
+/// tidier and reintroduces capture: `or` binds a temporary, and a user template
+/// that binds the same generated name and then calls `or` around it would have
+/// its own reference captured by the prelude's binding. This program is exactly
+/// that shape, and it must evaluate to 1.
+#[test]
+fn a_user_template_is_not_captured_by_a_prelude_macro() {
+    let out = expand_ok("(defmacro t [] `(let [v# 1] (or false v#)))\n(t)");
+    let outer = auto_name(&out);
+    assert!(
+        out.matches(&format!("[{outer} ")).count() == 1,
+        "the prelude and the user template share a name: {out}"
     );
 }
 
@@ -183,7 +227,7 @@ fn expansion_is_deterministic_across_units() {
 #[test]
 fn gensym_is_available_to_a_macro_that_computes_a_name() {
     let out = expand_ok("(defmacro t [] (list (quote quote) (gensym \"n\")))\n(t)");
-    assert!(out.ends_with("(quote n__1)"), "got {out}");
+    assert!(out.contains("(quote n__"), "got {out}");
 }
 
 // --- Expansion order and bounds -----------------------------------------------

@@ -17,3 +17,30 @@
 (set-macro! def
   (fn def [name value]
     `(set-global! ~name ~value)))
+
+; The conditionals every program writes, as macros over `if` — which is the
+; only one of them the core has. `and` and `or` cannot be functions: they have
+; to *not evaluate* what they skip.
+(defmacro when [test & body]
+  `(if ~test (do ~@body) nil))
+
+(defmacro unless [test & body]
+  `(if ~test nil (do ~@body)))
+
+; Both yield the *value* that decided them, not a boolean: `and` gives the
+; first falsy one and `or` the first truthy one, as in Clojure. `v#` is why
+; neither repeats its test — evaluating it twice is where a side effect goes
+; missing.
+(defmacro and [& xs]
+  (if (empty? xs)
+    true
+    (if (empty? (rest xs))
+      (first xs)
+      `(let [v# ~(first xs)] (if v# (and ~@(rest xs)) v#)))))
+
+(defmacro or [& xs]
+  (if (empty? xs)
+    nil
+    (if (empty? (rest xs))
+      (first xs)
+      `(let [v# ~(first xs)] (if v# v# (or ~@(rest xs)))))))

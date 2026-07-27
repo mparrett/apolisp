@@ -220,7 +220,7 @@ fn arity_is_checked_in_the_callee_at_call_time() {
         ("((fn [a] a))", "takes 1 argument(s), given 0"),
         ("((fn [a] a) 1 2)", "takes 1 argument(s), given 2"),
         ("((fn [a & b] a))", "takes at least 1 argument(s), given 0"),
-        ("(+ 1 nil)", "needs an integer"),
+        ("(+ 1 nil)", "needs a number"),
         ("(1 2)", "cannot call a int"),
     ] {
         let err = run(src).expect_err(&format!("{src:?} should fault"));
@@ -388,7 +388,7 @@ fn a_vm_fault_is_a_throw() {
             "(try (* 9223372036854775807 2) (catch e e))",
             ":kind :overflow",
         ),
-        ("(try (+ 1 2.5) (catch e e))", ":kind :undecided"),
+        ("(try (quot 1 0) (catch e e))", ":kind :divide-by-zero"),
     ] {
         let got = value_of(src);
         assert!(got.contains(kind), "{src}: expected {kind:?} in {got:?}");
@@ -508,14 +508,20 @@ fn handlers_nest_and_survive_calls() {
     );
 }
 
-// --- Q26: what is deliberately not decided yet --------------------------------
+// --- ADR-041: the numeric tower ----------------------------------------------
 
-/// Q26: the numeric tower is undecided, so a float in arithmetic faults rather
-/// than being coerced. Coercing would settle the question in a match arm.
+/// Q26 used to be pinned open here — `(+ 1 2.5)` faulted rather than settle the
+/// tower in a match arm. ADR-041 settled it deliberately instead, and the
+/// language-level cases now live in `tests/lang/numbers.xs` where they can be
+/// read as language rather than as Rust.
 #[test]
-fn float_arithmetic_is_deferred_rather_than_guessed() {
-    let err = run("(+ 1 2.5)").expect_err("should fault");
-    assert!(err.contains("Q26"), "got {err:?}");
+fn arithmetic_coerces_and_the_two_overflow_stories_differ() {
+    assert_eq!(value_of("(+ 1 2.5)"), "3.5");
+    assert_eq!(value_of("(/ 7 2)"), "3.5");
+    // Integers throw where floats reach infinity — different rules, both
+    // deliberate (ADR-037, ADR-041).
+    assert!(run("(+ 9223372036854775807 1)").is_err());
+    assert_eq!(value_of("(* 1.0e308 10.0)"), "##Inf");
 }
 
 // --- The value a program produces ---------------------------------------------

@@ -10,7 +10,7 @@
 (quote as-data)
 (println (if (< 0 answer) (do :positive) nil))
 (println (if (if (< answer 0) false true) (do :not-negative) nil))
-(println (let [v__1 21] (+ v__1 v__1)))
+(println (let [v__3 21] (+ v__3 v__3)))
 (println [:a :b] {:tag :k :value 1} [:all 1 2])
 (println quoted-call)
 (println (quote (when a b)))

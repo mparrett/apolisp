@@ -132,19 +132,23 @@ pub mod value {
     #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
     pub struct BufferId(pub u32, pub u32);
 
-    #[derive(Debug)]
+    // `Clone` is not decoration: ADR-041 builds collections with
+    // `Rc::make_mut`, which mutates when the refcount is one and clones when it
+    // is not. That is where the transient win comes from, and it is why these
+    // derive `Clone` rather than being cloned by hand at each call site.
+    #[derive(Clone, Debug)]
     pub struct StrObj(pub String);
-    #[derive(Debug)]
+    #[derive(Clone, Debug)]
     pub struct BytesObj(pub Vec<u8>);
-    #[derive(Debug)]
+    #[derive(Clone, Debug)]
     pub struct ListObj(pub Vec<Value>);
-    #[derive(Debug)]
+    #[derive(Clone, Debug)]
     pub struct VecObj(pub Vec<Value>);
     /// Insertion-ordered pairs. Q6 owns the real representation; this one is
     /// provisional and deliberately the dumbest thing that reads back in the
     /// order it was written, because iteration order reaches golden output and
     /// nondeterminism there kills the oracle (BUILD.md).
-    #[derive(Debug)]
+    #[derive(Clone, Debug)]
     pub struct MapObj(pub Vec<(Value, Value)>);
 
     /// An index into the VM's native function table (ADR-038).
@@ -210,6 +214,92 @@ pub mod value {
                 _ => false,
             }
         }
+    }
+
+    /// Language equality (ADR-041 part 2): structural, crossing list and
+    /// vector, never crossing `Int` and `Float`.
+    ///
+    /// Deliberately not Rust's `PartialEq` on `Value`, which is the wrong
+    /// answer for the language and is kept for what it is right for — constant
+    /// pool deduplication, where `1` and `1.0` must stay distinct entries
+    /// (`TRAPS.md`).
+    pub fn equal(a: &Value, b: &Value) -> bool {
+        match (a, b) {
+            (Value::Nil, Value::Nil) => true,
+            (Value::Bool(x), Value::Bool(y)) => x == y,
+            (Value::Int(x), Value::Int(y)) => x == y,
+            // IEEE, so `##NaN` equals nothing and `-0.0` equals `0.0`. Compared
+            // as numbers rather than bit patterns, which is the difference
+            // between this and the constant pool's rule.
+            (Value::Float(x), Value::Float(y)) => x == y,
+            (Value::Str(x), Value::Str(y)) => x.0 == y.0,
+            (Value::Bytes(x), Value::Bytes(y)) => x.0 == y.0,
+            (Value::Sym(x), Value::Sym(y)) => x == y,
+            (Value::Keyword(x), Value::Keyword(y)) => x == y,
+            // One abstraction, two representations.
+            (Value::List(x), Value::List(y)) => seq_equal(&x.0, &y.0),
+            (Value::Vec(x), Value::Vec(y)) => seq_equal(&x.0, &y.0),
+            (Value::List(x), Value::Vec(y)) | (Value::Vec(y), Value::List(x)) => {
+                seq_equal(&x.0, &y.0)
+            }
+            (Value::Map(x), Value::Map(y)) => map_equal(&x.0, &y.0),
+            // No structure to compare: these are identities.
+            (Value::Fn(x), Value::Fn(y)) => Rc::ptr_eq(x, y),
+            (Value::Cell(x), Value::Cell(y)) => x == y,
+            (Value::Handle(x), Value::Handle(y)) => x == y,
+            (Value::Buffer(x), Value::Buffer(y)) => x == y,
+            _ => false,
+        }
+    }
+
+    fn seq_equal(a: &[Value], b: &[Value]) -> bool {
+        a.len() == b.len() && a.iter().zip(b).all(|(x, y)| equal(x, y))
+    }
+
+    /// Insertion order is not part of a map's identity, so this is a
+    /// membership check both ways rather than a zip. Quadratic, and the size
+    /// where that matters is the size where the representation itself is the
+    /// problem (ADR-041's cost clause).
+    fn map_equal(a: &[(Value, Value)], b: &[(Value, Value)]) -> bool {
+        a.len() == b.len()
+            && a.iter().all(|(k, v)| {
+                b.iter()
+                    .find(|(k2, _)| equal(k, k2))
+                    .is_some_and(|(_, v2)| equal(v, v2))
+            })
+    }
+
+    /// Identity for the *constant pool*, which is a different question from
+    /// language `=` (ADR-041 part 2) and from Rust's derived `PartialEq`.
+    ///
+    /// Two constants may share a pool entry only if no program can tell them
+    /// apart. Floats therefore compare by **bit pattern**: `-0.0` and `0.0` are
+    /// equal as numbers and are not the same constant, and merging them makes
+    /// `(/ 1.0 0.0)` produce `##-Inf` in a chunk that mentioned `-0.0`
+    /// earlier — a miscompilation with no diagnostic, which is what the
+    /// in-language suite caught. `##NaN` merges with itself by the same rule,
+    /// which is safe for the opposite reason: identical bits, no observable
+    /// difference.
+    pub fn same_const(a: &Value, b: &Value) -> bool {
+        match (a, b) {
+            (Value::Float(x), Value::Float(y)) => x.to_bits() == y.to_bits(),
+            // Never across representations: a list and a vector are equal to
+            // the language and are still two different constants.
+            (Value::List(x), Value::List(y)) => same_consts(&x.0, &y.0),
+            (Value::Vec(x), Value::Vec(y)) => same_consts(&x.0, &y.0),
+            (Value::Map(x), Value::Map(y)) => {
+                x.0.len() == y.0.len()
+                    && x.0
+                        .iter()
+                        .zip(&y.0)
+                        .all(|((k1, v1), (k2, v2))| same_const(k1, k2) && same_const(v1, v2))
+            }
+            _ => a == b,
+        }
+    }
+
+    fn same_consts(a: &[Value], b: &[Value]) -> bool {
+        a.len() == b.len() && a.iter().zip(b).all(|(x, y)| same_const(x, y))
     }
 
     /// One table for symbols and keywords. They are distinct `Value` variants
@@ -417,7 +507,9 @@ pub mod value {
 /// later (ADR-014).
 pub mod reader {
     use crate::error::{LispErr, Span, SpanOrigin};
-    use crate::value::{Interner, ListObj, LocatedForm, MapObj, Origins, StrObj, Value, VecObj};
+    use crate::value::{
+        equal, Interner, ListObj, LocatedForm, MapObj, Origins, StrObj, Value, VecObj,
+    };
     use std::rc::Rc;
 
     /// ADR-036. Every phase in front of the VM recurses on the host stack — the
@@ -651,12 +743,27 @@ pub mod reader {
                             _ => {}
                         }
                         let v = self.read_form()?;
-                        // Q20 owns duplicate keys. Reading them through keeps
-                        // the reader honest about what the source said; a later
-                        // phase can reject or collapse.
-                        pairs.push((k.root, v.root));
-                        origins.push(k.origins);
-                        origins.push(v.origins);
+                        // Last write wins, so a map never holds two equal
+                        // keys (ADR-041 part 4) — including a map literal,
+                        // which is construction like any other. The surviving
+                        // *key* is the first occurrence, so its position is
+                        // where the map says it came from; only the value and
+                        // its origin are replaced, which keeps origins paired
+                        // with the pairs they describe (ADR-026).
+                        match pairs
+                            .iter()
+                            .position(|(existing, _)| equal(existing, &k.root))
+                        {
+                            Some(i) => {
+                                pairs[i].1 = v.root;
+                                origins[i * 2 + 1] = v.origins;
+                            }
+                            None => {
+                                pairs.push((k.root, v.root));
+                                origins.push(k.origins);
+                                origins.push(v.origins);
+                            }
+                        }
                     }
                 }
             }
@@ -1223,7 +1330,7 @@ pub mod compile {
         CaptureIdx, CaptureSrc, Chunk, ConstIdx, Instr, Pc, Proto, ProtoIdx, Slot,
     };
     use crate::error::{LispErr, SpanOrigin};
-    use crate::value::{kind_name, Interner, LocatedForm, Origins, SymId, Value};
+    use crate::value::{kind_name, same_const, Interner, LocatedForm, Origins, SymId, Value};
 
     pub type LocalId = u32;
 
@@ -1912,12 +2019,13 @@ pub mod compile {
             }
         }
 
-        /// Constants are deduplicated by language `=`, deliberately: it never
-        /// merges `1` with `1.0` (Q13) or a list with a vector (Q20), and it
-        /// never merges `##NaN` with itself, which costs a duplicate entry and
-        /// is the correct answer under IEEE rules.
+        /// Constants are deduplicated by `same_const`, which is neither Rust's
+        /// `PartialEq` nor the language's `=`. Two constants share an entry
+        /// only when no program can tell them apart, so `1` never merges with
+        /// `1.0`, a list never merges with a vector, and — the one that
+        /// actually bit — `0.0` never merges with `-0.0`.
         fn konst(&mut self, v: &Value, dst: Slot, o: SpanOrigin) {
-            let k = match self.consts.iter().position(|c| c == v) {
+            let k = match self.consts.iter().position(|c| same_const(c, v)) {
                 Some(k) => k,
                 None => {
                     self.consts.push(v.clone());
@@ -2190,6 +2298,9 @@ pub mod vm {
         NotCallable,
         Type,
         Overflow,
+        /// Integer division by zero (ADR-041). Floats reach `##Inf` instead,
+        /// which is IEEE's answer and not an error.
+        DivideByZero,
         /// A decision this language has deliberately not taken, reached at run
         /// time. Q26's floats are the only one so far.
         Undecided,
@@ -2199,12 +2310,13 @@ pub mod vm {
 
     impl Kind {
         /// In discriminant order, which is what `kind as usize` indexes.
-        const ALL: [Kind; 7] = [
+        const ALL: [Kind; 8] = [
             Kind::Arity,
             Kind::Unbound,
             Kind::NotCallable,
             Kind::Type,
             Kind::Overflow,
+            Kind::DivideByZero,
             Kind::Undecided,
             Kind::Internal,
         ];
@@ -2216,6 +2328,7 @@ pub mod vm {
                 Kind::NotCallable => "not-callable",
                 Kind::Type => "type",
                 Kind::Overflow => "overflow",
+                Kind::DivideByZero => "divide-by-zero",
                 Kind::Undecided => "undecided",
                 Kind::Internal => "internal",
             }
@@ -3651,35 +3764,397 @@ pub mod expand {
 /// `map` and `set-global!` can rebind any of them — the wart ADR-038 accepts.
 pub mod prim {
     use crate::printer;
-    use crate::value::{ListObj, MapObj, Value, VecObj};
+    use crate::value::{equal, kind_name, BytesObj, ListObj, MapObj, StrObj, Value, VecObj};
     use crate::vm::{fault, Fault, Kind, Vm};
     use std::rc::Rc;
 
     pub fn install(vm: &mut Vm) {
-        vm.native("+", 0, true, |_, a| int_fold(a, 0, i64::checked_add, "+"));
-        vm.native("*", 0, true, |_, a| int_fold(a, 1, i64::checked_mul, "*"));
+        // --- numbers (ADR-041 part 3) ---------------------------------------
+        vm.native("+", 0, true, |_, a| {
+            fold(a, 0, i64::checked_add, |x, y| x + y, "+")
+        });
+        vm.native("*", 0, true, |_, a| {
+            fold(a, 1, i64::checked_mul, |x, y| x * y, "*")
+        });
         vm.native("-", 1, true, |_, a| {
-            let first = int_arg(&a[0], "-")?;
+            let first = num(&a[0], "-")?;
             if a.len() == 1 {
-                return first
-                    .checked_neg()
-                    .map(Value::Int)
-                    .ok_or_else(|| overflow("-"));
+                return Ok(match first {
+                    Num::Int(i) => Value::Int(i.checked_neg().ok_or_else(|| overflow("-"))?),
+                    Num::Float(f) => Value::Float(-f),
+                });
             }
             let mut acc = first;
             for v in &a[1..] {
-                acc = acc
-                    .checked_sub(int_arg(v, "-")?)
-                    .ok_or_else(|| overflow("-"))?;
+                let n = num(v, "-")?;
+                acc = match (acc, n) {
+                    (Num::Int(x), Num::Int(y)) => {
+                        Num::Int(x.checked_sub(y).ok_or_else(|| overflow("-"))?)
+                    }
+                    _ => Num::Float(as_f64(acc) - as_f64(n)),
+                };
             }
-            Ok(Value::Int(acc))
+            Ok(number(acc))
         });
+        // Always a float: there are no ratios, and truncating under the `/`
+        // spelling is the silent wrong answer ADR-037 rejected (ADR-041).
+        vm.native("/", 1, true, |_, a| {
+            let first = as_f64(num(&a[0], "/")?);
+            if a.len() == 1 {
+                return Ok(Value::Float(1.0 / first));
+            }
+            let mut acc = first;
+            for v in &a[1..] {
+                acc /= as_f64(num(v, "/")?);
+            }
+            Ok(Value::Float(acc))
+        });
+        vm.native("quot", 2, false, |_, a| int_div(a, "quot"));
+        vm.native("rem", 2, false, |_, a| int_div(a, "rem"));
         vm.native("<", 2, false, |_, a| {
-            Ok(Value::Bool(int_arg(&a[0], "<")? < int_arg(&a[1], "<")?))
+            Ok(Value::Bool(compare(&a[0], &a[1], "<")?.is_lt()))
         });
         vm.native(">", 2, false, |_, a| {
-            Ok(Value::Bool(int_arg(&a[0], ">")? > int_arg(&a[1], ">")?))
+            Ok(Value::Bool(compare(&a[0], &a[1], ">")?.is_gt()))
         });
+        vm.native("<=", 2, false, |_, a| {
+            Ok(Value::Bool(compare(&a[0], &a[1], "<=")?.is_le()))
+        });
+        vm.native(">=", 2, false, |_, a| {
+            Ok(Value::Bool(compare(&a[0], &a[1], ">=")?.is_ge()))
+        });
+        // Numeric equality, which *does* cross Int and Float — the escape
+        // hatch for `=` being type-strict (ADR-041 part 2).
+        vm.native("==", 2, false, |_, a| {
+            Ok(Value::Bool(compare(&a[0], &a[1], "==")?.is_eq()))
+        });
+
+        // --- equality and truth ----------------------------------------------
+        vm.native("=", 1, true, |_, a| {
+            Ok(Value::Bool(a.windows(2).all(|p| equal(&p[0], &p[1]))))
+        });
+        vm.native("not=", 1, true, |_, a| {
+            Ok(Value::Bool(!a.windows(2).all(|p| equal(&p[0], &p[1]))))
+        });
+        // Only nil and false are falsy (`TRAPS.md`), and this is the one place
+        // that rule exists outside the `JumpUnless` opcode.
+        vm.native("not", 1, false, |_, a| {
+            Ok(Value::Bool(matches!(a[0], Value::Nil | Value::Bool(false))))
+        });
+
+        // --- collections (ADR-041 parts 1 and 4) -----------------------------
+        // `nil` reads as the empty thing on the operations that read, and as
+        // the empty thing *of the operation's own kind* on the ones that build.
+        vm.native("count", 1, false, |_, a| match &a[0] {
+            Value::Nil => Ok(Value::Int(0)),
+            Value::List(l) => Ok(Value::Int(l.0.len() as i64)),
+            Value::Vec(x) => Ok(Value::Int(x.0.len() as i64)),
+            Value::Map(m) => Ok(Value::Int(m.0.len() as i64)),
+            // ADR-018: a string is not a sequence, and `count` on one is the
+            // question "in what unit" wearing a shorter name.
+            Value::Str(_) => Err(fault(
+                Kind::Type,
+                "`count` on a string: say the unit — `str-len` for bytes, \
+                 `str-scalars` for scalar values (ADR-018)"
+                    .to_string(),
+            )),
+            other => Err(fault(
+                Kind::Type,
+                format!("`count` needs a collection, not a {}", kind_name(other)),
+            )),
+        });
+        vm.native("first", 1, false, |_, a| match &a[0] {
+            Value::Nil => Ok(Value::Nil),
+            Value::List(l) => Ok(l.0.first().cloned().unwrap_or(Value::Nil)),
+            Value::Vec(x) => Ok(x.0.first().cloned().unwrap_or(Value::Nil)),
+            other => Err(fault(
+                Kind::Type,
+                format!("`first` needs a sequence, not a {}", kind_name(other)),
+            )),
+        });
+        // Always a list, whatever it was given: `rest` is the sequence
+        // operation, and a list is what a sequence prints as.
+        vm.native("rest", 1, false, |_, a| {
+            let items = match &a[0] {
+                Value::Nil => Vec::new(),
+                Value::List(l) => l.0.iter().skip(1).cloned().collect(),
+                Value::Vec(x) => x.0.iter().skip(1).cloned().collect(),
+                other => {
+                    return Err(fault(
+                        Kind::Type,
+                        format!("`rest` needs a sequence, not a {}", kind_name(other)),
+                    ))
+                }
+            };
+            Ok(Value::List(Rc::new(ListObj(items))))
+        });
+        // Strict where `get` is forgiving: an index off the end is a mistake
+        // with a position, not a `nil` that turns up somewhere else later.
+        vm.native("nth", 2, false, |_, a| {
+            let items = seq_items(&a[0], "nth")?;
+            let i = index(&a[1], "nth")?;
+            items
+                .get(i)
+                .cloned()
+                .ok_or_else(|| fault(Kind::Type, format!("`nth` index {i} of {}", items.len())))
+        });
+        vm.native("get", 2, true, |_, a| {
+            let missing = a.get(2).cloned().unwrap_or(Value::Nil);
+            Ok(match &a[0] {
+                Value::Nil => missing,
+                Value::Map(m) => {
+                    m.0.iter()
+                        .find(|(k, _)| equal(k, &a[1]))
+                        .map(|(_, v)| v.clone())
+                        .unwrap_or(missing)
+                }
+                Value::List(l) => nth_or(&l.0, &a[1], missing),
+                Value::Vec(x) => nth_or(&x.0, &a[1], missing),
+                other => {
+                    return Err(fault(
+                        Kind::Type,
+                        format!("`get` needs a collection, not a {}", kind_name(other)),
+                    ))
+                }
+            })
+        });
+        vm.native("contains?", 2, false, |_, a| {
+            Ok(Value::Bool(match &a[0] {
+                Value::Nil => false,
+                Value::Map(m) => m.0.iter().any(|(k, _)| equal(k, &a[1])),
+                // A key, not a value — Clojure's rule, and the one that
+                // surprises people who expect it to search a vector.
+                Value::List(l) => in_range(l.0.len(), &a[1]),
+                Value::Vec(x) => in_range(x.0.len(), &a[1]),
+                other => {
+                    return Err(fault(
+                        Kind::Type,
+                        format!("`contains?` needs a collection, not a {}", kind_name(other)),
+                    ))
+                }
+            }))
+        });
+        vm.native("empty?", 1, false, |_, a| {
+            Ok(Value::Bool(match &a[0] {
+                Value::Nil => true,
+                Value::List(l) => l.0.is_empty(),
+                Value::Vec(x) => x.0.is_empty(),
+                Value::Map(m) => m.0.is_empty(),
+                other => {
+                    return Err(fault(
+                        Kind::Type,
+                        format!("`empty?` needs a collection, not a {}", kind_name(other)),
+                    ))
+                }
+            }))
+        });
+        // Where the copy-on-write lives (ADR-041 part 1). A list grows at the
+        // front and a vector at the back, as in Clojure — `conj` adds where the
+        // representation is cheap, and says so by doing it.
+        vm.native("conj", 1, true, |_, a| {
+            let rest = &a[1..];
+            Ok(match &a[0] {
+                Value::Nil => Value::List(Rc::new(ListObj(rest.iter().rev().cloned().collect()))),
+                Value::List(l) => {
+                    let mut out = l.clone();
+                    let items = &mut Rc::make_mut(&mut out).0;
+                    for v in rest {
+                        items.insert(0, v.clone());
+                    }
+                    Value::List(out)
+                }
+                Value::Vec(x) => {
+                    let mut out = x.clone();
+                    Rc::make_mut(&mut out).0.extend(rest.iter().cloned());
+                    Value::Vec(out)
+                }
+                Value::Map(m) => {
+                    let mut out = m.clone();
+                    for v in rest {
+                        let pair = seq_items(v, "conj")?;
+                        if pair.len() != 2 {
+                            return Err(fault(
+                                Kind::Type,
+                                "`conj` on a map needs a key/value pair".to_string(),
+                            ));
+                        }
+                        put(
+                            &mut Rc::make_mut(&mut out).0,
+                            pair[0].clone(),
+                            pair[1].clone(),
+                        );
+                    }
+                    Value::Map(out)
+                }
+                other => {
+                    return Err(fault(
+                        Kind::Type,
+                        format!("`conj` needs a collection, not a {}", kind_name(other)),
+                    ))
+                }
+            })
+        });
+        vm.native("assoc", 3, true, |_, a| {
+            if !a[1..].len().is_multiple_of(2) {
+                return Err(fault(
+                    Kind::Arity,
+                    "`assoc` needs a value for every key".to_string(),
+                ));
+            }
+            Ok(match &a[0] {
+                Value::Nil | Value::Map(_) => {
+                    let mut out = match &a[0] {
+                        Value::Map(m) => m.clone(),
+                        _ => Rc::new(MapObj(Vec::new())),
+                    };
+                    let pairs = &mut Rc::make_mut(&mut out).0;
+                    for p in a[1..].chunks(2) {
+                        put(pairs, p[0].clone(), p[1].clone());
+                    }
+                    Value::Map(out)
+                }
+                Value::Vec(x) => {
+                    let mut out = x.clone();
+                    let items = &mut Rc::make_mut(&mut out).0;
+                    for p in a[1..].chunks(2) {
+                        let i = index(&p[0], "assoc")?;
+                        if i >= items.len() {
+                            return Err(fault(
+                                Kind::Type,
+                                format!("`assoc` index {i} of {}", items.len()),
+                            ));
+                        }
+                        items[i] = p[1].clone();
+                    }
+                    Value::Vec(out)
+                }
+                other => {
+                    return Err(fault(
+                        Kind::Type,
+                        format!("`assoc` needs a map or vector, not a {}", kind_name(other)),
+                    ))
+                }
+            })
+        });
+        vm.native("dissoc", 1, true, |_, a| {
+            Ok(match &a[0] {
+                Value::Nil => Value::Nil,
+                Value::Map(m) => {
+                    let mut out = m.clone();
+                    Rc::make_mut(&mut out)
+                        .0
+                        .retain(|(k, _)| !a[1..].iter().any(|d| equal(k, d)));
+                    Value::Map(out)
+                }
+                other => {
+                    return Err(fault(
+                        Kind::Type,
+                        format!("`dissoc` needs a map, not a {}", kind_name(other)),
+                    ))
+                }
+            })
+        });
+        vm.native("keys", 1, false, |_, a| map_part(&a[0], "keys", true));
+        vm.native("vals", 1, false, |_, a| map_part(&a[0], "vals", false));
+
+        // --- cells (ADR-020, ADR-025) ----------------------------------------
+        // The mutable layer. `set-cell!` is a core form and until now there was
+        // no way to make the thing it writes to.
+        vm.native("cell", 1, false, |vm, a| {
+            Ok(Value::Cell(vm.new_cell(a[0].clone())))
+        });
+        vm.native("cell-get", 1, false, |vm, a| match &a[0] {
+            Value::Cell(id) => vm
+                .cell(*id)
+                .cloned()
+                .ok_or_else(|| fault(Kind::Internal, "cell is no longer live".to_string())),
+            other => Err(fault(
+                Kind::Type,
+                format!("`cell-get` needs a cell, not a {}", kind_name(other)),
+            )),
+        });
+
+        // --- strings and bytes (ADR-018, ADR-041 part 5) ----------------------
+        vm.native("str", 0, true, |vm, a| {
+            let mut out = String::new();
+            for v in a {
+                out.push_str(&printer::display(v, &vm.interner));
+            }
+            Ok(Value::Str(Rc::new(StrObj(out))))
+        });
+        vm.native("str-len", 1, false, |_, a| {
+            Ok(Value::Int(string(&a[0], "str-len")?.len() as i64))
+        });
+        // Byte indices, because ADR-018 promises no O(1) character indexing.
+        // A cut that lands inside a character is an error rather than a panic
+        // in the renderer downstream.
+        vm.native("str-slice", 3, false, |_, a| {
+            let s = string(&a[0], "str-slice")?;
+            let (from, to) = (index(&a[1], "str-slice")?, index(&a[2], "str-slice")?);
+            if from > to || to > s.len() {
+                return Err(fault(
+                    Kind::Type,
+                    format!("`str-slice` {from}..{to} of {} bytes", s.len()),
+                ));
+            }
+            if !s.is_char_boundary(from) || !s.is_char_boundary(to) {
+                return Err(fault(
+                    Kind::Type,
+                    format!("`str-slice` {from}..{to} splits a character"),
+                ));
+            }
+            Ok(Value::Str(Rc::new(StrObj(s[from..to].to_string()))))
+        });
+        // Scalar values as integers, since ADR-025 has no character type.
+        vm.native("str-scalars", 1, false, |_, a| {
+            let s = string(&a[0], "str-scalars")?;
+            let items = s.chars().map(|c| Value::Int(c as i64)).collect();
+            Ok(Value::Vec(Rc::new(VecObj(items))))
+        });
+        vm.native("scalars-str", 1, false, |_, a| {
+            let items = seq_items(&a[0], "scalars-str")?;
+            let mut out = String::new();
+            for v in &items {
+                let n = index(v, "scalars-str")? as u32;
+                match char::from_u32(n) {
+                    Some(c) => out.push(c),
+                    None => {
+                        return Err(fault(
+                            Kind::Type,
+                            format!("{n} is not a Unicode scalar value"),
+                        ))
+                    }
+                }
+            }
+            Ok(Value::Str(Rc::new(StrObj(out))))
+        });
+        vm.native("str-bytes", 1, false, |_, a| {
+            let s = string(&a[0], "str-bytes")?;
+            Ok(Value::Bytes(Rc::new(BytesObj(s.as_bytes().to_vec()))))
+        });
+        vm.native("bytes-str", 1, false, |_, a| match &a[0] {
+            Value::Bytes(b) => match std::str::from_utf8(&b.0) {
+                Ok(s) => Ok(Value::Str(Rc::new(StrObj(s.to_string())))),
+                // ADR-018 asks for defined behaviour here rather than a
+                // replacement character nobody notices.
+                Err(e) => Err(fault(
+                    Kind::Type,
+                    format!("`bytes-str`: not valid UTF-8 at byte {}", e.valid_up_to()),
+                )),
+            },
+            other => Err(fault(
+                Kind::Type,
+                format!("`bytes-str` needs bytes, not a {}", kind_name(other)),
+            )),
+        });
+        vm.native("bytes-len", 1, false, |_, a| match &a[0] {
+            Value::Bytes(b) => Ok(Value::Int(b.0.len() as i64)),
+            other => Err(fault(
+                Kind::Type,
+                format!("`bytes-len` needs bytes, not a {}", kind_name(other)),
+            )),
+        });
+
         vm.native("println", 0, true, |vm, a| {
             let line: Vec<String> = a
                 .iter()
@@ -3760,10 +4235,114 @@ pub mod prim {
             if !a.len().is_multiple_of(2) {
                 return Err(fault(Kind::Arity, "`hash-map` needs a value for every key"));
             }
-            Ok(Value::Map(Rc::new(MapObj(
-                a.chunks(2).map(|p| (p[0].clone(), p[1].clone())).collect(),
-            ))))
+            // Last write wins, so a map never holds two equal keys (ADR-041
+            // part 4). That this was not already true is the first thing the
+            // in-language suite caught.
+            let mut pairs = Vec::new();
+            for p in a.chunks(2) {
+                put(&mut pairs, p[0].clone(), p[1].clone());
+            }
+            Ok(Value::Map(Rc::new(MapObj(pairs))))
         });
+    }
+
+    // --- collection helpers ---------------------------------------------------
+
+    fn seq_items(v: &Value, op: &str) -> Result<Vec<Value>, Fault> {
+        match v {
+            Value::Nil => Ok(Vec::new()),
+            Value::List(l) => Ok(l.0.clone()),
+            Value::Vec(x) => Ok(x.0.clone()),
+            other => Err(fault(
+                Kind::Type,
+                format!("`{op}` needs a sequence, not a {}", kind_name(other)),
+            )),
+        }
+    }
+
+    fn string<'a>(v: &'a Value, op: &str) -> Result<&'a str, Fault> {
+        match v {
+            Value::Str(s) => Ok(&s.0),
+            other => Err(fault(
+                Kind::Type,
+                format!("`{op}` needs a string, not a {}", kind_name(other)),
+            )),
+        }
+    }
+
+    fn index(v: &Value, op: &str) -> Result<usize, Fault> {
+        match v {
+            Value::Int(i) if *i >= 0 => Ok(*i as usize),
+            Value::Int(i) => Err(fault(
+                Kind::Type,
+                format!("`{op}` needs a non-negative index, not {i}"),
+            )),
+            other => Err(fault(
+                Kind::Type,
+                format!("`{op}` needs an integer index, not a {}", kind_name(other)),
+            )),
+        }
+    }
+
+    fn nth_or(items: &[Value], key: &Value, missing: Value) -> Value {
+        match key {
+            Value::Int(i) if *i >= 0 => items.get(*i as usize).cloned().unwrap_or(missing),
+            _ => missing,
+        }
+    }
+
+    fn in_range(len: usize, key: &Value) -> bool {
+        matches!(key, Value::Int(i) if *i >= 0 && (*i as usize) < len)
+    }
+
+    /// Last write wins, and a map never holds two equal keys (ADR-041 part 4).
+    fn put(pairs: &mut Vec<(Value, Value)>, k: Value, v: Value) {
+        match pairs.iter_mut().find(|(existing, _)| equal(existing, &k)) {
+            Some(slot) => slot.1 = v,
+            None => pairs.push((k, v)),
+        }
+    }
+
+    fn map_part(v: &Value, op: &str, want_key: bool) -> Result<Value, Fault> {
+        let pairs = match v {
+            Value::Nil => Vec::new(),
+            Value::Map(m) => m.0.clone(),
+            other => {
+                return Err(fault(
+                    Kind::Type,
+                    format!("`{op}` needs a map, not a {}", kind_name(other)),
+                ))
+            }
+        };
+        let items = pairs
+            .into_iter()
+            .map(|(k, val)| if want_key { k } else { val })
+            .collect();
+        Ok(Value::List(Rc::new(ListObj(items))))
+    }
+
+    /// `quot` and `rem`: integer division, and the one place dividing by zero
+    /// is an error rather than an infinity (ADR-041 part 3).
+    fn int_div(a: &[Value], op: &str) -> Result<Value, Fault> {
+        let (x, y) = match (num(&a[0], op)?, num(&a[1], op)?) {
+            (Num::Int(x), Num::Int(y)) => (x, y),
+            _ => {
+                return Err(fault(
+                    Kind::Type,
+                    format!("`{op}` needs integers; `/` is the float division"),
+                ))
+            }
+        };
+        if y == 0 {
+            return Err(fault(Kind::DivideByZero, format!("`{op}` by zero")));
+        }
+        // `checked_*` covers the one overflowing case, i64::MIN / -1.
+        let r = if op == "quot" {
+            x.checked_div(y)
+        } else {
+            x.checked_rem(y)
+        };
+        Ok(Value::Int(r.ok_or_else(|| overflow(op))?))
     }
 
     fn overflow(op: &str) -> Fault {
@@ -3773,36 +4352,82 @@ pub mod prim {
         )
     }
 
-    /// Q26: mixing integers and floats, and float arithmetic at all, is
-    /// undecided. Faulting is the option that does not answer it by accident —
-    /// silently coercing would fix the numeric tower here, in a match arm.
-    fn int_arg(v: &Value, op: &str) -> Result<i64, Fault> {
+    /// One arithmetic operand, as the tower sees it (ADR-041 part 3). A float
+    /// anywhere in the operands makes the whole operation a float one, which is
+    /// the only rule the caller needs.
+    #[derive(Clone, Copy)]
+    enum Num {
+        Int(i64),
+        Float(f64),
+    }
+
+    fn num(v: &Value, op: &str) -> Result<Num, Fault> {
         match v {
-            Value::Int(i) => Ok(*i),
-            Value::Float(_) => Err(fault(
-                Kind::Undecided,
-                format!("`{op}` on a float: the numeric tower is undecided (Q26)"),
-            )),
+            Value::Int(i) => Ok(Num::Int(*i)),
+            Value::Float(f) => Ok(Num::Float(*f)),
             other => Err(fault(
                 Kind::Type,
-                format!(
-                    "`{op}` needs an integer, not a {}",
-                    crate::value::kind_name(other)
-                ),
+                format!("`{op}` needs a number, not a {}", kind_name(other)),
             )),
         }
     }
 
-    fn int_fold(
+    fn as_f64(n: Num) -> f64 {
+        match n {
+            Num::Int(i) => i as f64,
+            Num::Float(f) => f,
+        }
+    }
+
+    /// Fold the arguments, staying in integers until a float appears.
+    ///
+    /// The two halves fail differently on purpose: an integer that leaves the
+    /// range throws (ADR-037, a wrong answer with no diagnostic is the thing to
+    /// prevent), and a float that leaves it becomes `##Inf`, which is IEEE's
+    /// own out-of-range value and prints as itself (ADR-041 part 3).
+    fn fold(
         args: &[Value],
         init: i64,
-        op: fn(i64, i64) -> Option<i64>,
+        int_op: fn(i64, i64) -> Option<i64>,
+        float_op: fn(f64, f64) -> f64,
         name: &str,
     ) -> Result<Value, Fault> {
-        let mut acc = init;
+        let mut acc = Num::Int(init);
         for v in args {
-            acc = op(acc, int_arg(v, name)?).ok_or_else(|| overflow(name))?;
+            let n = num(v, name)?;
+            acc = match (acc, n) {
+                (Num::Int(a), Num::Int(b)) => Num::Int(int_op(a, b).ok_or_else(|| overflow(name))?),
+                _ => Num::Float(float_op(as_f64(acc), as_f64(n))),
+            };
         }
-        Ok(Value::Int(acc))
+        Ok(number(acc))
+    }
+
+    fn number(n: Num) -> Value {
+        match n {
+            Num::Int(i) => Value::Int(i),
+            Num::Float(f) => Value::Float(f),
+        }
+    }
+
+    /// Compare two numbers across the tower. `==` and the ordering primitives
+    /// share this, which is why `(< 1 1.5)` and `(== 1 1.0)` cannot disagree
+    /// about what a mixed comparison means.
+    fn compare(a: &Value, b: &Value, op: &str) -> Result<std::cmp::Ordering, Fault> {
+        let (x, y) = (num(a, op)?, num(b, op)?);
+        match (x, y) {
+            (Num::Int(a), Num::Int(b)) => Ok(a.cmp(&b)),
+            _ => as_f64(x)
+                .partial_cmp(&as_f64(y))
+                // `##NaN` is unordered against everything, itself included.
+                // Refusing beats inventing an answer that would make `<` and
+                // `>` both false and `=` false as well, with no diagnostic.
+                .ok_or_else(|| {
+                    fault(
+                        Kind::Type,
+                        format!("`{op}` on ##NaN, which is unordered (ADR-041)"),
+                    )
+                }),
+        }
     }
 }

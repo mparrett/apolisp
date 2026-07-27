@@ -1,0 +1,170 @@
+proto 0  <top>  params 0  slots 78
+  constants
+    k0  :one
+    k1  :body
+    k2  :cleanup-1
+    k3  :two
+    k4  :from-body
+    k5  :cleanup-2
+    k6  :three
+    k7  :first
+    k8  :second
+    k9  :cleanup-3
+    k10  :four
+    k11  :original
+    k12  :from-cleanup
+    k13  :five
+    k14  :six
+    k15  3
+    k16  :cleanup-6
+    k17  :uncaught
+    k18  :cleanup-7
+    k19  :from-cleanup-7
+  code
+    0000  GETGLOBAL   r2 <- println          9:2
+    0001  CONST       r3 <- k0               9:10
+    0002  PUSHFINALLY 0009                   9:15
+    0003  CONST       r4 <- k1               9:20
+    0004  POPHANDLER                         9:15
+    0005  GETGLOBAL   r6 <- println          9:36
+    0006  CONST       r7 <- k2               9:44
+    0007  CALL        r5 <- r6(1)            9:35
+    0008  JUMP        0013                   9:15
+    0009  GETGLOBAL   r9 <- println          9:36
+    0010  CONST       r10 <- k2              9:44
+    0011  CALL        r8 <- r9(1)            9:35
+    0012  ENDFINALLY                         9:15
+    0013  CALL        r1 <- r2(2)            9:1
+    0014  GETGLOBAL   r12 <- println         12:2
+    0015  CONST       r13 <- k3              12:10
+    0016  PUSHFINALLY 0028                   12:15
+    0017  PUSHHANDLER catch 0022, err r15    12:15
+    0018  CONST       r16 <- k4              12:27
+    0019  THROW       r16                    12:20
+    0020  POPHANDLER                         12:15
+    0021  JUMP        0023                   12:15
+    0022  MOVE        r14 <- r15             12:48
+    0023  POPHANDLER                         12:15
+    0024  GETGLOBAL   r18 <- println         12:61
+    0025  CONST       r19 <- k5              12:69
+    0026  CALL        r17 <- r18(1)          12:60
+    0027  JUMP        0032                   12:15
+    0028  GETGLOBAL   r21 <- println         12:61
+    0029  CONST       r22 <- k5              12:69
+    0030  CALL        r20 <- r21(1)          12:60
+    0031  ENDFINALLY                         12:15
+    0032  CALL        r11 <- r12(2)          12:1
+    0033  GETGLOBAL   r24 <- println         16:2
+    0034  CONST       r25 <- k6              16:10
+    0035  PUSHHANDLER catch 0055, err r27    17:3
+    0036  PUSHFINALLY 0049                   17:8
+    0037  PUSHHANDLER catch 0042, err r28    17:8
+    0038  CONST       r29 <- k7              17:20
+    0039  THROW       r29                    17:13
+    0040  POPHANDLER                         17:8
+    0041  JUMP        0044                   17:8
+    0042  CONST       r30 <- k8              17:44
+    0043  THROW       r30                    17:37
+    0044  POPHANDLER                         17:8
+    0045  GETGLOBAL   r32 <- println         17:64
+    0046  CONST       r33 <- k9              17:72
+    0047  CALL        r31 <- r32(1)          17:63
+    0048  JUMP        0053                   17:8
+    0049  GETGLOBAL   r35 <- println         17:64
+    0050  CONST       r36 <- k9              17:72
+    0051  CALL        r34 <- r35(1)          17:63
+    0052  ENDFINALLY                         17:8
+    0053  POPHANDLER                         17:3
+    0054  JUMP        0056                   17:3
+    0055  MOVE        r26 <- r27             18:17
+    0056  CALL        r23 <- r24(2)          16:1
+    0057  GETGLOBAL   r38 <- println         23:2
+    0058  CONST       r39 <- k10             23:10
+    0059  PUSHHANDLER catch 0072, err r41    24:3
+    0060  PUSHFINALLY 0067                   24:8
+    0061  CONST       r42 <- k11             24:20
+    0062  THROW       r42                    24:13
+    0063  POPHANDLER                         24:8
+    0064  CONST       r44 <- k12             24:47
+    0065  THROW       r44                    24:40
+    0066  JUMP        0070                   24:8
+    0067  CONST       r46 <- k12             24:47
+    0068  THROW       r46                    24:40
+    0069  ENDFINALLY                         24:8
+    0070  POPHANDLER                         24:3
+    0071  JUMP        0073                   24:3
+    0072  MOVE        r40 <- r41             25:17
+    0073  CALL        r37 <- r38(2)          23:1
+    0074  GETGLOBAL   r48 <- println         29:2
+    0075  CONST       r49 <- k13             29:10
+    0076  PUSHHANDLER catch 0081, err r51    29:16
+    0077  GETGLOBAL   r52 <- no-such-global  29:22
+    0078  CALL        r50 <- r52(0)          29:21
+    0079  POPHANDLER                         29:16
+    0080  JUMP        0082                   29:16
+    0081  MOVE        r50 <- r51             29:47
+    0082  CALL        r47 <- r48(2)          29:1
+    0083  CLOSURE     r53 <- proto 1         33:19
+    0084  SETGLOBAL   deep <- r53            33:1
+    0085  GETGLOBAL   r55 <- println         34:2
+    0086  CONST       r56 <- k14             34:10
+    0087  PUSHFINALLY 0100                   34:15
+    0088  PUSHHANDLER catch 0094, err r58    34:15
+    0089  GETGLOBAL   r59 <- deep            34:21
+    0090  CONST       r60 <- k15             34:26
+    0091  CALL        r57 <- r59(1)          34:20
+    0092  POPHANDLER                         34:15
+    0093  JUMP        0095                   34:15
+    0094  MOVE        r57 <- r58             34:38
+    0095  POPHANDLER                         34:15
+    0096  GETGLOBAL   r62 <- println         34:51
+    0097  CONST       r63 <- k16             34:59
+    0098  CALL        r61 <- r62(1)          34:50
+    0099  JUMP        0104                   34:15
+    0100  GETGLOBAL   r65 <- println         34:51
+    0101  CONST       r66 <- k16             34:59
+    0102  CALL        r64 <- r65(1)          34:50
+    0103  ENDFINALLY                         34:15
+    0104  CALL        r54 <- r55(2)          34:1
+    0105  PUSHFINALLY 0115                   39:1
+    0106  CONST       r67 <- k17             39:13
+    0107  THROW       r67                    39:6
+    0108  POPHANDLER                         39:1
+    0109  GETGLOBAL   r70 <- println         39:34
+    0110  CONST       r71 <- k18             39:42
+    0111  CALL        r69 <- r70(1)          39:33
+    0112  CONST       r72 <- k19             39:61
+    0113  THROW       r72                    39:54
+    0114  JUMP        0121                   39:1
+    0115  GETGLOBAL   r75 <- println         39:34
+    0116  CONST       r76 <- k18             39:42
+    0117  CALL        r74 <- r75(1)          39:33
+    0118  CONST       r77 <- k19             39:61
+    0119  THROW       r77                    39:54
+    0120  ENDFINALLY                         39:1
+    0121  RETURN      r0                     39:1
+
+proto 1  deep  params 1  slots 15
+  constants
+    k0  1
+    k1  :from-the-bottom
+    k2  0
+  code
+    0000  GETGLOBAL   r3 <- <                33:37
+    0001  MOVE        r4 <- r0               33:39
+    0002  CONST       r5 <- k0               33:41
+    0003  CALL        r2 <- r3(2)            33:36
+    0004  JUMPUNLESS  r2, 0008               33:32
+    0005  CONST       r6 <- k1               33:51
+    0006  THROW       r6                     33:44
+    0007  JUMP        0017                   33:32
+    0008  GETGLOBAL   r7 <- +                33:70
+    0009  CONST       r8 <- k2               33:72
+    0010  GETSELF     r10 <- self            33:75
+    0011  GETGLOBAL   r12 <- -               33:81
+    0012  MOVE        r13 <- r0              33:83
+    0013  CONST       r14 <- k0              33:85
+    0014  CALL        r11 <- r12(2)          33:80
+    0015  CALL        r9 <- r10(1)           33:74
+    0016  TAILCALL    r7(2)                  33:69
+    0017  RETURN      r1                     33:32

@@ -1,9 +1,14 @@
-//! Milestone 3 verification (BUILD.md): frames, calls, closures, tail calls.
+//! Milestones 3 and 4 (BUILD.md): frames, calls, closures, tail calls, and
+//! then errors, `try`/`throw`/`finally`, and the handler stack.
 //!
-//! The exit condition is "smoke.sh runs a recursive function; a tail loop runs
-//! in constant space". The first half is smoke's; the second half is not
-//! observable from outside the VM at all, so it is measured here — a tail loop
-//! that quietly grew the frame stack would still print the right answer.
+//! Milestone 3's exit condition is "smoke.sh runs a recursive function; a tail
+//! loop runs in constant space". The first half is smoke's; the second half is
+//! not observable from outside the VM at all, so it is measured here — a tail
+//! loop that quietly grew the frame stack would still print the right answer.
+//!
+//! Milestone 4's is "failure transcripts in the corpus; cleanup runs exactly
+//! once". The transcripts are goldens; "exactly once" is counted here, because
+//! a cleanup that runs twice produces the same *value* as one that runs once.
 //!
 //! Nothing here regenerates a golden file.
 
@@ -34,6 +39,11 @@ fn run(src: &str) -> Result<Ran, String> {
 }
 
 /// The same, plus the high-water marks.
+///
+/// The `Err` side is a program that threw. Since ADR-039 a VM fault *is* a
+/// throw, so this is where an arity error arrives too — rendered as the value
+/// plus the position that travels beside it, which is what the transcript
+/// prints and what these tests assert on.
 fn run_traced(src: &str) -> Result<(Ran, Peak), String> {
     let mut machine = Vm::new();
     let forms = reader::read_all(src, &mut machine.interner)
@@ -43,18 +53,42 @@ fn run_traced(src: &str) -> Result<(Ran, Peak), String> {
         .map_err(|e| e.render("<test>", src))
         .expect("the test source compiles");
     match vm::run_traced(&mut machine, &chunk) {
-        Ok((Outcome::Returned(v), (frames, slots))) => Ok((
+        (Outcome::Returned(v), (frames, slots)) => Ok((
             Ran {
                 value: printer::print(&v, &machine.interner),
                 output: machine.take_output(),
             },
             Peak { frames, slots },
         )),
-        Ok((Outcome::Threw(v), _)) => {
-            Err(format!("threw {}", printer::print(&v, &machine.interner)))
+        (Outcome::Threw(u), _) => {
+            let at = u.position("<test>", src).unwrap_or_else(|| "?".to_string());
+            let mut msg = format!(
+                "threw {} at {at}",
+                printer::print(&u.value, &machine.interner)
+            );
+            for v in &u.suppressed {
+                msg.push_str(&format!(
+                    ", suppressing {}",
+                    printer::print(v, &machine.interner)
+                ));
+            }
+            Err(msg)
         }
-        Err(e) => Err(e.render("<test>", src)),
     }
+}
+
+/// What a program printed, when it is the *order* of effects being pinned
+/// rather than the value. A program that ends in a throw still has output.
+fn output_of(src: &str) -> String {
+    let mut machine = Vm::new();
+    let forms = reader::read_all(src, &mut machine.interner)
+        .map_err(|e| e.render("<test>", src))
+        .expect("the test source reads");
+    let chunk = compile::compile(&forms, &mut machine.interner)
+        .map_err(|e| e.render("<test>", src))
+        .expect("the test source compiles");
+    vm::run(&mut machine, &chunk);
+    machine.take_output()
 }
 
 fn value_of(src: &str) -> String {
@@ -63,16 +97,16 @@ fn value_of(src: &str) -> String {
 
 // --- Golden transcripts -------------------------------------------------------
 
-/// Rung 3 (BUILD.md). Milestone 3 owns `.out`.
+/// Rung 3 (BUILD.md). Milestone 3 owns `.out`; milestone 4 puts failures in it.
 ///
-/// Only the programs that *run* have one. The rest reference globals nothing
-/// defines yet, so they fault — and a fault transcript is milestone 4's, which
-/// cannot be written before Q23 says what a thrown value is. The list is
-/// asserted rather than inferred, so adding a corpus program forces the choice
-/// instead of silently skipping it.
+/// Only the programs that *run to a defined end* have one, and since ADR-039
+/// that includes the ones that fail: `control.xs` faults on the first global
+/// nothing defines, and `errors.xs` ends on an uncaught throw. The rest still
+/// have none, and the list is asserted rather than inferred so adding a corpus
+/// program forces the choice instead of silently skipping it.
 #[test]
 fn out_transcripts_match() {
-    let runnable = ["hello.xs", "recursion.xs"];
+    let runnable = ["control.xs", "errors.xs", "hello.xs", "recursion.xs"];
     let with_out: Vec<String> = common::corpus_files()
         .iter()
         .filter(|p| p.with_extension("out").exists())
@@ -268,16 +302,169 @@ fn an_unbound_global_faults_where_it_was_used() {
     );
 }
 
-// --- ADR-038: what is deliberately not built yet ------------------------------
+// --- ADR-028 / ADR-039: the handler stack -------------------------------------
 
-/// `try` compiles (milestone 2) and does not run (milestone 4). The VM says so
-/// rather than skipping the instruction, because a handler that silently does
-/// nothing is the failure mode ADR-028 invariant 1 exists to prevent.
+/// Milestone 4's exit condition, and the one a value cannot show: a cleanup
+/// that runs twice produces the same answer as one that runs once. Every path
+/// prints, so the count is in the output.
+///
+/// The four paths are the ones milestone 2's reviewer traced on the emitted
+/// code: normal completion, a throw from the body, a throw from the handler,
+/// and a throw from the cleanup itself.
 #[test]
-fn try_compiles_but_does_not_run_yet() {
-    let err = run("(try 1 (finally 2))").expect_err("should fault");
-    assert!(err.contains("milestone 4"), "got {err:?}");
+fn cleanup_runs_exactly_once_on_every_path() {
+    for (src, want) in [
+        // Nothing thrown.
+        ("(try 1 (finally (println :c)))", ":c\n"),
+        // Thrown from the body, caught.
+        (
+            "(try (throw :x) (catch e e) (finally (println :c)))",
+            ":c\n",
+        ),
+        // Thrown from the handler: the catch region nests inside the finally
+        // region, so the cleanup still runs (ADR-034).
+        (
+            "(try (try (throw :x) (catch e (throw :y)) (finally (println :c))) (catch e e))",
+            ":c\n",
+        ),
+        // Thrown from the cleanup itself.
+        (
+            "(try (try (throw :x) (finally (println :c) (throw :y))) (catch e e))",
+            ":c\n",
+        ),
+        // Nothing catches it at all: the cleanup runs on the way out.
+        ("(try (throw :x) (finally (println :c)))", ":c\n"),
+    ] {
+        assert_eq!(output_of(src), want, "{src}");
+    }
 }
+
+/// A cleanup on a path that never throws must not run the *unwinding* copy as
+/// well — the two copies are the same source, so a double run is invisible in
+/// the value and obvious in the output.
+#[test]
+fn the_two_copies_of_a_cleanup_are_never_both_taken() {
+    assert_eq!(
+        output_of("(try (println :body) (finally (println :c))) (println :after)"),
+        ":body\n:c\n:after\n"
+    );
+}
+
+#[test]
+fn a_handler_binds_the_thrown_value() {
+    assert_eq!(value_of("(try (throw 42) (catch e e))"), "42");
+    assert_eq!(value_of("(try 1 (catch e e))"), "1");
+    // ADR-039 clause 1: no shape is imposed, so a collection throws as itself.
+    assert_eq!(
+        value_of("(try (throw {:kind :boom}) (catch e e))"),
+        "{:kind :boom}"
+    );
+}
+
+/// ADR-039 clause 2, the decision this milestone turns on: a VM-raised fault
+/// unwinds like a `throw`, so a handler catches one and a cleanup runs for it.
+#[test]
+fn a_vm_fault_is_a_throw() {
+    assert_eq!(
+        value_of("(try (no-such-global) (catch e e))"),
+        "{:type :vm-error :kind :unbound :message \"`no-such-global` is not bound\"}"
+    );
+    // The kind is the contract; the message is prose (ADR-039 clause 3).
+    for (src, kind) in [
+        ("(try ((fn [a] a)) (catch e e))", ":kind :arity"),
+        ("(try (1 2) (catch e e))", ":kind :not-callable"),
+        ("(try (+ 1 nil) (catch e e))", ":kind :type"),
+        (
+            "(try (* 9223372036854775807 2) (catch e e))",
+            ":kind :overflow",
+        ),
+        ("(try (+ 1 2.5) (catch e e))", ":kind :undecided"),
+    ] {
+        let got = value_of(src);
+        assert!(got.contains(kind), "{src}: expected {kind:?} in {got:?}");
+    }
+    // And the cleanup runs for a fault exactly as it does for a throw — the
+    // case `with-open` will depend on at milestone 7.
+    assert_eq!(output_of("(try (nope) (finally (println :c)))"), ":c\n");
+}
+
+/// ADR-028 invariant 3. The cleanup's error wins; the original is retained on
+/// it as suppressed, which is observable because both reach the transcript.
+#[test]
+fn a_cleanup_error_wins_and_keeps_the_original_as_suppressed() {
+    let err =
+        run("(try (throw :original) (finally (throw :from-cleanup)))").expect_err("should throw");
+    assert!(err.starts_with("threw :from-cleanup"), "got {err:?}");
+    assert!(err.contains("suppressing :original"), "got {err:?}");
+
+    // A throw the cleanup catches *itself* displaces nothing: the parked error
+    // resumes when the cleanup ends.
+    let err = run("(try (throw :original) (finally (try (throw :inner) (catch e e))))")
+        .expect_err("should throw");
+    assert!(err.starts_with("threw :original"), "got {err:?}");
+    assert!(!err.contains("suppressing"), "got {err:?}");
+}
+
+/// Unwinding is what drops the frames between the throw and the handler. The
+/// run continues afterwards, which is the part that would break if the slot
+/// stack were left where the throw abandoned it.
+#[test]
+fn unwinding_crosses_frames_and_leaves_the_machine_usable() {
+    let deep = "(set-global! deep (fn deep [n] (if (< n 1) (throw :bottom) (+ 0 (deep (- n 1))))))";
+    assert_eq!(
+        value_of(&format!("{deep}\n(try (deep 5) (catch e e))")),
+        ":bottom"
+    );
+    // Caught, then used: the slots the abandoned frames occupied are gone, so
+    // the arithmetic below runs in a frame that is the right width.
+    assert_eq!(
+        value_of(&format!("{deep}\n(+ 1 (try (deep 5) (catch e 41)))")),
+        "42"
+    );
+}
+
+/// ADR-028 rule 2 at run time. The compiler refuses to emit a tail call inside
+/// a handler region; the observable consequence is that the frame stack grows,
+/// which is the cost the rule accepts to keep the handler record meaningful.
+#[test]
+fn a_call_in_tail_position_inside_a_try_is_not_a_tail_call() {
+    let program = |n: i64| {
+        format!(
+            "(set-global! down (fn down [i] (try (if (< i {n}) (down (+ i 1)) i) (finally nil))))\n(down 0)"
+        )
+    };
+    let (short, small) = run_traced(&program(10)).unwrap();
+    let (long, big) = run_traced(&program(50)).unwrap();
+
+    assert_eq!(short.value, "10");
+    assert_eq!(long.value, "50");
+    assert!(
+        big.frames > small.frames,
+        "a loop inside a `try` stayed flat at {} frames — the handler region \
+         did not stop the tail call",
+        big.frames
+    );
+}
+
+/// The handler stack is not the Rust stack (ADR-004/ADR-028): a handler pushed
+/// in one frame survives the calls made under it, and nesting is unbounded by
+/// the host.
+#[test]
+fn handlers_nest_and_survive_calls() {
+    assert_eq!(
+        value_of("(try (try (throw :inner) (catch e (throw :outer))) (catch e e))"),
+        ":outer"
+    );
+    assert_eq!(
+        value_of(
+            "(set-global! boom (fn [] (throw :b)))\n\
+             (try (try (boom) (finally nil)) (catch e e))"
+        ),
+        ":b"
+    );
+}
+
+// --- Q26: what is deliberately not decided yet --------------------------------
 
 /// Q26: the numeric tower is undecided, so a float in arithmetic faults rather
 /// than being coerced. Coercing would settle the question in a match arm.

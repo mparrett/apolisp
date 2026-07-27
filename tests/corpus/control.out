@@ -1,0 +1,7 @@
+--- stdout
+--- threw
+{:type :vm-error :kind :unbound :message "`ready?` is not bound"}
+--- at
+tests/corpus/control.xs:3:6
+--- exit
+1

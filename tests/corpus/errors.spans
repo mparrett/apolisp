@@ -1,0 +1,140 @@
+393..450 list (println :one (try :body (finally (println :cleanup-1))))
+  394..401 symbol println
+  402..406 keyword :one
+  407..449 list (try :body (finally (println :cleanup-1)))
+    408..411 symbol try
+    412..417 keyword :body
+    418..448 list (finally (println :cleanup-1))
+      419..426 symbol finally
+      427..447 list (println :cleanup-1)
+        428..435 symbol println
+        436..446 keyword :cleanup-1
+528..610 list (println :two (try (throw :from-body) (catch e e) (finally (println :cleanup-2))))
+  529..536 symbol println
+  537..541 keyword :two
+  542..609 list (try (throw :from-body) (catch e e) (finally (println :cleanup-2)))
+    543..546 symbol try
+    547..565 list (throw :from-body)
+      548..553 symbol throw
+      554..564 keyword :from-body
+    566..577 list (catch e e)
+      567..572 symbol catch
+      573..574 symbol e
+      575..576 symbol e
+    578..608 list (finally (println :cleanup-2))
+      579..586 symbol finally
+      587..607 list (println :cleanup-2)
+        588..595 symbol println
+        596..606 keyword :cleanup-2
+763..884 list (println :three (try (try (throw :first) (catch e (throw :second)) (finally (println :cleanup-3))) (catch e e)))
+  764..771 symbol println
+  772..778 keyword :three
+  781..883 list (try (try (throw :first) (catch e (throw :second)) (finally (println :cleanup-3))) (catch e e))
+    782..785 symbol try
+    786..863 list (try (throw :first) (catch e (throw :second)) (finally (println :cleanup-3)))
+      787..790 symbol try
+      791..805 list (throw :first)
+        792..797 symbol throw
+        798..804 keyword :first
+      806..831 list (catch e (throw :second))
+        807..812 symbol catch
+        813..814 symbol e
+        815..830 list (throw :second)
+          816..821 symbol throw
+          822..829 keyword :second
+      832..862 list (finally (println :cleanup-3))
+        833..840 symbol finally
+        841..861 list (println :cleanup-3)
+          842..849 symbol println
+          850..860 keyword :cleanup-3
+    871..882 list (catch e e)
+      872..877 symbol catch
+      878..879 symbol e
+      880..881 symbol e
+1107..1205 list (println :four (try (try (throw :original) (finally (throw :from-cleanup))) (catch e e)))
+  1108..1115 symbol println
+  1116..1121 keyword :four
+  1124..1204 list (try (try (throw :original) (finally (throw :from-cleanup))) (catch e e))
+    1125..1128 symbol try
+    1129..1184 list (try (throw :original) (finally (throw :from-cleanup)))
+      1130..1133 symbol try
+      1134..1151 list (throw :original)
+        1135..1140 symbol throw
+        1141..1150 keyword :original
+      1152..1183 list (finally (throw :from-cleanup))
+        1153..1160 symbol finally
+        1161..1182 list (throw :from-cleanup)
+          1162..1167 symbol throw
+          1168..1181 keyword :from-cleanup
+    1192..1203 list (catch e e)
+      1193..1198 symbol catch
+      1199..1200 symbol e
+      1201..1202 symbol e
+1349..1399 list (println :five (try (no-such-global) (catch e e)))
+  1350..1357 symbol println
+  1358..1363 keyword :five
+  1364..1398 list (try (no-such-global) (catch e e))
+    1365..1368 symbol try
+    1369..1385 list (no-such-global)
+      1370..1384 symbol no-such-global
+    1386..1397 list (catch e e)
+      1387..1392 symbol catch
+      1393..1394 symbol e
+      1395..1396 symbol e
+1548..1639 list (set-global! deep (fn deep [n] (if (< n 1) (throw :from-the-bottom) (+ 0 (deep (- n 1))))))
+  1549..1560 symbol set-global!
+  1561..1565 symbol deep
+  1566..1638 list (fn deep [n] (if (< n 1) (throw :from-the-bottom) (+ 0 (deep (- n 1)))))
+    1567..1569 symbol fn
+    1570..1574 symbol deep
+    1575..1578 vector [n]
+      1576..1577 symbol n
+    1579..1637 list (if (< n 1) (throw :from-the-bottom) (+ 0 (deep (- n 1))))
+      1580..1582 symbol if
+      1583..1590 list (< n 1)
+        1584..1585 symbol <
+        1586..1587 symbol n
+        1588..1589 int 1
+      1591..1615 list (throw :from-the-bottom)
+        1592..1597 symbol throw
+        1598..1614 keyword :from-the-bottom
+      1616..1636 list (+ 0 (deep (- n 1)))
+        1617..1618 symbol +
+        1619..1620 int 0
+        1621..1635 list (deep (- n 1))
+          1622..1626 symbol deep
+          1627..1634 list (- n 1)
+            1628..1629 symbol -
+            1630..1631 symbol n
+            1632..1633 int 1
+1640..1712 list (println :six (try (deep 3) (catch e e) (finally (println :cleanup-6))))
+  1641..1648 symbol println
+  1649..1653 keyword :six
+  1654..1711 list (try (deep 3) (catch e e) (finally (println :cleanup-6)))
+    1655..1658 symbol try
+    1659..1667 list (deep 3)
+      1660..1664 symbol deep
+      1665..1666 int 3
+    1668..1679 list (catch e e)
+      1669..1674 symbol catch
+      1675..1676 symbol e
+      1677..1678 symbol e
+    1680..1710 list (finally (println :cleanup-6))
+      1681..1688 symbol finally
+      1689..1709 list (println :cleanup-6)
+        1690..1697 symbol println
+        1698..1708 keyword :cleanup-6
+1908..1986 list (try (throw :uncaught) (finally (println :cleanup-7) (throw :from-cleanup-7)))
+  1909..1912 symbol try
+  1913..1930 list (throw :uncaught)
+    1914..1919 symbol throw
+    1920..1929 keyword :uncaught
+  1931..1985 list (finally (println :cleanup-7) (throw :from-cleanup-7))
+    1932..1939 symbol finally
+    1940..1960 list (println :cleanup-7)
+      1941..1948 symbol println
+      1949..1959 keyword :cleanup-7
+    1961..1984 list (throw :from-cleanup-7)
+      1962..1967 symbol throw
+      1968..1983 keyword :from-cleanup-7
+ok: span invariants hold

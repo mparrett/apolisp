@@ -1,0 +1,20 @@
+--- stdout
+:cleanup-1
+:one :body
+:cleanup-2
+:two :from-body
+:cleanup-3
+:three :second
+:four :from-cleanup
+:five {:type :vm-error :kind :unbound :message "`no-such-global` is not bound"}
+:cleanup-6
+:six :from-the-bottom
+:cleanup-7
+--- threw
+:from-cleanup-7
+--- at
+tests/corpus/errors.xs:39:54
+--- suppressed
+:uncaught
+--- exit
+1

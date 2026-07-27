@@ -21,14 +21,26 @@ pub fn bin() -> &'static str {
 }
 
 pub fn run_cmd(cmd: &str, path: &Path) -> Result<String, String> {
+    // From the repository root, with a repository-relative path. A diagnostic
+    // prints the path it was given (`--- at`, since ADR-039), so running this
+    // with the absolute path the harness builds would put the checkout
+    // directory in a golden file — and a golden that differs per machine is the
+    // determinism failure BUILD.md is emphatic about. It also makes the harness
+    // and `just bless` pass byte-identical arguments.
+    let relative = path.strip_prefix(repo_root()).unwrap_or(path);
     let out = Command::new(bin())
+        .current_dir(repo_root())
         .arg(cmd)
-        .arg(path)
+        .arg(relative)
         .output()
         .expect("failed to run apolisp");
     let stdout = String::from_utf8_lossy(&out.stdout).into_owned();
     let stderr = String::from_utf8_lossy(&out.stderr).into_owned();
-    if out.status.success() {
+    // A program that failed is still a program with a transcript (BUILD.md:
+    // `.out` records the exit status, so a failure has to be able to reach the
+    // file). The driver exits 1 for "the program failed" and 2 or 3 for "the
+    // driver could not run it" — only the second kind has nothing to compare.
+    if out.status.success() || (out.status.code() == Some(1) && !stdout.is_empty()) {
         Ok(stdout)
     } else {
         Err(stderr)

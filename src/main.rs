@@ -134,20 +134,27 @@ fn main() -> ExitCode {
             let stdout = vm.take_output();
             print!("--- stdout\n{stdout}");
             match outcome {
-                Ok(vm::Outcome::Returned(v)) => {
+                vm::Outcome::Returned(v) => {
                     println!("--- value\n{}", printer::print(&v, &vm.interner));
                     println!("--- exit\n0");
                     ExitCode::SUCCESS
                 }
-                Ok(vm::Outcome::Threw(v)) => {
-                    println!("--- threw\n{}", printer::print(&v, &vm.interner));
-                    println!("--- exit\n1");
-                    ExitCode::FAILURE
-                }
-                // A host fault is not a language value until Q23 (ADR-038), so
-                // it is reported as a diagnostic and never as a thrown value.
-                Err(e) => {
-                    println!("--- fault\n{}", e.render(path, &src));
+                // ADR-039: a VM fault is a throw, so there is one section for
+                // both. Position and the suppressed chain travel beside the
+                // value rather than inside it, so they print as their own
+                // sections — and a section is absent rather than empty when
+                // there is nothing to say.
+                vm::Outcome::Threw(u) => {
+                    println!("--- threw\n{}", printer::print(&u.value, &vm.interner));
+                    if let Some(at) = u.position(path, &src) {
+                        println!("--- at\n{at}");
+                    }
+                    if !u.suppressed.is_empty() {
+                        println!("--- suppressed");
+                        for v in &u.suppressed {
+                            println!("{}", printer::print(v, &vm.interner));
+                        }
+                    }
                     println!("--- exit\n1");
                     ExitCode::FAILURE
                 }

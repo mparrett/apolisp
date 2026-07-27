@@ -1153,6 +1153,155 @@ belongs with the instruction format in milestone 2 rather than here.
 
 ---
 
+### ADR-034 — The instruction format: a typed enum, and the spellings the core was missing
+
+*(New, 2026-07-26. Answers ADR-033's Open clause. Reads ADR-006 through E-5.
+Refines ADR-007's core-form list with two spellings it never fixed.)*
+
+**Decision.** Five parts.
+
+**1. An instruction is a Rust enum with named, typed fields.** No bit packing, no
+operand-width question.
+
+```rust
+pub enum Instr {
+    Const      { dst: Slot, k: ConstIdx },
+    Move       { dst: Slot, src: Slot },
+    GetGlobal  { dst: Slot, name: SymId },
+    SetGlobal  { name: SymId, src: Slot },
+    GetCapture { dst: Slot, idx: CaptureIdx },
+    GetSelf    { dst: Slot },
+    SetCell    { cell: Slot, src: Slot },
+    Closure    { dst: Slot, proto: ProtoIdx },
+    Call       { dst: Slot, base: Slot, argc: u32 },
+    TailCall   { base: Slot, argc: u32 },
+    Return     { src: Slot },
+    Jump       { target: Pc },
+    JumpUnless { cond: Slot, target: Pc },
+    Throw      { src: Slot },
+    PushHandler { catch: Pc, err: Slot },
+    PushFinally { target: Pc },
+    PopHandler,
+    EndFinally,
+}
+```
+
+`Slot`, `ConstIdx`, `Pc`, `ProtoIdx`, and `CaptureIdx` are all `u32`.
+`size_of::<Instr>() <= 16` is asserted the way `size_of::<Value>()` is
+(ADR-025) — the number is measured, not assumed.
+
+A call's callee sits at `base` and its arguments at `base+1 ..= base+argc`, which
+is where left-to-right evaluation into monotonically allocated slots puts them
+anyway (ADR-033). The callee's frame receives the arguments in its own slots
+`0..argc`, so parameters are the first slots of a frame by construction.
+
+**2. There is no maximum arity.** Arity is bounded by the slot space and, long
+before that, by memory. This is the answer to ADR-033's Open clause, not a
+deferral of it: the encoding imposes no limit, so there is no number to state.
+
+**3. A global is referenced by its interned `SymId`.** The name→cell resolution
+is the VM's, at run time. ADR-027's rule that globals are VM-owned `CellId`
+entries is unchanged; what this fixes is that the *operand* is the name.
+
+**4. The unit of compilation is a `Chunk`: a flat `Vec<Proto>`, with `protos[0]`
+the top level.** A `Proto` carries `code`, a `lines` array parallel to it
+(ADR-023 point 2), a constant pool, capture descriptors, the parameter count and
+variadic flag, and the slot count. Nested `fn`s are separate protos referenced by
+index, reserved in source order so the disassembly is stable. A file's top-level
+proto takes no parameters, evaluates each top-level form in order, and returns
+the last — `nil` for an empty file.
+
+**5. The two core forms that had no spelling get one, and `try` gets its shape.**
+
+- ADR-027's top-level create-or-rebind operation is **`set-global!`**:
+  `(set-global! name expr)`, `name` unevaluated. `def` and `defmacro` are the
+  library macros over it, as that entry says.
+- **`fn` takes an optional name** — `(fn name? [params] body*)` — bound only
+  inside the body, to the running closure's own identity, compiled as `GetSelf`.
+  This is ADR-002's self-recursion exception made real: the name resolves through
+  identity, never through a capture.
+- **`try` is `(try body* (catch sym body*)? (finally body*)?)`.** The catch
+  clause binds the thrown value to one symbol. There is no class filter and no
+  predicate, because Q23 has not decided what a thrown value *is*.
+
+`let`, `fn`, and the `try` clauses take implicit `do` bodies, as in Clojure.
+
+**Why.**
+
+*The enum, because of E-5.* ADR-006 claims monotonic slots avoid a wider
+encoding; E-5 corrects it — no reuse raises the maximum live slot index, so a
+packed format's operand fields are exactly what comes under pressure. The two
+standard answers to that are 8-bit fields with an `EXTRAARG` escape, or varint
+operands, and both buy density with encode/decode complexity in three places at
+once: the compiler, the VM loop, and the disassembler. Not packing dissolves the
+problem instead of managing it. With `u32` fields there is no width to exhaust,
+E-5's correction stops having a consequence, and ADR-006's optional last-use
+reuse pass goes back to being a pure optimization rather than a latent
+requirement.
+
+It also ranks correctly under `ETHOS.md`'s own order. *Line count:*
+`Call { dst, base, argc }` reads the same in the compiler, the VM, and a
+debugger, and the disassembler is a `match`, not a decoder. *Serializable state:*
+a typed enum derives its encoder; a packed word needs the layout documented as
+a wire format. *Speed:* dispatch is a match on a discriminant, which lowers to
+the jump table a byte opcode would get. What is actually given up is code
+density and therefore instruction-cache behaviour — a constant, unmeasured, on a
+project whose own prior art says architecture is the lever and everything else
+is a rounding error (`PRIOR-ART.md`, wallisp). If it ever matters, it is a
+pre-registered experiment, not a design assumption.
+
+*No maximum arity* is what the unpacked encoding makes available, and it is
+worth taking. Every fixed limit here would be arbitrary — 20 is Clojure's and it
+is a JVM artifact, 255 is a byte and this format has no bytes — and an arbitrary
+limit is discovered by the generated call that trips it, at the worst moment.
+Macro-expanded code is exactly where a 300-argument call comes from.
+
+*Globals by name.* Three reasons, in order. Forward references are free: a call
+to a global defined later in the file compiles with no fixup and no patch list,
+which matters because the top level is a sequence. The disassembly prints the
+name rather than a table index whose value depends on definition order — that is
+a determinism property for the goldens, not a nicety. And the compiler does not
+need a live VM to resolve a name, which keeps milestone 2 from having to build
+half of milestone 3; compilation acquires a VM dependency at milestone 5, when
+macros make it unavoidable (ADR-004), and not before.
+
+*Duplicated `finally`.* `(try B (catch e H) (finally F))` lowers to two nested
+handler regions, and `F` is emitted twice — once inline on the normal path, once
+as the unwinding path the VM enters. Nesting the catch region inside the finally
+region is what makes a throw *from the catch body* still run the cleanup, and
+composition falls out: a `try` with only one clause emits only that region. The
+duplication buys the absence of a runtime mechanism — no return-address slot, no
+jsr/ret — and "exactly once" (ADR-028 invariant 1) is readable off the emitted
+code rather than argued about a state machine. It is also cheap here because the
+core has no `return`: the only nonlocal exit is `throw`, so there are two exit
+paths, not three.
+
+**Cost.** The code array is 16 bytes an instruction rather than 4, and an `Image`
+is correspondingly larger. `finally` duplicates 2^depth under nesting;
+de-duplicating it is a compiler-local change under ADR-021 if a real program ever
+nests deeply enough to care. Reading a global costs a name→cell lookup per
+access that a `CellId` operand would have paid once at compile time — that is
+where an inline cache goes, and ADR-007's rejection of an extensible special-form
+registry was partly to keep that option open. `set-global!` is a name nobody will
+type, which is the intent.
+
+**Rejected.** *Packed `u32` words, Lua-style* — 8-bit slot fields against
+monotonic allocation with no reuse is E-5 as a compile error; the escape hatch
+is the complexity ADR-006 declined. *A varint byte stream* — densest and
+unbounded, but `lines[i]` stops being an array index into the code, which is the
+one thing ADR-023 point 2 asks for. *A `CellId` operand for globals* — needs a
+live VM at compile time and a fixup list for forward references, and makes the
+disassembly depend on definition order. *jsr/ret for `finally`* — puts a machine
+address in a slot, therefore in a language value, therefore in the snapshot and
+the debugger, to avoid duplicating code we can duplicate. *A stated maximum
+arity* — see why.
+
+**Open.** Multiple catch clauses, and any dispatch on the thrown value, wait on
+Q23. Whether `lines` stays one `SpanOrigin` per instruction or compresses to a
+range table is a size question for milestone 8 and changes nothing semantic.
+
+---
+
 ## Errata
 
 Factual corrections to entries whose **decision still stands**. A wrong reason is

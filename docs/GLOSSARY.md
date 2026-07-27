@@ -98,6 +98,18 @@ forms. Input to the compiler.
 **lowering** — Translating a higher construct into core forms or bytecode
 (`with-open` lowers to `try`/`finally`).
 
+**`Proto`** — One compiled function: code, the parallel `lines` array, constants,
+capture descriptors, parameter count, and slot count (ADR-034). A *prototype*
+rather than a function because it holds no captured values — a `Closure` is a
+`Proto` plus the values captured at the moment it was created.
+
+**`Chunk`** — What compiling one file produces: a flat `Vec<Proto>` with
+`protos[0]` the top level and every nested `fn` an index into it (ADR-034).
+
+**`set-global!`** — The core create-or-rebind operation on the global table
+(ADR-027, spelled by ADR-034). `def` is the library macro over it, and `def` is
+what anyone will actually write.
+
 **disassembler / `.disasm`** — Prints bytecode back as readable instructions. Both
 a debugging tool and a golden-file phase.
 

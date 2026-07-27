@@ -51,6 +51,44 @@ It is also the second milestone in a row where the mutation check found somethin
 no property, corpus, or review pass did. That is the evidence Q18 was waiting
 for.
 
+## Second pass — after a fresh-context review
+
+A diff-only review by a fresh context (`BUILD.md`, "On process") ran its own
+mutations and found **seven more survivors**, all in correct code that nothing
+observed. The pattern is worth naming: every one of them was a *decision that
+had a home in an ADR and no test*, so the ADR read as enforced when only the
+code was carrying it.
+
+| Mutant | Before | After |
+|---|---|---|
+| R1 — `tail` passed through to the operator position, so `((f) 1)` returns `(f)` instead of calling it | passed | fails |
+| R2 — `let` declares before resolving its own initializer, i.e. becomes `letrec` | passed | fails |
+| R3 — the block scope walk is not reversed, so an outer binding beats an inner one | passed | fails |
+| R4 — a `fn`'s own name is checked before its parameters, so `(fn f [f] f)` returns the function | passed | fails |
+| R5 — the rest parameter is allowed to be named `&` | passed | fails |
+| R6 — `if`'s then-branch is not a tail position | passed | fails |
+| R7 — a `do`/`let`/`fn` body's last expression is not a tail position | passed | fails |
+
+R1 is the one to remember. It is a single token — `false` becoming `tail` on one
+argument — and it produces a `TAILCALL` on a computed callee, which returns the
+operator's value and never performs the call. Every test passed and every golden
+was byte-identical, because no program in the corpus had a call whose operator
+was itself a call.
+
+**What made these invisible was corpus shape, not test design.** The tail-call
+test existed and asserted both directions; it only ever exercised a call in
+plain operator position. The lesson generalizes past mutation: a corpus assembled
+to look representative is not the same as one assembled to distinguish. A program
+belongs in the corpus because some plausible wrong implementation compiles it
+differently.
+
+The review also found two dead things of the M3 kind — the `src != dst` guard
+before `MOVE`, which cannot fire and left the goldens byte-identical when
+deleted, and a `RETURN` attributed to the first form in the file rather than the
+expression it returns — plus one test that panicked out of bounds while building
+its own failure message, so the only test written to be readable on failure was
+the one that could not be.
+
 ## Method, so it can be repeated
 
 Commit first, then mutate, then `git checkout -- src/lib.rs`. The one mistake

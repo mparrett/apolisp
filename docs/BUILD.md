@@ -49,7 +49,7 @@ Each milestone is a runnable artifact.
 | 6 | Collections, strings, bytes | **Done** (`de916cc`) — `tests/lang/` runs through the binary, and caught two bugs on its first run |
 | 7 | Host handle table + blocking file/stdio | **Done** (`1e7555e`) — `with-open` closes on all four paths; a stale id reaches nothing |
 | 8 | Fuel suspension + `Image` + resume | **Done** (`ab75b1b`) — the round-trip cuts at *every* instruction boundary; live handles are refused |
-| 9 | REPL | Becomes the primary development interface |
+| 9 | REPL | **Done** (`5644b58`) — a session is one unit and one chunk; a function defined in one input is callable from the next |
 | 10 | Host adapters: terminal, TCP, JSON | Outside the line budget |
 
 ## The oracle
@@ -197,6 +197,15 @@ several of its headline findings are its own hypotheses being falsified
 (`PRIOR-ART.md`).
 
 Two lines in a commit message is enough. This is a habit, not a document.
+
+**Check that the mutant applied.** A substitution whose pattern no longer
+matches leaves the tree untouched, the suite green, and a run that is
+indistinguishable from a surviving mutant — and the wrong reading is the
+flattering one, because "it survived" is a finding and "it never happened" is a
+wasted run recorded as a finding. Assert the old text was present before
+writing the new. Milestone 9 lost two of twelve mutants this way and only
+noticed because one of them had been *predicted* to survive, so checking the
+prediction meant opening the file (`notes/milestone-9-mutants.md`).
 
 When a pass outgrows a commit message it goes in `notes/`, one file per
 milestone, named `milestone-N-<topic>.md`. A pass belongs to the milestone whose

@@ -103,9 +103,10 @@ wants a function there; writing `map` per file has not hurt yet.
 
 ## No milestone — decide when evidence arrives
 
-**Q18 — Mutation checks as an oracle rung.** *(Evidence arrived seven times —
-milestones 1, 2, 4, 5, 6, 7, and 8. At this point the rung is not in question;
-what remains open is only its shape.)*
+**Q18 — Mutation checks as an oracle rung.** *(Evidence arrived eight times —
+milestones 1, 2, 4, 5, 6, 7, 8, and 9. At this point the rung is not in
+question; what remains open is only its shape — and milestone 9 found that the
+shape has a failure mode of its own, see below.)*
 Run against milestone 1's own span tests, two of three mutants survived: every
 origin could be `Unknown`, or every span could start at byte 0, with the suite
 staying green. Only arity was actually checked. Fixed by adding `.spans`
@@ -155,6 +156,16 @@ Both passes also predicted every survivor, which is the argument for
 pre-registration rather than for mutation testing: writing the table down is
 when the holes became visible. Filled in afterwards they would have read as
 discoveries.
+
+Milestone 9 found the rung's own failure mode, and it argues for keeping this
+hand-rolled rather than for building the framework. **A substitution that does
+not match leaves a green suite, which is exactly what a surviving mutant
+leaves.** Two of twelve were no-ops and were recorded as survivors until one of
+them — predicted to survive for a specific reason — was checked against the
+file. Whatever shape this rung ends up taking has to assert that the mutation
+happened; `../reg-lisp`'s `verify.sh mutate` deletes a named line, which fails
+loudly when the line has moved, and that is one more argument for its shape
+over a pattern-matching script.
 
 **So the finding is broader than "tests can be dead."** A mutation check also
 finds duplicated enforcement, which nothing else in this loop looks for, and

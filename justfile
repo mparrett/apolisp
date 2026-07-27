@@ -75,6 +75,11 @@ bless:
     for f in tests/corpus/*.xs; do if [ -f "${f%.xs}.out" ]; then cargo run --quiet -- run "$f" > "${f%.xs}.out" || [ $? -eq 1 ]; fi; done
     @echo 'goldens regenerated — run `git diff` and justify every hunk before committing'
 
+# Milestone 9. A session is one compilation unit, so definitions and macros
+# accumulate across inputs and the gensym counter never restarts (ADR-044).
+repl:
+    cargo run --quiet -- repl
+
 # Constraint #1, on demand. The budget test prints the same numbers per layer.
 lines:
     @wc -l src/*.rs

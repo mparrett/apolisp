@@ -68,6 +68,10 @@ a clippy error because neither check was in the one command anyone runs.
 - **Pre-register.** Before a benchmark or a mutation check, write down what you
   expect and why; afterwards record whether it was refuted. The refutations are
   the interesting part. Two lines in a commit message is enough.
+- **Check the mutant applied.** A pattern that no longer matches leaves the
+  tree untouched and the suite green — indistinguishable from a survivor, and
+  the flattering reading is the wrong one. Assert the old text was there before
+  writing the new (`docs/notes/milestone-9-mutants.md`).
 - **Try to break your own test.** Milestone 1's span property was dead — two of
   three mutants passed the entire suite. Ten minutes of deliberate mutation
   found what the property, the corpus, and a review all missed

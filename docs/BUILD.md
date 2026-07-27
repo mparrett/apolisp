@@ -37,7 +37,7 @@ Each milestone is a runnable artifact.
 |---:|---|---|
 | 1 | Reader + printer + forms with span origins | **Done** (`ffcefa7`) — round-trip + span-invariants properties pass |
 | 2 | Core AST + slot compiler + disassembler | **Done** (`38d109c`) — `.disasm` goldens for six corpus programs |
-| 3 | VM: frames, calls, closures, `if`/`let`/`fn`, tail calls | `smoke.sh` runs a recursive function; a tail loop runs in constant space |
+| 3 | VM: frames, calls, closures, `if`/`let`/`fn`, tail calls | **Done** (`8ff2c9f`) — smoke runs `run`; 100k tail calls peak at the same frame *and* slot count as 10 |
 | 4 | Errors, `try`/`throw`/`finally`, handler stack | Failure transcripts in the corpus; cleanup runs exactly once |
 | 5 | Macro expansion + quasiquote + gensym | `defmacro` in-language; deterministic output |
 | 6 | Collections, strings, bytes | In-language test suite begins |
@@ -77,7 +77,7 @@ tests/corpus/<name>.forms      # reader output, printed
 tests/corpus/<name>.spans      # the same forms with their origins (ADR-026)
 tests/corpus/<name>.expanded   # post-macroexpansion forms
 tests/corpus/<name>.disasm     # bytecode disassembly (milestone 2)
-tests/corpus/<name>.out        # execution transcript (see below)
+tests/corpus/<name>.out        # execution transcript (milestone 3, see below)
 ```
 
 `.spans` is the fifth, added by ADR-026 point 3. It exists because origins live
@@ -89,6 +89,14 @@ check proved the structural invariant alone was dead without it — see
 *or* the thrown value, stdout, and any diagnostics. Milestone 4 puts failures in
 the corpus, and a failure with no defined record is a failure that cannot be
 pinned.
+
+Only the programs that *run* carry one, and which those are is asserted as a
+list rather than inferred from which files happen to exist — so adding a corpus
+program forces the choice instead of silently skipping it. `just bless` updates
+a `.out` where one exists and never creates one, because creating the first one
+for a program is the decision. The rest of the corpus faults on globals nothing
+defines yet, and a fault transcript cannot be pinned before Q23 says what a
+thrown value is.
 
 A snapshot per phase localizes a regression to one phase before anyone reads
 a diff. This is the highest-leverage thing in the project and should exist by the

@@ -2738,11 +2738,10 @@ pub mod vm {
             let p = ex.pending.pop().expect("just checked");
             u.suppress(p.unwind);
         }
-        // Frames above the record's owner are gone, and each one's slots go
-        // with it — the same restore a normal return does.
+        // Frames above the record's owner are gone, through the same call a
+        // normal return uses — see `drop_frame` for why that matters.
         while ex.frames.len() > h.frame + 1 {
-            let f = ex.frames.pop().expect("a frame above the handler's owner");
-            ex.slots.truncate(f.ret_len);
+            drop_frame(ex);
         }
         let base = ex.frames[h.frame].base;
         ex.frames[h.frame].pc = h.target;
@@ -2758,11 +2757,25 @@ pub mod vm {
         None
     }
 
+    /// Pop one frame and give its slots back.
+    ///
+    /// The only place a frame is released, so returning and unwinding cannot
+    /// disagree about what that means — and the milestone-4 mutation pass says
+    /// that sharing is the *only* thing keeping the unwinding side honest.
+    /// Dropping the frames while keeping their slots leaves every test green:
+    /// the leak is bounded, never reaches a value, and cannot move a high-water
+    /// mark. It is visible only as dead slots carried into later frames and
+    /// into an `Image` (ADR-029, `notes/milestone-4-mutants.md`).
+    fn drop_frame(ex: &mut Execution) -> Frame {
+        let f = ex.frames.pop().expect("a frame to drop");
+        ex.slots.truncate(f.ret_len);
+        f
+    }
+
     /// Pop the finished frame and deliver its value. `None` means execution
     /// continues; `Some` means the outermost frame returned.
     fn ret(ex: &mut Execution, value: Value) -> Option<Value> {
-        let f = ex.frames.pop().expect("a frame to return from");
-        ex.slots.truncate(f.ret_len);
+        let f = drop_frame(ex);
         if ex.frames.is_empty() {
             return Some(value);
         }

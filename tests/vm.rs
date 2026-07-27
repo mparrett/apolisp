@@ -423,6 +423,40 @@ fn unwinding_crosses_frames_and_leaves_the_machine_usable() {
     );
 }
 
+/// A loop that catches a throw every iteration stays flat.
+///
+/// The loop is a tail loop: the `try` region closes before the recursive call,
+/// so ADR-028 rule 2 does not apply and the frame is reused. Unwinding has to
+/// leave the machine exactly as deep as it found it, or the marks diverge.
+///
+/// **What this does not catch**, and the reason the doc comment says so: an
+/// unwind that drops the abandoned frames but keeps their *slots*. That leak is
+/// bounded — the next call reuses the same slot range and never grows past it —
+/// so no high-water mark and no value can see it. The mutation pass found it,
+/// no test could be written to attribute it, and the answer was structural:
+/// `drop_frame` is the one place a frame is released
+/// (`notes/milestone-4-mutants.md`).
+#[test]
+fn a_loop_that_catches_a_throw_every_iteration_stays_flat() {
+    let program = |n: i64| {
+        format!(
+            "(set-global! boom (fn boom [n] (if (< n 1) (throw :x) (+ 0 (boom (- n 1))))))\n\
+             (set-global! spin (fn spin [i] (if (< i {n}) (do (try (boom 3) (catch e e)) \
+             (spin (+ i 1))) i)))\n(spin 0)"
+        )
+    };
+    let (short, small) = run_traced(&program(10)).unwrap();
+    let (long, big) = run_traced(&program(200)).unwrap();
+
+    assert_eq!(short.value, "10");
+    assert_eq!(long.value, "200");
+    assert_eq!(
+        small, big,
+        "ten caught throws peaked at {small:?} and two hundred at {big:?} — \
+         a caught throw is leaving something on the frame stack"
+    );
+}
+
 /// ADR-028 rule 2 at run time. The compiler refuses to emit a tail call inside
 /// a handler region; the observable consequence is that the frame stack grows,
 /// which is the cost the rule accepts to keep the handler record meaningful.

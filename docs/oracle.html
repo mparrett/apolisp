@@ -106,6 +106,11 @@
     text-transform: uppercase;
     color: var(--faint);
     margin: 0;
+    /* The spans have no whitespace between them, so without this the whole
+       line is one unbreakable run and the page scrolls sideways on a phone. */
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
   }
   .byline span { white-space: nowrap; }
   .byline .sep { margin: 0 0.55rem; opacity: 0.5; }

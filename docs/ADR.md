@@ -1754,6 +1754,127 @@ answerable: the machinery it was waiting on exists.
 
 ---
 
+### ADR-041 — Collections, equality, and the numeric tower
+
+*(New, 2026-07-27. Resolves Q6, Q13, and Q26, and the collection half of Q20.
+Names the representation ADR-011 left open. Narrows ADR-032. Adds one `:kind`
+to ADR-039's vocabulary.)*
+
+**Decision.** Six parts.
+
+**1. Every collection is a flat `Vec`, and mutation happens in place when the
+value is not shared.** A list and a vector are both `Vec<Value>`; a map is a
+`Vec<(Value, Value)>` of pairs in insertion order. `conj` and `assoc` take the
+buffer by `Rc::make_mut`, which mutates when the refcount is one and copies
+otherwise. There are **no transients**, because the case they exist for —
+building a fresh collection in a loop — is the case where the refcount is
+already one.
+
+There are **no sets** in v1, and still no character type. Both would be
+`Value` variants, and ADR-025 froze that enum.
+
+**2. `=` is structural, crosses list and vector, and does not cross `Int` and
+`Float`.** `(= '(1 2) [1 2])` is true; `(= 1 1.0)` is false. Maps compare
+without regard to insertion order. `##NaN` is equal to nothing including
+itself, and `-0.0` equals `0.0` — both are IEEE's answers, reached by comparing
+the numbers rather than their bit patterns. Functions, cells, handles, and
+buffers compare by identity. `==` is numeric equality and *does* cross
+`Int`/`Float`.
+
+**3. Arithmetic coerces; integers and floats fail differently.** Any float
+among the operands makes the result a float. Integer overflow throws (ADR-037,
+unchanged); float overflow is `##Inf`, as IEEE says. `/` always produces a
+float, because there are no ratios and truncating integer division under a `/`
+spelling is the kind of silent wrong answer ADR-037 rejected. `quot` and `rem`
+are integer division, and dividing by integer zero throws `:divide-by-zero` —
+a new `:kind` in ADR-039's `:vm-error` vocabulary.
+
+**4. `nil` punning, on the operations that read.** `(count nil)` is 0,
+`(first nil)` is `nil`, `(rest nil)` is `()`, `(get nil k)` is `nil`,
+`(empty? nil)` is true. The operations that *build* treat `nil` as the empty
+thing of their own kind: `(conj nil x)` is `(x)` and `(assoc nil k v)` is a
+map. Duplicate keys resolve last-wins at construction, so a map never holds
+two equal keys.
+
+**5. Strings are not sequences, and this is the surface that makes ADR-018
+real:** `str`, `str-len` (bytes), `str-slice` (byte indices, and an error
+rather than a panic on a non-boundary), `str-scalars` and `scalars-str` (Unicode
+scalar values as integers, since there is no character type), `str-bytes` and
+`bytes-str`, `bytes-len`, `bytes-slice`. `count` refuses a string, and says to
+name the unit.
+
+**6. Higher-order functions are written in the language, never as
+primitives.** A native that called a language closure would re-enter the
+dispatch loop on the Rust stack, and ADR-004 requires that stack to be empty at
+every instruction boundary — a suspended computation inside a native's callback
+is not representable in an `Image`. So `map`, `filter`, and `reduce` are
+ordinary in-language definitions written where they are used.
+
+**Why.**
+
+*Flat `Vec` with copy-on-write* is the answer Q6 was actually asking for. The
+question named the failure mode precisely: with reduce-into-a-collection as the
+default idiom (ADR-012), copy-on-`assoc` makes the commonest operation in the
+language O(n²). `Rc::make_mut` removes exactly that case — a fresh accumulator
+has one reference, so the loop mutates a buffer it already owns — without a
+transient API, a second representation, or a second set of rules about when a
+value can be aliased. What remains O(n) is `get`/`assoc` against a *large* map
+and `conj` onto a *shared* vector, and both are measurable rather than
+arguable: ADR-021 removes the gate on optimizing them, and a pre-registered
+benchmark is what should decide HAMT and RRB, not the fact that Clojure has
+them.
+
+*`=` follows Clojure's split because the alternative decides hashing too.* If
+`1` equals `1.0` then equal values must hash equal, and every later choice about
+a hashed map inherits a constraint made now, for a convenience. Type-strict `=`
+plus `==` costs one extra function and keeps the assoc-vec map — which hashes
+nothing — genuinely free of the question. Crossing list and vector is the same
+call in the other direction: those are one abstraction with two representations,
+and Clojure agrees.
+
+*Arithmetic coerces because the alternative is a language whose literals do not
+compose.* Q26 kept `(+ 1 2.5)` a fault so the tower would not be settled in a
+match arm; this entry settles it deliberately. Integers throwing while floats
+saturate to infinity looks inconsistent and is not: ADR-037's argument was that
+a wrapped integer is a *wrong answer with no diagnostic*, and `##Inf` is neither
+wrong nor silent — it is IEEE's own out-of-range value, it propagates, and it
+prints.
+
+**Narrowing ADR-032.** That entry made `##Inf` a value the reader accepts and
+the printer emits, on the grounds that it is written rather than computed. Part
+3 makes it computable, so the rule narrows to what it was really about: the
+*reader and printer* must agree on a spelling for every float a program can
+hold, including the ones arithmetic produces. The round-trip property is
+unaffected and gets a wider input set.
+
+**Cost.** A large map is a linear scan, and nothing warns you when it gets
+large. `Rc::make_mut` makes performance depend on aliasing, so the same code is
+fast or slow depending on whether something else is holding the collection —
+the honest version of the transient story, but a real cliff with no diagnostic.
+`(= 1 1.0)` being false will surprise, and it is the surprise Clojure ships. No
+sets means `contains?` over a vector is the workaround, and it is O(n).
+
+Part 6 has a sharper cost than it looks: with no way to call a closure from a
+primitive, and no way to share compiled code between chunks (**Q29**), `map` and
+`reduce` cannot live in the prelude either — a prelude function's closure names
+a proto in the prelude's own chunk, which the unit being compiled does not have.
+They are written per file until that is fixed.
+
+**Rejected.** *HAMT and RRB now* — ADR-011 rejected it on line count and nothing
+has changed except that we now know which operation to measure. *Transients* —
+an API for the case `Rc::make_mut` already covers. *Numeric `=` across types* —
+decides hashing as a side effect. *Truncating `/` on integers* — a silent wrong
+answer under the spelling everybody types. *Float overflow throwing, for
+symmetry with ADR-037* — symmetry with a rule whose reason does not apply.
+*`count` on a string* — ADR-018 exists because that is where Unicode
+correctness goes to die.
+
+**Open.** Q29 (sharing compiled code between chunks, which milestone 9's REPL
+forces anyway), and the representation question reopens the day a benchmark
+says so.
+
+---
+
 ## Errata
 
 Factual corrections to entries whose **decision still stands**. A wrong reason is

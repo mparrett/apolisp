@@ -9,8 +9,8 @@ design review of 2026-07-25.
 
 *Resolved: Q1 (→ADR-008 stands, REPL clause deferred), Q2 (→ADR-023, ADR-026),
 Q3 (→ADR-025), Q4 (→ADR-028), Q7 (→ADR-029), Q9 (→ADR-029), Q10 (→ADR-037),
-Q11 (→ADR-027), Q17 (→ADR-027), Q21 (→ADR-030), Q23 (→ADR-039), Q24 (→ADR-038),
-Q25 (→ADR-038).*
+Q11 (→ADR-027), Q13 (→ADR-041), Q17 (→ADR-027), Q21 (→ADR-030), Q23 (→ADR-039),
+Q24 (→ADR-038), Q25 (→ADR-038), Q26 (→ADR-041), Q6 (→ADR-041).*
 
 ---
 
@@ -29,10 +29,10 @@ answer by default.
 literal without it: `[a b]` in code position is `(vector a b)`. That says what a
 literal *means*, not which ones exist.
 
-**Still open:** duplicate map keys, which collection literals exist, characters,
-sets, and cross-type collection equality. Exception values are settled by
-**ADR-039**: a thrown value is any value, and only VM-raised faults have a fixed
-shape.
+**Still open:** which collection literals exist beyond list, vector, and map,
+and whether characters are worth superseding ADR-025 for. Everything else in
+this list has an entry now: exception values in **ADR-039**, and duplicate map
+keys, sets, and cross-type collection equality in **ADR-041**.
 
 Add one to the milestone-6 list: **do the core functions accept `nil` where they
 accept a collection** — `(count nil)` → 0, `(empty? nil)` → true? Erratum E-11
@@ -49,29 +49,6 @@ variant, and the size is asserted. The original design conversation recommended
 including one — "it gives reader and Unicode APIs a clear scalar-value type" —
 and no entry records rejecting it, so this is an omission rather than a
 decision. Answering "yes, characters exist" means superseding ADR-025.
-
-## Before milestone 3 — VM, calls, closures
-
-**Q13 — Numeric equality and hashing.**
-Does `1` equal `1.0`? Decide with hashing in the same breath — equal values must
-hash equal. Include `NaN` and `-0.0`, which are where this actually bites.
-
-**Q26 — The numeric tower: what does arithmetic do with a float?**
-ADR-037 settles overflow for integers and says nothing about floats, because
-milestone 3's exit condition needed neither. So the VM's `+`, `-`, `*`, `<`, and
-`>` accept integers and **fault on a float**, naming this question. That is
-deliberate: coercing silently would settle the tower in a match arm, which is
-what rule 3 exists to stop.
-
-Decide together, because they are one question: whether `(+ 1 2.5)` is legal and
-what it produces, whether float arithmetic has its own overflow story (IEEE says
-infinity, ADR-037 says integers throw — those are different answers to the same
-shape of problem), and whether ADR-032's written-not-computed rule for `##Inf`
-survives contact with arithmetic that can *produce* one.
-
-Bears on **Q13**, which asks whether `1` equals `1.0`. A language where they are
-equal and one where `(+ 1 2.5)` is an error are not obviously the same language,
-so answering either alone risks answering the other by accident.
 
 ## Before milestone 5 — macros
 
@@ -101,14 +78,6 @@ Attempt `loop`/`recur` as a macro over the core forms and admit it as a fourteen
 special form only on evidence from a real attempt. Note the interaction from
 ADR-028 rule 2: a `recur` inside a `try` with a `finally` is not a tail call, so
 the macro has to either reject that shape or accept the frame.
-
-## Before milestone 6 — collections
-
-**Q6 — Collection representation and transients.**
-ADR-011 says one representation each and still does not name it. With ADR-012
-making reduce-into-a-collection the default idiom, an assoc-vec map with
-copy-on-`assoc` and no transients is O(n²) for the most common operation in the
-language. Name the representation; decide whether transients exist.
 
 ## Before milestone 7 — the host handle table
 
@@ -167,6 +136,19 @@ Decide: are clock and RNG injected capabilities that a snapshot captures, and is
 a seeded, virtual-clock profile a first-class execution mode or a convention?
 
 ## Before milestone 9 — REPL
+
+**Q29 — Can compiled code be shared between chunks?**
+A `Closure` names its proto by index into the chunk it was compiled in
+(ADR-034), so a closure is meaningless outside that chunk. The expander already
+works around this by keeping a macro's chunk beside the macro. Two things want
+the general fix: a **prelude function** — `map` and `reduce` cannot live there,
+because the unit being compiled does not have the prelude's chunk (ADR-041 part
+6) — and the **REPL** at milestone 9, where every input is a chunk and a
+function defined in one must be callable from the next.
+
+The shape is probably a VM-owned chunk registry with `Closure` carrying a chunk
+id, which puts one indirection in the dispatch loop and makes `Image` carry the
+registry. Decide with a REPL in hand rather than before.
 
 **Q1 — Reader table scope in the REPL.**
 ADR-008 freezes reader config per file. Is a REPL *session* its own parse unit,

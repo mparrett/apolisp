@@ -1989,8 +1989,14 @@ pub mod compile {
                 self.emit(Instr::PushHandler { catch: 0, err }, o)
             });
 
-            let protected = tail && self.regions == 0;
-            self.body(lo, &t.body, dst, protected, o);
+            // `tail` passes through untouched. Whether a call in the protected
+            // body is *actually* a tail call is the `regions` counter's
+            // business, decided where the call is emitted — one mechanism
+            // rather than two that have to agree. Clearing the flag here as
+            // well read as belt-and-braces and was really a way for the counter
+            // to be dead and untestable: a mutation that deleted it left the
+            // whole suite green (`docs/notes/milestone-2-mutants.md`).
+            self.body(lo, &t.body, dst, tail, o);
 
             if let (Some(push), Some((_, handler))) = (cat, t.catch.as_ref()) {
                 self.emit(Instr::PopHandler, o);
@@ -1998,8 +2004,7 @@ pub mod compile {
                 let over = self.emit(Instr::Jump { target: 0 }, o);
                 let entry = self.here();
                 self.patch(push, entry);
-                let handler_tail = tail && self.regions == 0;
-                self.body(lo, handler, dst, handler_tail, o);
+                self.body(lo, handler, dst, tail, o);
                 let done = self.here();
                 self.patch(over, done);
             }

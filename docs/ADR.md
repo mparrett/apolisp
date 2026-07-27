@@ -1352,6 +1352,55 @@ survive contact with Q6's representation — is still Q20's.
 
 ---
 
+### ADR-036 — Nesting depth is bounded, and the reader is the only place that checks
+
+*(New, 2026-07-26. From the milestone-2 review. Related to ADR-004, which bounds
+the *interpreter*; this bounds the phases in front of it.)*
+
+**Decision.** A form may nest at most **256** levels deep. The reader enforces
+it, once, and returns an ordinary `LispErr` with a position. No other phase
+checks.
+
+**Why.** ADR-004 keeps the Rust stack empty at every VM instruction boundary.
+Nothing had said anything about the phases *before* the VM, and all of them
+recurse on the host stack: the reader, the origin walkers, `Rc`'s drop glue over
+a deeply nested list, the resolver, and the lowering. Milestone 2's compiler
+aborted with SIGABRT at about 1,400 levels of nesting on input the reader
+accepted at 3,000 — a stack overflow presenting as a killed process rather than
+as a diagnostic, which is the failure `TRAPS.md` describes for the VM and which
+had quietly arrived in the compiler.
+
+The reader is the only place that needs the check because every later phase
+recurses at most once per level of form nesting, so a bound on form depth bounds
+all of them. Checking again downstream would be the duplicated enforcement that
+milestone 2's mutation pass already found once
+(`notes/milestone-2-mutants.md`) — two mechanisms for one rule, and no way for a
+test to say which is working.
+
+256 is chosen to be safe on the smallest stack this code runs on, which is a
+2 MB cargo test thread rather than the 8 MB main thread — the limit that
+matters is the tightest one, not the typical one. It is also far past anything
+hand-written; `../reg-lisp` capped nesting for the same reason after its
+conversion had to become iterative on both axes (`PRIOR-ART.md`).
+
+**Cost.** A generated program that nests past 256 is rejected rather than
+compiled. Macro expansion is where that could plausibly happen, and macro output
+does not pass through the reader — so when milestone 5 lands, the expander owns
+this check for the forms it produces, and that is the one place the rule is
+allowed to be enforced twice, because it is genuinely two entry points rather
+than two mechanisms on one path. Raising the number later is a new entry, not an
+edit.
+
+**Rejected.** *Making the resolver and lowering iterative* — an explicit worklist
+in both phases costs far more legibility than the bound does expressiveness, and
+constraint #1 is the binding constraint. *A larger stack for the process* —
+moves the number without removing the failure mode, and does nothing for the test
+threads. *Catching the overflow* — a Rust stack overflow is an abort, not a
+recoverable condition, and ADR-028 rule 5 already says host-level failures never
+become language unwinding.
+
+---
+
 ## Errata
 
 Factual corrections to entries whose **decision still stands**. A wrong reason is
@@ -1459,3 +1508,14 @@ Nearly free today, since `ListObj` and `VecObj` are both `Vec<Value>` and
 arguments already occupy contiguous slots. Declined because it would quietly
 constrain Q20's still-open cross-type sequential equality, which currently
 answers `false` for list-versus-vector.
+
+**E-12 — ADR-034, what `finally` duplicates.** The cost clause says "`finally`
+duplicates 2^depth under nesting" and means the code array. The proto table
+doubles with it: a `fn` literal inside a cleanup is lowered twice and occupies
+two entries in `Chunk.protos`, identical apart from their capture slots. The
+per-copy capture slots are correct — each copy reads the cleanup's own bindings
+from its own scratch slots — so this is a size statement, not a correctness one.
+It matters because `Chunk.protos` is what an `Image` serializes (ADR-029), so
+the duplication reaches the snapshot and not only the compiler's output.
+Measured at milestone 2 on
+`(try (a) (finally (let [z (q)] (fn [] z))))`, which yields protos 1 and 2.

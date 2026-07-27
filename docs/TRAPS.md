@@ -54,6 +54,15 @@ the deviation most likely to be typed from muscle memory: an empty list is
 `(nil? more)` takes the opposite branch — and takes it silently, with no error
 anywhere. The compiler emitting `nil` here instead would be equally silent.
 
+**A `let`-bound function cannot call itself.** `(let [f (fn [] (f))] (f))` looks
+recursive and is not. ADR-033 makes `let` sequential, so the inner `f` is not in
+scope while its own initializer is compiled, and ADR-002/ADR-027 restrict
+recursion through a binding to module level. The inner `f` therefore compiles to
+a **global** read — no compile error, because a global named `f` may well exist —
+and the program fails at run time with an unresolved-global error pointing at the
+inner call, which is not where the mistake is. `(fn f [] (f))` and
+`(set-global! f (fn [] (f)))` are the two spellings that work.
+
 **Laziness assumptions.** Ported Clojure idioms may assume lazy evaluation. Eager
 `map` over an infinite generator hangs rather than erroring.
 

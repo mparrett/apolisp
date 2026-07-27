@@ -141,6 +141,24 @@ const PROGRAMS: &[(&str, &str)] = &[
         "a program that ends by throwing",
         "(println :before) (throw {:type :app-error :kind :nope})",
     ),
+    // The gensym counter is VM state a program can advance at run time, and
+    // dropping it from the `Image` was invisible until this line existed: a
+    // resume that restarted the counter reissues a name it already handed out,
+    // which is the one thing a fresh symbol may never do.
+    (
+        "a run-time gensym counter",
+        "(println (gensym \"x\") (gensym \"x\")) (gensym \"x\")",
+    ),
+    // Negative zero has bitten this project once already — milestone 6's first
+    // in-language run found `-0.0` and `0.0` sharing a constant-pool entry. An
+    // encoder that stored an `f64` rather than its bits, or normalised on the
+    // way through, loses the sign and `(/ 1.0 z)` flips from `##-Inf` to
+    // `##Inf`. Computed rather than written, so it does not depend on the
+    // reader.
+    (
+        "a negative zero, whose sign only shows on division",
+        "(def z (* -1.0 0.0)) (println z (/ 1.0 z)) z",
+    ),
 ];
 
 // --- The property --------------------------------------------------------------
@@ -240,9 +258,18 @@ fn a_live_handle_refuses_the_snapshot() {
 fn a_snapshot_with_no_open_files_is_allowed_after_they_close() {
     let path = std::path::PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("snapshot-closed.txt");
     std::fs::write(&path, "x").expect("writes");
+    // Two `with-open`s, not one. The second reuses the slot the first freed,
+    // so its handle id carries a bumped generation — and that id reaches the
+    // transcript. An `Image` that dropped the free list would hand the second
+    // open a fresh slot instead, printing `2:0` where the uninterrupted run
+    // printed `2:1`; one that dropped the generations would index past the end
+    // of a table it had just shortened. Neither was caught until this became
+    // two opens (`notes/milestone-8-mutants.md`).
     let src = format!(
-        "(with-open [f (io/open \"{}\" :read)] (println :read)) :after",
-        path.display()
+        "(with-open [f (io/open \"{p}\" :read)] (println :first))\n\
+         (with-open [g (io/open \"{p}\" :read)] (println g))\n\
+         :after",
+        p = path.display()
     );
     let want = uninterrupted(&src);
     let n = steps(&src);

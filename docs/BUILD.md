@@ -60,6 +60,14 @@ Climb in this order:
 program end to end; exit nonzero on failure. Write this *before* the reader is
 finished — a failing smoke test is a better queue than an empty one.
 
+The stages run in **pipeline** order, which is not the order they are built in:
+expand is milestone 5 while compile and run are 2 and 3. So a pending stage does
+not stop the run. The driver exits `3` for "not built yet", and smoke reports
+that stage as pending and carries on; any other nonzero exit is a real failure
+and stops immediately. Smoke stays nonzero while anything is pending — that is
+the queue — but a milestone that lands is reachable the day it lands rather than
+waiting on a later one.
+
 **Rung 3 — behavior is pinned.** A corpus of `.xs` programs, each with a committed
 snapshot per phase:
 

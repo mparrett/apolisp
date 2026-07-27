@@ -524,13 +524,48 @@ fn a_number_that_does_not_fit_is_an_error_not_a_symbol() {
 }
 
 /// The CLI is the artifact the goldens pin, so its contract gets one test:
-/// unimplemented stages fail loudly rather than no-opping (BUILD.md rung 2).
+/// unimplemented stages fail loudly rather than no-opping (BUILD.md rung 2),
+/// and they do it with an exit code that says *why*.
+///
+/// The code is load-bearing, not cosmetic. `smoke.sh` runs the stages in
+/// pipeline order, which is not the order they are built in — expand is
+/// milestone 5, compile and run are 2 and 3 — so it distinguishes "not built
+/// yet" from "ran and failed" by this number alone. Without it the script
+/// either stops at the first gap, hiding milestones 2 and 3 behind milestone 5,
+/// or treats a genuine failure as pending.
 #[test]
-fn unimplemented_stages_fail_rather_than_no_op() {
+fn unimplemented_stages_exit_with_the_pending_code() {
+    // Keep in sync with EXIT_NOT_IMPLEMENTED in src/main.rs and NOT_IMPLEMENTED
+    // in smoke.sh.
+    const EXIT_NOT_IMPLEMENTED: i32 = 3;
+
     let mut path = repo_root();
     path.push("tests/corpus/hello.xs");
     for cmd in ["expand", "compile", "run"] {
-        let err = run_cmd(cmd, &path).expect_err(&format!("`{cmd}` should not succeed yet"));
-        assert!(err.contains("not implemented"), "`{cmd}`: {err:?}");
+        let out = Command::new(bin())
+            .arg(cmd)
+            .arg(&path)
+            .output()
+            .expect("failed to run apolisp");
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        assert!(stderr.contains("not implemented"), "`{cmd}`: {stderr:?}");
+        assert_eq!(
+            out.status.code(),
+            Some(EXIT_NOT_IMPLEMENTED),
+            "`{cmd}` must exit {EXIT_NOT_IMPLEMENTED} so smoke.sh can tell pending from broken"
+        );
     }
+
+    // A stage that exists and fails must not look pending.
+    let bad = repo_root().join("tests/corpus/does-not-exist.xs");
+    let out = Command::new(bin())
+        .arg("read")
+        .arg(&bad)
+        .output()
+        .expect("failed to run apolisp");
+    assert_ne!(
+        out.status.code(),
+        Some(EXIT_NOT_IMPLEMENTED),
+        "a real failure must not use the pending code"
+    );
 }

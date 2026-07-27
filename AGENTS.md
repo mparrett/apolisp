@@ -43,7 +43,7 @@ defers to. Then, as needed:
 ```
 just verify       # the gate: fmt, check, clippy, tests, Value size
 just test         # rung 3 and the properties
-just smoke        # rung 2 — FAILS ON PURPOSE at the first unbuilt milestone
+just smoke        # rung 2 — NONZERO ON PURPOSE while any stage is pending
 just bless        # regenerate goldens; then read every hunk before committing
 just lines        # constraint #1, per file and per layer
 just hooks        # install the advisory pre-commit hook (warns, never blocks)

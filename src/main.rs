@@ -7,6 +7,14 @@
 use apolisp::{printer, reader, value};
 use std::process::ExitCode;
 
+/// A stage whose milestone has not landed, as distinct from a stage that ran
+/// and failed. `smoke.sh` needs to tell those apart: without it, the first gap
+/// in the pipeline hides every stage behind it, and the stages are not built in
+/// pipeline order (expand is milestone 5; compile and run are 2 and 3).
+///
+/// Keep in sync with `NOT_IMPLEMENTED` in `smoke.sh`.
+const EXIT_NOT_IMPLEMENTED: u8 = 3;
+
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().collect();
     if args.len() < 2 {
@@ -83,7 +91,7 @@ fn main() -> ExitCode {
         // a smoke test that silently skips a stage stops being an oracle.
         "expand" | "compile" | "run" => {
             eprintln!("apolisp: `{cmd}` is not implemented yet (see BUILD.md)");
-            ExitCode::FAILURE
+            ExitCode::from(EXIT_NOT_IMPLEMENTED)
         }
         _ => {
             eprintln!("apolisp: unknown command `{cmd}`");

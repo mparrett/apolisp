@@ -308,7 +308,10 @@ fn core_stays_within_the_line_budget() {
     // noise band, so the tripwire sits at the top of that band rather than at
     // the working number. Failing at 7,001 would invite the 40-line debate the
     // ADR exists to prevent.
-    const BUDGET: usize = 7_000;
+    // ADR-043 added the row this layer never had: `Image`, fuel, and resume
+    // were invented by ADR-029 after the table in `BUILD.md` was written, and
+    // ADR-030 raised the total without noticing the layer had no line.
+    const BUDGET: usize = 7_500;
     const TRIPWIRE: usize = BUDGET + 1_000;
 
     let mut src = repo_root();

@@ -320,6 +320,23 @@ pub mod value {
             }
         }
 
+        /// Positional, so the whole table travels as its names and the index
+        /// is rebuilt (ADR-043 part 6). A snapshot that omitted it would resume
+        /// with wrong symbol identities and *appear to work*, which `TRAPS.md`
+        /// lists as the dangerous one.
+        pub fn names(&self) -> &[String] {
+            &self.names
+        }
+
+        pub fn restore(names: Vec<String>) -> Interner {
+            let index = names
+                .iter()
+                .enumerate()
+                .map(|(i, n)| (n.clone(), i as u32))
+                .collect();
+            Interner { names, index }
+        }
+
         pub fn intern(&mut self, name: &str) -> u32 {
             if let Some(&id) = self.index.get(name) {
                 return id;
@@ -2250,6 +2267,11 @@ pub mod vm {
     pub enum Outcome {
         Returned(Value),
         Threw(Unwind),
+        /// Fuel ran out at an instruction boundary (ADR-029, ADR-043 part 4).
+        /// It carries nothing: the state is the `Execution`, which the caller
+        /// already holds, and duplicating any of it here would be a second
+        /// place for it to be wrong.
+        Suspended,
     }
 
     /// A failure in flight. The value is what a `catch` binds; the origin and
@@ -2377,9 +2399,9 @@ pub mod vm {
 
     /// ADR-025: cells are retained for the lifetime of the VM in v1, and the
     /// live count is instrumented rather than reclaimed.
-    struct CellEntry {
-        generation: u32,
-        value: Value,
+    pub(crate) struct CellEntry {
+        pub(crate) generation: u32,
+        pub(crate) value: Value,
     }
 
     /// ADR-016: handles are generational, so a stale handle is an error rather
@@ -2390,11 +2412,11 @@ pub mod vm {
     /// never bumped, while a handle is the first thing here that frees a slot
     /// and hands the index back out. The generation is what keeps the reuse
     /// from being an alias (ADR-042 part 4).
-    struct HandleEntry {
-        generation: u32,
+    pub(crate) struct HandleEntry {
+        pub(crate) generation: u32,
         /// `None` once closed. The slot outlives the resource so a stale id can
         /// still be recognised as stale rather than falling off the end.
-        host: Option<crate::host::Host>,
+        pub(crate) host: Option<crate::host::Host>,
     }
 
     /// The keywords a fault value is built from, interned once at construction
@@ -2425,24 +2447,24 @@ pub mod vm {
         /// disassembler and eventually through an `Image`, and a `Vec` is
         /// deterministic by construction where a `HashMap` needs a sort
         /// (BUILD.md, determinism).
-        globals: Vec<Option<CellId>>,
-        cells: Vec<CellEntry>,
+        pub(crate) globals: Vec<Option<CellId>>,
+        pub(crate) cells: Vec<CellEntry>,
         /// ADR-016: the VM owns the handle table, not the host module. What
         /// `host` owns is what a handle *is*.
-        handles: Vec<HandleEntry>,
+        pub(crate) handles: Vec<HandleEntry>,
         /// Indices whose resource has been closed, available for reuse under a
         /// bumped generation. A `Vec` and not a free-list threaded through the
         /// entries, because the entries have to stay readable.
-        free_handles: Vec<u32>,
+        pub(crate) free_handles: Vec<u32>,
         natives: Vec<Native>,
         kws: Kws,
         /// ADR-040: reset per compilation unit by the expander, never here.
         /// A counter that survived a unit would make the same source expand
         /// differently on its second run, and a golden cannot pin that.
-        gensym: u64,
+        pub(crate) gensym: u64,
         /// The buffered in-memory host BUILD.md's serialization property needs:
         /// emitted effects are part of the comparison rather than escaping it.
-        out: String,
+        pub(crate) out: String,
     }
 
     impl Vm {
@@ -2716,59 +2738,69 @@ pub mod vm {
     /// One function activation. Slots live in a single flat `Vec` on the
     /// `Execution`, base-relative, which is the shape an `Image` wants
     /// (ADR-029) and what makes a tail call a truncation rather than a copy.
-    struct Frame {
-        proto: u32,
-        pc: usize,
+    pub(crate) struct Frame {
+        pub(crate) proto: u32,
+        pub(crate) pc: usize,
         /// Index in `Execution::slots` of this frame's slot 0.
-        base: usize,
+        pub(crate) base: usize,
         /// Absolute slot index, in the *caller's* frame, for the return value.
         /// Always below `base`, so returning can truncate first and write after.
-        dst: usize,
+        pub(crate) dst: usize,
         /// The slot stack's length before this frame existed. Returning
         /// restores it. Truncating to `base` instead would discard the part of
         /// the *caller's* frame that sits above the call window, which is most
         /// of it — the window is allocated early and the caller keeps using
         /// slots above it after the call returns.
-        ret_len: usize,
-        closure: Rc<Closure>,
+        pub(crate) ret_len: usize,
+        pub(crate) closure: Rc<Closure>,
     }
 
     /// One active `try` region (ADR-028). `err` is the whole difference between
     /// the two kinds: a catch has a slot to bind the thrown value to, a finally
     /// has nothing to bind.
-    struct Handler {
+    pub(crate) struct Handler {
         /// The frame that owns the record. Unwinding to it drops every frame
         /// above, which is what makes a handler survive a call.
-        frame: usize,
-        target: usize,
-        err: Option<Slot>,
+        pub(crate) frame: usize,
+        pub(crate) target: usize,
+        pub(crate) err: Option<Slot>,
     }
 
     /// An unwind parked while a cleanup runs. `depth` is the handler depth the
     /// cleanup body runs at: an unwind that escapes *below* it displaces this
     /// one (ADR-028 invariant 3), and one that does not is a throw the cleanup
     /// caught itself.
-    struct Pending {
-        depth: usize,
-        unwind: Unwind,
+    pub(crate) struct Pending {
+        pub(crate) depth: usize,
+        pub(crate) unwind: Unwind,
     }
 
+    /// `pub(crate)` throughout rather than private: `image` is the one other
+    /// module that has to read all of this, and an `Image` that could only see
+    /// what an accessor exposed would be an `Image` that silently omits
+    /// whatever nobody wrote an accessor for — which is the ADR-005 failure
+    /// ADR-029 exists to correct.
     pub struct Execution {
-        frames: Vec<Frame>,
-        slots: Vec<Value>,
+        pub(crate) frames: Vec<Frame>,
+        pub(crate) slots: Vec<Value>,
         /// ADR-028: active handlers and finalizers live in VM-owned memory,
         /// reachable from the image — never on the Rust stack.
-        handlers: Vec<Handler>,
-        pending: Vec<Pending>,
+        pub(crate) handlers: Vec<Handler>,
+        pub(crate) pending: Vec<Pending>,
+        /// Instructions left before this run suspends (ADR-043 part 4).
+        /// `u64::MAX` is the un-fuelled run, which is every caller that is not
+        /// the snapshot property.
+        pub(crate) fuel: u64,
     }
 
     impl Execution {
-        fn new() -> Execution {
+        pub(crate) fn new() -> Execution {
             Execution {
                 frames: Vec::new(),
                 slots: Vec::new(),
                 handlers: Vec::new(),
                 pending: Vec::new(),
+                fuel: u64::MAX,
             }
         }
 
@@ -2791,13 +2823,20 @@ pub mod vm {
     /// `run`, plus the high-water marks. Separate because the marks exist for
     /// the constant-space property and have no place in the driver.
     pub fn run_traced(vm: &mut Vm, chunk: &Chunk) -> (Outcome, (usize, usize)) {
+        let (outcome, _, peak) = run_fueled(vm, chunk, start(chunk), u64::MAX);
+        (outcome, peak)
+    }
+
+    /// A program's `Execution` before its first instruction: the top-level
+    /// proto in frame 0, nothing else. Separate from running it because
+    /// milestone 8 needs to run a program in more than one sitting.
+    pub fn start(chunk: &Chunk) -> Execution {
         let top = Rc::new(Closure::Fn {
             proto: 0,
             captures: Rc::from(Vec::new()),
         });
         let mut ex = Execution::new();
-        let slots = chunk.protos[0].slots as usize;
-        ex.slots.resize(slots, Value::Nil);
+        ex.slots.resize(chunk.protos[0].slots as usize, Value::Nil);
         ex.frames.push(Frame {
             proto: 0,
             pc: 0,
@@ -2806,7 +2845,23 @@ pub mod vm {
             ret_len: 0,
             closure: top,
         });
-        drive(vm, chunk, ex)
+        ex
+    }
+
+    /// Run — or resume — for at most `fuel` instructions, handing the
+    /// `Execution` back either way. Resuming is calling this again with what it
+    /// returned; there is no separate resume path, because a second one would
+    /// be a second thing to keep in agreement (ADR-039's argument, applied to
+    /// the other end of the loop).
+    pub fn run_fueled(
+        vm: &mut Vm,
+        chunk: &Chunk,
+        mut ex: Execution,
+        fuel: u64,
+    ) -> (Outcome, Execution, (usize, usize)) {
+        ex.fuel = fuel;
+        let (outcome, peak) = drive_ex(vm, chunk, &mut ex);
+        (outcome, ex, peak)
     }
 
     /// Call a closure from Rust, inside the chunk it was compiled in.
@@ -2834,14 +2889,30 @@ pub mod vm {
             None => match drive(vm, chunk, ex).0 {
                 Outcome::Returned(v) => Ok(v),
                 Outcome::Threw(u) => Err(u),
+                // ADR-029 permits a snapshot only at an instruction boundary in
+                // compiled code, and never mid-expansion. `call_in` is how a
+                // macro body runs, and it always runs un-fuelled — so this arm
+                // is where that promise is kept rather than described.
+                Outcome::Suspended => unreachable!("`call_in` runs un-fuelled"),
             },
         }
     }
 
     /// The dispatch loop, over an `Execution` someone else set up.
     fn drive(vm: &mut Vm, chunk: &Chunk, mut ex: Execution) -> (Outcome, (usize, usize)) {
+        drive_ex(vm, chunk, &mut ex)
+    }
+
+    fn drive_ex(vm: &mut Vm, chunk: &Chunk, ex: &mut Execution) -> (Outcome, (usize, usize)) {
         let mut peak = (ex.frames.len(), ex.slots.len());
         loop {
+            // Before the fetch, so the suspension point is *between* two
+            // instructions and never inside one. Resuming re-enters here with
+            // the same `pc`, which is why `Suspended` needs to carry nothing.
+            if ex.fuel == 0 {
+                return (Outcome::Suspended, peak);
+            }
+            ex.fuel -= 1;
             let fi = ex.frames.len() - 1;
             let (pidx, pc) = {
                 let f = &ex.frames[fi];
@@ -2852,7 +2923,7 @@ pub mod vm {
             let at = proto.lines[pc];
             ex.frames[fi].pc = pc + 1;
 
-            match exec(vm, &mut ex, chunk, ins, at) {
+            match exec(vm, ex, chunk, ins, at) {
                 Ok(Step::Next) => {}
                 Ok(Step::Done(v)) => {
                     // A record left open by a return is a compiler bug, not a
@@ -2870,7 +2941,7 @@ pub mod vm {
                 // ADR-039: one failure path. A fault and a `throw` arrive here
                 // identically, and unwinding is what runs the cleanups.
                 Err(u) => {
-                    if let Some(escaped) = unwind(&mut ex, u) {
+                    if let Some(escaped) = unwind(ex, u) {
                         return (Outcome::Threw(escaped), peak);
                     }
                 }
@@ -3596,6 +3667,7 @@ pub mod expand {
             let at = body.origins.origin;
             let chunk = compile::compile(&[body], &mut self.vm.interner)?;
             let value = match vm::run(self.vm, &chunk) {
+                Outcome::Suspended => unreachable!("macro expansion runs un-fuelled"),
                 Outcome::Returned(v) => v,
                 Outcome::Threw(u) => {
                     return Err(LispErr::at_origin(
@@ -4809,6 +4881,11 @@ pub mod host {
         });
     }
 
+    /// How many handles a fresh VM of this build already has open, and which
+    /// ADR-043 part 5 declares reconstructible: `io/stdin` and `io/stdout`.
+    /// A snapshot refuses anything beyond them.
+    pub const RECONSTRUCTIBLE: usize = 2;
+
     pub fn install(vm: &mut Vm) {
         // Not functions. ADR-038 made a primitive an ordinary global, so the
         // two standard streams are *values* in the global table — one handle
@@ -4930,5 +5007,419 @@ pub mod host {
                 Host::Stdout => unreachable!("settled above, before the mutable borrow"),
             }
         });
+    }
+}
+
+// ---------------------------------------------------------------------------
+
+/// Fuel suspension's other half: turning a live `Vm` and `Execution` into
+/// something with no `Rc` in it, and back (ADR-029, ADR-043).
+///
+/// The encoding is object-id based, and sharing is preserved: two `Rc`s at the
+/// same address encode to the same id. That is not a size optimization —
+/// expanding shared structure into copies is exponential, and `(def b [a a])`
+/// four times over is sixteen copies of one vector (ADR-043 part 2).
+///
+/// v1 does not serialize this to bytes. Once no `Rc` appears inside an `Image`,
+/// a `serde` derive is plumbing rather than design, which is what ADR-029
+/// claimed and what leaving it out lets this milestone keep as a claim honestly.
+pub mod image {
+    use crate::bytecode::{Chunk, Slot};
+    use crate::error::SpanOrigin;
+    use crate::value::{
+        BufferId, BytesObj, CellId, Closure, HandleId, Interner, KwId, ListObj, MapObj, NativeId,
+        StrObj, SymId, Value, VecObj,
+    };
+    use crate::vm::{CellEntry, Execution, Frame, HandleEntry, Handler, Pending, Unwind, Vm};
+    use std::collections::HashMap;
+    use std::rc::Rc;
+
+    /// Why a snapshot was refused. Both are ADR-029's promises, as values
+    /// rather than as prose.
+    #[derive(Debug, PartialEq)]
+    pub enum SnapshotError {
+        /// ADR-029: adapter checkpointing is a later opt-in, so a live resource
+        /// is a refusal and not a best effort. The count excludes the standard
+        /// streams, which ADR-043 part 5 declares reconstructible.
+        SnapshotHasLiveHandles(usize),
+        /// ADR-029: same-build, same-code only. The `Image` carries a
+        /// fingerprint rather than the chunk, so this is the check that makes
+        /// "same build" something other than an assumption.
+        ChunkMismatch,
+    }
+
+    /// A `Value` with the pointers taken out. Every variant is `Copy` and
+    /// self-contained; anything that lived behind an `Rc` became an `Obj`.
+    #[derive(Clone, Copy, Debug, PartialEq)]
+    pub enum Ref {
+        Nil,
+        Bool(bool),
+        /// Bits, not an `f64`. ADR-032 exists because `##NaN` and `-0.0` have to
+        /// survive a round trip exactly, and bit patterns are the only spelling
+        /// that cannot quietly normalise one into the other.
+        Float(u64),
+        Int(i64),
+        Sym(u32),
+        Keyword(u32),
+        Cell(u32, u32),
+        Handle(u32, u32),
+        Buffer(u32, u32),
+        /// Index into `Image::objects`.
+        Obj(u32),
+    }
+
+    /// Everything that lived behind an `Rc`, flattened. Children are `Ref`s, so
+    /// an `Obj` is one level deep no matter how deep the value was.
+    #[derive(Debug)]
+    pub enum Obj {
+        Str(String),
+        Bytes(Vec<u8>),
+        List(Vec<Ref>),
+        Vec(Vec<Ref>),
+        Map(Vec<(Ref, Ref)>),
+        Fn { proto: u32, captures: Vec<Ref> },
+        Native(u32),
+    }
+
+    #[derive(Debug)]
+    pub struct FrameDto {
+        proto: u32,
+        pc: usize,
+        base: usize,
+        dst: usize,
+        ret_len: usize,
+        /// An object id, so a closure shared between a frame and a slot stays
+        /// one closure across the round trip.
+        closure: u32,
+    }
+
+    #[derive(Debug)]
+    pub struct HandlerDto {
+        frame: usize,
+        target: usize,
+        err: Option<Slot>,
+    }
+
+    /// An unwind parked mid-cleanup. It has to travel: a snapshot taken while a
+    /// `finally` runs and a resume that forgot the parked error would drop the
+    /// original failure and report success (ADR-028 invariant 3).
+    #[derive(Debug)]
+    pub struct PendingDto {
+        depth: usize,
+        value: Ref,
+        origin: SpanOrigin,
+        suppressed: Vec<Ref>,
+    }
+
+    /// One `Vm` plus one suspended `Execution`, and nothing else — ADR-029's
+    /// promise is that anything not in one of the two is out of scope by
+    /// construction rather than by oversight.
+    #[derive(Debug)]
+    pub struct Image {
+        fingerprint: u64,
+        names: Vec<String>,
+        objects: Vec<Obj>,
+        globals: Vec<Option<(u32, u32)>>,
+        cells: Vec<(u32, Ref)>,
+        /// Generations only. The resources themselves are gone by construction:
+        /// a capture refuses while any non-reconstructible handle is open, so
+        /// every slot here is either a standard stream or closed. The
+        /// generations still matter, because a later `io/open` reuses an index
+        /// and the id it hands out has to differ from the retired one.
+        handle_generations: Vec<u32>,
+        free_handles: Vec<u32>,
+        gensym: u64,
+        out: String,
+        frames: Vec<FrameDto>,
+        slots: Vec<Ref>,
+        handlers: Vec<HandlerDto>,
+        pending: Vec<PendingDto>,
+        fuel: u64,
+    }
+
+    impl Image {
+        /// How many distinct heap objects the encoding holds. Exposed because
+        /// sharing is invisible from inside the language — `=` is structural
+        /// and there is no `identical?` — so this number is the only way a test
+        /// can tell a sharing encoder from a copying one (ADR-043 part 2).
+        pub fn object_count(&self) -> usize {
+            self.objects.len()
+        }
+    }
+
+    /// Same-build, same-code. Hashing the `Debug` rendering rather than deriving
+    /// `Hash` over the tree: `Proto::consts` holds `Value`s, floats included, so
+    /// a derive would need a hand-written `Hash` for a numeric tower whose
+    /// equality is deliberately not Rust's (`TRAPS.md`). A snapshot is not a hot
+    /// path, and one allocation buys total coverage.
+    pub fn fingerprint(chunk: &Chunk) -> u64 {
+        use std::hash::{Hash, Hasher};
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        format!("{chunk:?}").hash(&mut h);
+        h.finish()
+    }
+
+    // --- capture ------------------------------------------------------------
+
+    struct Encoder {
+        objects: Vec<Obj>,
+        /// `Rc` address to object id. Encoding therefore depends on addresses,
+        /// which are stable within a run and meaningless across one — so no two
+        /// `Image`s may ever be compared. The round-trip property compares
+        /// transcripts, which is the only comparison this design supports.
+        seen: HashMap<usize, u32>,
+    }
+
+    impl Encoder {
+        /// Children are encoded before their parent is pushed, so an object's
+        /// id is always higher than every id it names. That makes the table
+        /// topologically ordered and the decoder a single forward loop with no
+        /// forward reference to resolve — see erratum E-14.
+        fn obj(&mut self, addr: usize, build: impl FnOnce(&mut Encoder) -> Obj) -> Ref {
+            if let Some(&id) = self.seen.get(&addr) {
+                return Ref::Obj(id);
+            }
+            let o = build(self);
+            let id = self.objects.len() as u32;
+            self.objects.push(o);
+            self.seen.insert(addr, id);
+            Ref::Obj(id)
+        }
+
+        fn each(&mut self, vs: &[Value]) -> Vec<Ref> {
+            vs.iter().map(|v| self.value(v)).collect()
+        }
+
+        fn value(&mut self, v: &Value) -> Ref {
+            fn addr<T>(r: &Rc<T>) -> usize {
+                Rc::as_ptr(r) as *const u8 as usize
+            }
+            match v {
+                Value::Nil => Ref::Nil,
+                Value::Bool(b) => Ref::Bool(*b),
+                Value::Int(i) => Ref::Int(*i),
+                Value::Float(f) => Ref::Float(f.to_bits()),
+                Value::Sym(s) => Ref::Sym(s.0),
+                Value::Keyword(k) => Ref::Keyword(k.0),
+                Value::Cell(c) => Ref::Cell(c.0, c.1),
+                Value::Handle(h) => Ref::Handle(h.0, h.1),
+                Value::Buffer(b) => Ref::Buffer(b.0, b.1),
+                Value::Str(s) => self.obj(addr(s), |_| Obj::Str(s.0.clone())),
+                Value::Bytes(b) => self.obj(addr(b), |_| Obj::Bytes(b.0.clone())),
+                Value::List(l) => self.obj(addr(l), |e| Obj::List(e.each(&l.0))),
+                Value::Vec(x) => self.obj(addr(x), |e| Obj::Vec(e.each(&x.0))),
+                Value::Map(m) => self.obj(addr(m), |e| {
+                    Obj::Map(m.0.iter().map(|(k, v)| (e.value(k), e.value(v))).collect())
+                }),
+                Value::Fn(f) => self.obj(addr(f), |e| match &**f {
+                    Closure::Fn { proto, captures } => Obj::Fn {
+                        proto: *proto,
+                        captures: e.each(captures),
+                    },
+                    Closure::Native(id) => Obj::Native(id.0),
+                }),
+            }
+        }
+    }
+
+    /// Take an `Image` of a suspended run.
+    ///
+    /// Refused while a non-reconstructible handle is open (ADR-029). The two
+    /// standard streams do not count: `host::install` recreates them at the
+    /// same ids in any VM of this build, so restoring them is restoring rather
+    /// than inventing (ADR-043 part 5). A file is not reconstructible and never
+    /// becomes so by that argument.
+    pub fn capture(vm: &Vm, ex: &Execution, chunk: &Chunk) -> Result<Image, SnapshotError> {
+        let live = vm.open_handles();
+        if live > crate::host::RECONSTRUCTIBLE {
+            return Err(SnapshotError::SnapshotHasLiveHandles(
+                live - crate::host::RECONSTRUCTIBLE,
+            ));
+        }
+        let mut e = Encoder {
+            objects: Vec::new(),
+            seen: HashMap::new(),
+        };
+        let cells = vm
+            .cells
+            .iter()
+            .map(|c| (c.generation, e.value(&c.value)))
+            .collect();
+        let slots = e.each(&ex.slots);
+        let frames = ex
+            .frames
+            .iter()
+            .map(|f| FrameDto {
+                proto: f.proto,
+                pc: f.pc,
+                base: f.base,
+                dst: f.dst,
+                ret_len: f.ret_len,
+                closure: match e.value(&Value::Fn(f.closure.clone())) {
+                    Ref::Obj(id) => id,
+                    _ => unreachable!("a closure always encodes as an object"),
+                },
+            })
+            .collect();
+        let pending = ex
+            .pending
+            .iter()
+            .map(|p| PendingDto {
+                depth: p.depth,
+                value: e.value(&p.unwind.value),
+                origin: p.unwind.origin,
+                suppressed: e.each(&p.unwind.suppressed),
+            })
+            .collect();
+        Ok(Image {
+            fingerprint: fingerprint(chunk),
+            names: vm.interner.names().to_vec(),
+            globals: vm.globals.iter().map(|g| g.map(|c| (c.0, c.1))).collect(),
+            cells,
+            handle_generations: vm.handles.iter().map(|h| h.generation).collect(),
+            free_handles: vm.free_handles.clone(),
+            gensym: vm.gensym,
+            out: vm.out.clone(),
+            frames,
+            slots,
+            handlers: ex
+                .handlers
+                .iter()
+                .map(|h| HandlerDto {
+                    frame: h.frame,
+                    target: h.target,
+                    err: h.err,
+                })
+                .collect(),
+            pending,
+            fuel: ex.fuel,
+            objects: e.objects,
+        })
+    }
+
+    // --- restore ------------------------------------------------------------
+
+    /// Rebuild a `Vm` and its suspended `Execution` from an `Image`.
+    ///
+    /// The chunk comes from the caller, not the image: ADR-029 says *code
+    /// identity*, and same-build means whoever resumes already has the code.
+    /// The fingerprint is what makes that a check rather than an assumption.
+    pub fn restore(img: &Image, chunk: &Chunk) -> Result<(Vm, Execution), SnapshotError> {
+        if img.fingerprint != fingerprint(chunk) {
+            return Err(SnapshotError::ChunkMismatch);
+        }
+        // A fresh VM of this build, so the natives, the interned fault
+        // keywords, and the two standard streams are back in place before
+        // anything else is written over them. `install` is deterministic, which
+        // is what makes the ids below line up.
+        let mut vm = Vm::new();
+
+        // One forward pass. An object's children were encoded first, so every
+        // id it names is already built — see erratum E-14.
+        let mut objects: Vec<Value> = Vec::with_capacity(img.objects.len());
+        for o in &img.objects {
+            let get = |r: &Ref| deref(r, &objects);
+            let v = match o {
+                Obj::Str(s) => Value::Str(Rc::new(StrObj(s.clone()))),
+                Obj::Bytes(b) => Value::Bytes(Rc::new(BytesObj(b.clone()))),
+                Obj::List(xs) => Value::List(Rc::new(ListObj(xs.iter().map(get).collect()))),
+                Obj::Vec(xs) => Value::Vec(Rc::new(VecObj(xs.iter().map(get).collect()))),
+                Obj::Map(kvs) => Value::Map(Rc::new(MapObj(
+                    kvs.iter().map(|(k, v)| (get(k), get(v))).collect(),
+                ))),
+                Obj::Fn { proto, captures } => Value::Fn(Rc::new(Closure::Fn {
+                    proto: *proto,
+                    captures: captures.iter().map(get).collect(),
+                })),
+                Obj::Native(id) => Value::Fn(Rc::new(Closure::Native(NativeId(*id)))),
+            };
+            objects.push(v);
+        }
+        let get = |r: &Ref| deref(r, &objects);
+
+        vm.interner = Interner::restore(img.names.clone());
+        vm.globals = img
+            .globals
+            .iter()
+            .map(|g| g.map(|(i, gen)| CellId(i, gen)))
+            .collect();
+        vm.cells = img
+            .cells
+            .iter()
+            .map(|(gen, r)| CellEntry {
+                generation: *gen,
+                value: get(r),
+            })
+            .collect();
+        // The reconstructible prefix keeps the resources `install` just made;
+        // every slot above it is a closed one whose generation still matters.
+        for (i, gen) in img.handle_generations.iter().enumerate() {
+            match vm.handles.get_mut(i) {
+                Some(e) => e.generation = *gen,
+                None => vm.handles.push(HandleEntry {
+                    generation: *gen,
+                    host: None,
+                }),
+            }
+        }
+        vm.free_handles = img.free_handles.clone();
+        vm.gensym = img.gensym;
+        vm.out = img.out.clone();
+
+        let mut ex = Execution::new();
+        ex.slots = img.slots.iter().map(&get).collect();
+        ex.fuel = img.fuel;
+        ex.frames = img
+            .frames
+            .iter()
+            .map(|f| Frame {
+                proto: f.proto,
+                pc: f.pc,
+                base: f.base,
+                dst: f.dst,
+                ret_len: f.ret_len,
+                closure: match &objects[f.closure as usize] {
+                    Value::Fn(c) => c.clone(),
+                    _ => unreachable!("a frame's closure id names a closure"),
+                },
+            })
+            .collect();
+        ex.handlers = img
+            .handlers
+            .iter()
+            .map(|h| Handler {
+                frame: h.frame,
+                target: h.target,
+                err: h.err,
+            })
+            .collect();
+        ex.pending = img
+            .pending
+            .iter()
+            .map(|p| Pending {
+                depth: p.depth,
+                unwind: Unwind {
+                    value: get(&p.value),
+                    origin: p.origin,
+                    suppressed: p.suppressed.iter().map(&get).collect(),
+                },
+            })
+            .collect();
+        Ok((vm, ex))
+    }
+
+    fn deref(r: &Ref, objects: &[Value]) -> Value {
+        match r {
+            Ref::Nil => Value::Nil,
+            Ref::Bool(b) => Value::Bool(*b),
+            Ref::Int(i) => Value::Int(*i),
+            Ref::Float(bits) => Value::Float(f64::from_bits(*bits)),
+            Ref::Sym(s) => Value::Sym(SymId(*s)),
+            Ref::Keyword(k) => Value::Keyword(KwId(*k)),
+            Ref::Cell(i, g) => Value::Cell(CellId(*i, *g)),
+            Ref::Handle(i, g) => Value::Handle(HandleId(*i, *g)),
+            Ref::Buffer(i, g) => Value::Buffer(BufferId(*i, *g)),
+            Ref::Obj(id) => objects[*id as usize].clone(),
+        }
     }
 }

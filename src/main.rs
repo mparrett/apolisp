@@ -134,6 +134,11 @@ fn main() -> ExitCode {
             let stdout = vm.take_output();
             print!("--- stdout\n{stdout}");
             match outcome {
+                // The driver runs un-fuelled. Suspension is a library facility
+                // for the round-trip property (ADR-043); giving the CLI a fuel
+                // flag would make `.out` depend on a step limit, and a golden
+                // that changes with a step limit is not a golden.
+                vm::Outcome::Suspended => unreachable!("`run` is un-fuelled"),
                 vm::Outcome::Returned(v) => {
                     println!("--- value\n{}", printer::print(&v, &vm.interner));
                     println!("--- exit\n0");

@@ -53,6 +53,7 @@ fn run_traced(src: &str) -> Result<(Ran, Peak), String> {
         .map_err(|e| e.render("<test>", src))
         .expect("the test source compiles");
     match vm::run_traced(&mut machine, &chunk) {
+        (Outcome::Suspended, _) => unreachable!("`run_traced` is un-fuelled"),
         (Outcome::Returned(v), (frames, slots)) => Ok((
             Ran {
                 value: printer::print(&v, &machine.interner),

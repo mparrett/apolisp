@@ -2326,6 +2326,30 @@ arguments already occupy contiguous slots. Declined because it would quietly
 constrain Q20's still-open cross-type sequential equality, which currently
 answers `false` for list-versus-vector.
 
+**E-14 — ADR-043, the two-pass decode that is not needed.** The cost clause
+says "the decode is now two passes rather than one for every object kind,"
+because preserving sharing means an object can name an id it has not reached
+yet. Written before the encoder was: it is not true, and the reason is worth
+keeping.
+
+The encoder builds an object's *children before it pushes the object itself*,
+so every id an object names is strictly lower than its own. The object table
+comes out topologically ordered by construction, and the decoder is a single
+forward loop over it with no placeholder, no fixup, and no forward reference to
+resolve. Preserving sharing cost a pointer-keyed map on the encode side and
+nothing at all on the decode side.
+
+The forward-reference worry was real for the *other* shape — reserving an id
+before building, which is what a cycle would force. There is no cycle here: the
+only cycle this system can construct runs through a cell, and a cell is an
+arena id in a `Ref` rather than an edge in the object graph, which is the thing
+ADR-029 made ids for. Ordering children first is available precisely because
+the graph is acyclic, and the entry's own argument for ids is what guarantees
+that.
+
+The decision stands unchanged. What is wrong is a cost that was predicted and
+never paid.
+
 **E-13 — ADR-041, the transient win that is not there yet.** The *Why* clause
 says `Rc::make_mut` "removes exactly that case — a fresh accumulator has one
 reference, so the loop mutates a buffer it already owns". Measured, it never

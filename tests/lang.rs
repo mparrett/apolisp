@@ -29,6 +29,28 @@ fn suites() -> Vec<PathBuf> {
     files
 }
 
+/// A writable directory the suite can name, emptied per run.
+///
+/// ADR-042 part 5: the runner injects it rather than the language asking for
+/// it, because an `io/temp-dir` primitive would be a line in the 700-line host
+/// row that exists only so a test can find a directory this function already
+/// knows. Nothing machine-specific escapes — `tests/lang/` compares assertions,
+/// not transcripts, so no golden ever sees this path.
+fn tmp_dir_decl(name: &str) -> String {
+    let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join(format!("lang-{name}"));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).expect("the suite's temp directory is creatable");
+    let text = dir.to_str().expect("a UTF-8 target directory");
+    // Emitted into a string literal, so escaping would have to be right.
+    // Refusing is better than getting it subtly wrong on a path nobody expects
+    // to contain either character.
+    assert!(
+        !text.contains(['"', '\\']),
+        "CARGO_TARGET_TMPDIR needs escaping before it can be injected: {text}"
+    );
+    format!("(def tmp-dir \"{text}\")\n")
+}
+
 #[test]
 fn the_in_language_suite_passes() {
     let harness = std::fs::read_to_string(repo_root().join("tests/lang/harness.xs"))
@@ -43,8 +65,9 @@ fn the_in_language_suite_passes() {
         // Pasted together rather than required, because there is no `require`
         // and one namespace (ADR-027, Q12). The harness goes first so its
         // macros are defined before a test uses one — expansion is sequential
-        // (ADR-040).
-        let unit = format!("{harness}\n{src}");
+        // (ADR-040), and `tmp-dir` goes ahead of both so it is defined before
+        // anything reads it.
+        let unit = format!("{}{harness}\n{src}", tmp_dir_decl(&name));
         let joined = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join(&name);
         std::fs::write(&joined, &unit).expect("the joined unit writes");
 

@@ -541,3 +541,51 @@ fn println_displays_strings_without_their_quotes() {
     // `["a" "b"]` would print identically.
     assert_eq!(ran.output, "a b\n1 :k\n[\"a\" \"b\"]\n");
 }
+
+// --- The handle table ----------------------------------------------------------
+
+/// The one invariant no language program can reach. `open_handles` is what
+/// ADR-029 asks before it will take an `Image`, and nothing in `tests/lang/`
+/// can ask the VM how many slots it is holding — so a table that never
+/// reclaimed, or one that reclaimed twice, would pass the whole in-language
+/// suite (ADR-042 part 4).
+#[test]
+fn a_closed_handle_returns_its_slot_and_a_stale_id_cannot_reach_it() {
+    use apolisp::host::Host;
+
+    let mut vm = Vm::new();
+    // `io/stdin` and `io/stdout` are handles too, and they are never closed.
+    let base = vm.open_handles();
+
+    let a = vm.open_handle(Host::Stdout);
+    let b = vm.open_handle(Host::Stdout);
+    assert_eq!(vm.open_handles(), base + 2);
+
+    assert!(vm.close_handle(a), "closing a live handle succeeds");
+    assert_eq!(vm.open_handles(), base + 1);
+    // Idempotent, and still idempotent the third time — a `with-open` whose
+    // body closed explicitly closes again on the way out.
+    assert!(vm.close_handle(a), "closing a closed handle succeeds");
+    assert!(vm.close_handle(a));
+    assert_eq!(
+        vm.open_handles(),
+        base + 1,
+        "a repeated close must not queue the slot twice"
+    );
+
+    // The reuse is what makes the generation load-bearing: `c` takes `a`'s
+    // index, so without the bump the two ids would be equal and `a` would
+    // silently address a resource it never opened.
+    let c = vm.open_handle(Host::Stdout);
+    assert_ne!(a, c, "a reused slot must not hand back the retired id");
+    assert!(vm.host(c).is_some());
+    assert!(vm.host(a).is_none(), "the stale id reaches nothing");
+    assert!(!vm.close_handle(a), "closing a stale handle is an error");
+    assert!(
+        vm.host(c).is_some(),
+        "and closing it must not have closed the live resource"
+    );
+
+    assert!(vm.close_handle(b) && vm.close_handle(c));
+    assert_eq!(vm.open_handles(), base);
+}

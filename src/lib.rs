@@ -2237,8 +2237,9 @@ pub mod compile {
 pub mod vm {
     use crate::bytecode::{CaptureSrc, Chunk, Instr, Slot};
     use crate::error::SpanOrigin;
+    use crate::host::{IoKind, IoOp};
     use crate::value::{
-        CellId, Closure, Interner, KwId, ListObj, MapObj, NativeId, StrObj, SymId, Value,
+        CellId, Closure, HandleId, Interner, KwId, ListObj, MapObj, NativeId, StrObj, SymId, Value,
     };
     use std::rc::Rc;
 
@@ -2338,14 +2339,27 @@ pub mod vm {
     /// A fault before it has a position: what went wrong, and how to say it to
     /// a human. Natives raise these; the dispatch loop turns one into an
     /// `Unwind` at the instruction that raised it.
+    ///
+    /// Two variants because ADR-039 closes `:kind` *within* a `:type`, and
+    /// ADR-042 adds the second `:type`. An io failure carries the operation and
+    /// (where the operation names one) the path beside its kind; a VM fault has
+    /// neither.
     #[derive(Debug)]
-    pub struct Fault {
-        pub kind: Kind,
-        pub msg: String,
+    pub enum Fault {
+        Vm {
+            kind: Kind,
+            msg: String,
+        },
+        Io {
+            op: IoOp,
+            path: Option<String>,
+            kind: IoKind,
+            msg: String,
+        },
     }
 
     pub fn fault(kind: Kind, msg: impl Into<String>) -> Fault {
-        Fault {
+        Fault::Vm {
             kind,
             msg: msg.into(),
         }
@@ -2368,6 +2382,21 @@ pub mod vm {
         value: Value,
     }
 
+    /// ADR-016: handles are generational, so a stale handle is an error rather
+    /// than a silent alias.
+    ///
+    /// This is the cell arena's shape with the half ADR-025 does not need: a
+    /// cell lives as long as the VM, so its generation is written once and
+    /// never bumped, while a handle is the first thing here that frees a slot
+    /// and hands the index back out. The generation is what keeps the reuse
+    /// from being an alias (ADR-042 part 4).
+    struct HandleEntry {
+        generation: u32,
+        /// `None` once closed. The slot outlives the resource so a stale id can
+        /// still be recognised as stale rather than falling off the end.
+        host: Option<crate::host::Host>,
+    }
+
     /// The keywords a fault value is built from, interned once at construction
     /// (ADR-039 clause 3). The closed vocabulary is readable here, in one
     /// place, instead of being spread over the raise sites.
@@ -2378,6 +2407,16 @@ pub mod vm {
         vm_error: KwId,
         /// Indexed by `Kind as usize`.
         kinds: Vec<KwId>,
+        /// ADR-042: the second `:type`, and the two keys only it carries.
+        io_error: KwId,
+        operation: KwId,
+        path: KwId,
+        /// Indexed by `IoKind as usize` and `IoOp as usize`. The operations are
+        /// a closed list for the same reason the kinds are: `:operation` is a
+        /// keyword, and interning one at a raise site would need `&mut Vm`
+        /// where building a fault value has only `&Vm`.
+        io_kinds: Vec<KwId>,
+        io_ops: Vec<KwId>,
     }
 
     pub struct Vm {
@@ -2388,6 +2427,13 @@ pub mod vm {
         /// (BUILD.md, determinism).
         globals: Vec<Option<CellId>>,
         cells: Vec<CellEntry>,
+        /// ADR-016: the VM owns the handle table, not the host module. What
+        /// `host` owns is what a handle *is*.
+        handles: Vec<HandleEntry>,
+        /// Indices whose resource has been closed, available for reuse under a
+        /// bumped generation. A `Vec` and not a free-list threaded through the
+        /// entries, because the entries have to stay readable.
+        free_handles: Vec<u32>,
         natives: Vec<Native>,
         kws: Kws,
         /// ADR-040: reset per compilation unit by the expander, never here.
@@ -2411,15 +2457,33 @@ pub mod vm {
                     .iter()
                     .map(|k| KwId(interner.intern(k.name())))
                     .collect(),
+                io_error: KwId(interner.intern("io-error")),
+                operation: KwId(interner.intern("operation")),
+                path: KwId(interner.intern("path")),
+                io_kinds: IoKind::ALL
+                    .iter()
+                    .map(|k| KwId(interner.intern(k.name())))
+                    .collect(),
+                io_ops: IoOp::ALL
+                    .iter()
+                    .map(|o| KwId(interner.intern(o.name())))
+                    .collect(),
             };
             debug_assert!(
                 Kind::ALL.iter().enumerate().all(|(i, k)| *k as usize == i),
                 "Kind::ALL is not in discriminant order, so `kind as usize` indexes the wrong keyword"
             );
+            debug_assert!(
+                IoKind::ALL.iter().enumerate().all(|(i, k)| *k as usize == i)
+                    && IoOp::ALL.iter().enumerate().all(|(i, o)| *o as usize == i),
+                "an io vocabulary is not in discriminant order, so `as usize` indexes the wrong keyword"
+            );
             let mut vm = Vm {
                 interner,
                 globals: Vec::new(),
                 cells: Vec::new(),
+                handles: Vec::new(),
+                free_handles: Vec::new(),
                 natives: Vec::new(),
                 kws,
                 gensym: 0,
@@ -2427,23 +2491,48 @@ pub mod vm {
             };
             // The one edge of the `prim` seam: cut that module out and this
             // line is the only thing that stops compiling, which is what
-            // ETHOS.md means by a boundary that exists for subtraction.
+            // ETHOS.md means by a boundary that exists for subtraction. `host`
+            // is the same shape — ADR-013's gating happens here, at install,
+            // and never in the dispatch loop.
             crate::prim::install(&mut vm);
+            crate::host::install(&mut vm);
             vm
         }
 
-        /// ADR-039 clause 3: a VM-raised fault is a language value of exactly
-        /// this shape. `:kind` is the contract; `:message` is prose.
+        /// ADR-039 clause 3 and ADR-042 part 1: a raised fault is a language
+        /// value of exactly one of these two shapes. `:kind` is the contract;
+        /// `:message` is prose.
         fn fault_value(&self, f: &Fault) -> Value {
             let kw = Value::Keyword;
-            Value::Map(Rc::new(MapObj(vec![
-                (kw(self.kws.type_), kw(self.kws.vm_error)),
-                (kw(self.kws.kind), kw(self.kws.kinds[f.kind as usize])),
-                (
-                    kw(self.kws.message),
-                    Value::Str(Rc::new(StrObj(f.msg.clone()))),
-                ),
-            ])))
+            let text = |s: &String| Value::Str(Rc::new(StrObj(s.clone())));
+            let pairs = match f {
+                Fault::Vm { kind, msg } => vec![
+                    (kw(self.kws.type_), kw(self.kws.vm_error)),
+                    (kw(self.kws.kind), kw(self.kws.kinds[*kind as usize])),
+                    (kw(self.kws.message), text(msg)),
+                ],
+                Fault::Io {
+                    op,
+                    path,
+                    kind,
+                    msg,
+                } => {
+                    let mut v = vec![
+                        (kw(self.kws.type_), kw(self.kws.io_error)),
+                        (kw(self.kws.operation), kw(self.kws.io_ops[*op as usize])),
+                    ];
+                    // Present only when the operation names one (ADR-042 part
+                    // 1): a `:path` of nil on every stdio failure is a key that
+                    // says nothing, carried so the count stays even.
+                    if let Some(p) = path {
+                        v.push((kw(self.kws.path), text(p)));
+                    }
+                    v.push((kw(self.kws.kind), kw(self.kws.io_kinds[*kind as usize])));
+                    v.push((kw(self.kws.message), text(msg)));
+                    v
+                }
+            };
+            Value::Map(Rc::new(MapObj(pairs)))
         }
     }
 
@@ -2504,6 +2593,73 @@ pub mod vm {
             }
         }
 
+        /// Take an index from the free list before growing, so a program that
+        /// opens and closes in a loop occupies a bounded number of slots.
+        pub fn open_handle(&mut self, host: crate::host::Host) -> HandleId {
+            match self.free_handles.pop() {
+                Some(i) => {
+                    let e = &mut self.handles[i as usize];
+                    // Bumped on *reuse*, never on release. Bumping at `close`
+                    // would make the id that just closed the resource stale as
+                    // a side effect, so closing twice — exactly what a correct
+                    // `with-open` does when the body closed explicitly — would
+                    // report the aliasing error instead of being a no-op. The
+                    // two halves of ADR-042 part 4 are only compatible this
+                    // way round, and the in-language suite caught it wrong.
+                    e.generation += 1;
+                    e.host = Some(host);
+                    HandleId(i, e.generation)
+                }
+                None => {
+                    self.handles.push(HandleEntry {
+                        generation: 0,
+                        host: Some(host),
+                    });
+                    HandleId((self.handles.len() - 1) as u32, 0)
+                }
+            }
+        }
+
+        /// `None` for a closed *or* stale handle. Everything that reads or
+        /// writes wants exactly this, because both are `:closed` to a program —
+        /// the two only differ for `close` itself.
+        pub fn host_mut(&mut self, id: HandleId) -> Option<&mut crate::host::Host> {
+            let e = self.handles.get_mut(id.0 as usize)?;
+            (e.generation == id.1).then_some(e.host.as_mut()?)
+        }
+
+        pub fn host(&self, id: HandleId) -> Option<&crate::host::Host> {
+            let e = self.handles.get(id.0 as usize)?;
+            (e.generation == id.1).then_some(e.host.as_ref()?)
+        }
+
+        /// ADR-042 part 4. `false` means *stale*, not *already closed*:
+        /// closing twice is what a correct `with-open` does when the body
+        /// closed explicitly, and erroring there would make the safe idiom the
+        /// dangerous one. A stale handle is a live resource addressed through a
+        /// dead name, which is the bug the generation exists to catch.
+        pub fn close_handle(&mut self, id: HandleId) -> bool {
+            let Some(e) = self.handles.get_mut(id.0 as usize) else {
+                return false;
+            };
+            if e.generation != id.1 {
+                return false;
+            }
+            // Only a slot that actually held something goes back on the free
+            // list — otherwise closing twice would queue the index twice, and
+            // the second reuse would hand out an id aliasing the first.
+            if e.host.take().is_some() {
+                self.free_handles.push(id.0);
+            }
+            true
+        }
+
+        /// ADR-029 refuses a snapshot while a handle is live, so milestone 8
+        /// asks this once per `Image` — a subtraction rather than a scan.
+        pub fn open_handles(&self) -> usize {
+            self.handles.len() - self.free_handles.len()
+        }
+
         pub fn global(&self, name: SymId) -> Option<&Value> {
             let id = (*self.globals.get(name.0 as usize)?)?;
             self.cell(id)
@@ -2525,6 +2681,14 @@ pub mod vm {
                     self.globals[i] = Some(id);
                 }
             }
+        }
+
+        /// Bind a name to a value that is not a function. `io/stdout` is one:
+        /// ADR-038 made a primitive an ordinary global, which means a primitive
+        /// does not have to be callable to be one.
+        pub fn set_named_global(&mut self, name: &str, value: Value) {
+            let sym = SymId(self.interner.intern(name));
+            self.set_global(sym, value);
         }
 
         /// Register a primitive as an ordinary global (ADR-038). The `prim`
@@ -4429,5 +4593,322 @@ pub mod prim {
                     )
                 }),
         }
+    }
+}
+
+// ---------------------------------------------------------------------------
+
+/// The host boundary (ADR-016): the only place this system touches something
+/// outside itself.
+///
+/// Language code never holds a Rust object. It holds a generational `HandleId`
+/// into the table the VM owns, which is the one representation of a resource
+/// that survives a snapshot (ADR-029) — a raw pointer cannot be serialized, an
+/// index can. There is no `HostCall` opcode: an io primitive is an ordinary
+/// global reached through the ordinary `Call`, which is everything ADR-038
+/// already delivered (ADR-042 part 3).
+pub mod host {
+    use crate::value::{kind_name, BytesObj, HandleId, Value};
+    use crate::vm::{Fault, Kind, Vm};
+    use std::io::{Read, Write};
+    use std::rc::Rc;
+
+    /// A live host resource. Cutting a variant is what ADR-013 means by a seam
+    /// for subtraction: the primitive that constructs it goes with it, and
+    /// nothing in the VM changes.
+    pub enum Host {
+        File(std::fs::File),
+        Stdin,
+        /// The buffered in-memory host, *not* a file descriptor. ADR-029 needs
+        /// emitted effects to be part of the serialization comparison rather
+        /// than escaping it, so a write here goes where `println` goes.
+        Stdout,
+    }
+
+    /// The closed `:kind` vocabulary for `:type :io-error` (ADR-042 part 1).
+    /// The three network kinds the design conversation proposed are absent on
+    /// purpose: nothing here can raise one, and they arrive with the adapter
+    /// that can.
+    #[derive(Clone, Copy, Debug)]
+    pub enum IoKind {
+        NotFound,
+        PermissionDenied,
+        Closed,
+        InvalidData,
+        Interrupted,
+        /// Documented as *do not dispatch on this, read the message*. It exists
+        /// because `std::io::ErrorKind` is `#[non_exhaustive]` and the set of
+        /// things an operating system can refuse is not ours to close.
+        Other,
+    }
+
+    impl IoKind {
+        /// In discriminant order, which is what `kind as usize` indexes.
+        pub const ALL: [IoKind; 6] = [
+            IoKind::NotFound,
+            IoKind::PermissionDenied,
+            IoKind::Closed,
+            IoKind::InvalidData,
+            IoKind::Interrupted,
+            IoKind::Other,
+        ];
+
+        pub fn name(self) -> &'static str {
+            match self {
+                IoKind::NotFound => "not-found",
+                IoKind::PermissionDenied => "permission-denied",
+                IoKind::Closed => "closed",
+                IoKind::InvalidData => "invalid-data",
+                IoKind::Interrupted => "interrupted",
+                IoKind::Other => "other",
+            }
+        }
+    }
+
+    /// The primitive that failed. Closed for the same reason the kinds are, and
+    /// for one more: `:operation` is a keyword, and interning one at a raise
+    /// site would need `&mut Vm` where building a fault value has only `&Vm`.
+    #[derive(Clone, Copy, Debug)]
+    pub enum IoOp {
+        Open,
+        Close,
+        Read,
+        Write,
+    }
+
+    impl IoOp {
+        pub const ALL: [IoOp; 4] = [IoOp::Open, IoOp::Close, IoOp::Read, IoOp::Write];
+
+        pub fn name(self) -> &'static str {
+            match self {
+                IoOp::Open => "open",
+                IoOp::Close => "close",
+                IoOp::Read => "read",
+                IoOp::Write => "write",
+            }
+        }
+    }
+
+    /// ADR-042 part 2: the message is ours, and the raw code is dropped.
+    /// `std::io::Error`'s own `Display` carries an errno and platform wording —
+    /// "No such file or directory (os error 2)" on one host, other words on
+    /// another — and ADR-039 makes a thrown value printable into a `.out`
+    /// golden, so forwarding it would put the machine in the oracle.
+    fn classify(e: &std::io::Error) -> (IoKind, &'static str) {
+        use std::io::ErrorKind as E;
+        match e.kind() {
+            E::NotFound => (IoKind::NotFound, "no such file"),
+            E::PermissionDenied => (IoKind::PermissionDenied, "permission denied"),
+            E::InvalidData => (IoKind::InvalidData, "not valid data"),
+            E::Interrupted => (IoKind::Interrupted, "interrupted"),
+            _ => (IoKind::Other, "the host refused the operation"),
+        }
+    }
+
+    fn host_failed(op: IoOp, path: Option<String>, e: &std::io::Error) -> Fault {
+        let (kind, msg) = classify(e);
+        Fault::Io {
+            op,
+            path,
+            kind,
+            msg: msg.to_string(),
+        }
+    }
+
+    fn io_fault(op: IoOp, kind: IoKind, msg: impl Into<String>) -> Fault {
+        Fault::Io {
+            op,
+            path: None,
+            kind,
+            msg: msg.into(),
+        }
+    }
+
+    /// A closed *or* stale handle. Both are `:closed` to a program: the id does
+    /// not name a live resource, and which of the two ways it fails to is a
+    /// distinction only `io/close` draws (ADR-042 part 4).
+    fn not_live(op: IoOp) -> Fault {
+        io_fault(
+            op,
+            IoKind::Closed,
+            "the handle does not name an open resource",
+        )
+    }
+
+    /// A misuse is a `:vm-error :type`, not an `:io-error`. Passing a string
+    /// where a handle belongs is the same class of mistake as `(+ 1 "x")`, and
+    /// nothing about the host was involved.
+    fn misuse(msg: impl Into<String>) -> Fault {
+        Fault::Vm {
+            kind: Kind::Type,
+            msg: msg.into(),
+        }
+    }
+
+    fn handle_arg(v: &Value, op: &str) -> Result<HandleId, Fault> {
+        match v {
+            Value::Handle(h) => Ok(*h),
+            other => Err(misuse(format!(
+                "`{op}` needs a handle, not a {}",
+                kind_name(other)
+            ))),
+        }
+    }
+
+    fn string_arg<'a>(v: &'a Value, op: &str) -> Result<&'a str, Fault> {
+        match v {
+            Value::Str(s) => Ok(&s.0),
+            other => Err(misuse(format!(
+                "`{op}` needs a string, not a {}",
+                kind_name(other)
+            ))),
+        }
+    }
+
+    pub fn install(vm: &mut Vm) {
+        // Not functions. ADR-038 made a primitive an ordinary global, so the
+        // two standard streams are *values* in the global table — one handle
+        // each, created once, rather than a native that mints a new one per
+        // call and leaks a table slot every time it is asked.
+        let stdin = vm.open_handle(Host::Stdin);
+        let stdout = vm.open_handle(Host::Stdout);
+        vm.set_named_global("io/stdin", Value::Handle(stdin));
+        vm.set_named_global("io/stdout", Value::Handle(stdout));
+
+        vm.native("io/open", 2, false, |vm, a| {
+            let path = string_arg(&a[0], "io/open")?.to_string();
+            let mode = match &a[1] {
+                // Cloned because opening needs `&mut vm` and the name borrows
+                // the interner out of it.
+                Value::Keyword(k) => vm.interner.name(k.0).to_string(),
+                other => {
+                    return Err(misuse(format!(
+                        "`io/open` needs a mode keyword, not a {}",
+                        kind_name(other)
+                    )))
+                }
+            };
+            let mut opts = std::fs::OpenOptions::new();
+            match mode.as_str() {
+                "read" => opts.read(true),
+                "write" => opts.write(true).create(true).truncate(true),
+                "append" => opts.append(true).create(true),
+                other => {
+                    return Err(misuse(format!(
+                        "`io/open`: mode is :read, :write, or :append, not :{other}"
+                    )))
+                }
+            };
+            match opts.open(&path) {
+                Ok(f) => Ok(Value::Handle(vm.open_handle(Host::File(f)))),
+                Err(e) => Err(host_failed(IoOp::Open, Some(path), &e)),
+            }
+        });
+
+        vm.native("io/close", 1, false, |vm, a| {
+            let id = handle_arg(&a[0], "io/close")?;
+            // Dropping the `File` is what closes the descriptor, and it is also
+            // what flushes it — which is why there is no `io/flush`.
+            if vm.close_handle(id) {
+                Ok(Value::Nil)
+            } else {
+                Err(io_fault(
+                    IoOp::Close,
+                    IoKind::Closed,
+                    "the handle is stale: its slot has been reused",
+                ))
+            }
+        });
+
+        vm.native("io/open?", 1, false, |vm, a| {
+            let id = handle_arg(&a[0], "io/open?")?;
+            Ok(Value::Bool(vm.host(id).is_some()))
+        });
+
+        vm.native("io/read", 2, false, |vm, a| {
+            let id = handle_arg(&a[0], "io/read")?;
+            let n = match &a[1] {
+                Value::Int(i) if *i >= 0 => *i as usize,
+                other => {
+                    return Err(misuse(format!(
+                        "`io/read` needs a non-negative count, not {}",
+                        crate::printer::display(other, &vm.interner)
+                    )))
+                }
+            };
+            let mut buf = vec![0u8; n];
+            let got = match vm.host_mut(id).ok_or_else(|| not_live(IoOp::Read))? {
+                Host::File(f) => f.read(&mut buf),
+                Host::Stdin => std::io::stdin().read(&mut buf),
+                Host::Stdout => return Err(misuse("`io/read` cannot read from `io/stdout`")),
+            };
+            // A short read is not an error and neither is end of input: empty
+            // bytes is the end, which is what lets a read loop terminate on a
+            // value rather than on a caught throw.
+            match got {
+                Ok(got) => {
+                    buf.truncate(got);
+                    Ok(Value::Bytes(Rc::new(BytesObj(buf))))
+                }
+                Err(e) => Err(host_failed(IoOp::Read, None, &e)),
+            }
+        });
+
+        vm.native("io/read-all", 1, false, |vm, a| {
+            let id = handle_arg(&a[0], "io/read-all")?;
+            let mut buf = Vec::new();
+            let got = match vm.host_mut(id).ok_or_else(|| not_live(IoOp::Read))? {
+                Host::File(f) => f.read_to_end(&mut buf),
+                Host::Stdin => std::io::stdin().read_to_end(&mut buf),
+                Host::Stdout => return Err(misuse("`io/read-all` cannot read from `io/stdout`")),
+            };
+            match got {
+                Ok(_) => Ok(Value::Bytes(Rc::new(BytesObj(buf)))),
+                Err(e) => Err(host_failed(IoOp::Read, None, &e)),
+            }
+        });
+
+        vm.native("io/write", 2, false, |vm, a| {
+            let id = handle_arg(&a[0], "io/write")?;
+            let bytes = match &a[1] {
+                Value::Bytes(b) => b.0.clone(),
+                Value::Str(s) => s.0.as_bytes().to_vec(),
+                other => {
+                    return Err(misuse(format!(
+                        "`io/write` needs bytes or a string, not a {}",
+                        kind_name(other)
+                    )))
+                }
+            };
+            let n = Value::Int(bytes.len() as i64);
+            // Stdout is looked up twice on purpose. `vm.emit` needs `&mut vm`
+            // and `host_mut` is already holding one, so the buffered case has
+            // to be settled before the borrow is taken rather than inside the
+            // match that would be the obvious place for it.
+            if matches!(vm.host(id), Some(Host::Stdout)) {
+                return match String::from_utf8(bytes) {
+                    Ok(text) => {
+                        vm.emit(&text);
+                        Ok(n)
+                    }
+                    Err(e) => Err(io_fault(
+                        IoOp::Write,
+                        IoKind::InvalidData,
+                        format!(
+                            "`io/stdout` takes text, and these bytes are not valid UTF-8 at byte {}",
+                            e.utf8_error().valid_up_to()
+                        ),
+                    )),
+                };
+            }
+            match vm.host_mut(id).ok_or_else(|| not_live(IoOp::Write))? {
+                Host::File(f) => f
+                    .write_all(&bytes)
+                    .map(|()| n)
+                    .map_err(|e| host_failed(IoOp::Write, None, &e)),
+                Host::Stdin => Err(misuse("`io/write` cannot write to `io/stdin`")),
+                Host::Stdout => unreachable!("settled above, before the mutable borrow"),
+            }
+        });
     }
 }

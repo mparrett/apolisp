@@ -44,3 +44,23 @@
     (if (empty? (rest xs))
       (first xs)
       `(let [v# ~(first xs)] (if v# v# (or ~@(rest xs)))))))
+
+; ADR-016's promise, kept where it said it would be: `with-open` is a macro
+; over `try`/`finally`, not a primitive. A primitive that called a language
+; closure would re-enter the dispatch loop on the Rust stack, which ADR-004
+; forbids (ADR-041 part 6).
+;
+; It recurses over the bindings rather than taking one, because a `with-open`
+; that holds a single resource is one people nest by hand — and hand-nesting is
+; the thing it exists to prevent.
+;
+; Note ADR-028 rule 2: a call in tail position inside the body is *not* a tail
+; call, because the cleanup still has to run after it. A loop written inside a
+; `with-open` accumulates frames.
+(defmacro with-open [bindings & body]
+  (if (empty? bindings)
+    `(do ~@body)
+    `(let [~(first bindings) ~(first (rest bindings))]
+       (try
+         (with-open ~(rest (rest bindings)) ~@body)
+         (finally (io/close ~(first bindings)))))))

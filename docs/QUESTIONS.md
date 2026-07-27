@@ -107,8 +107,9 @@ order-dependent `.forms` snapshots — the failure mode ADR-008 exists to preven
 
 ## No milestone — decide when evidence arrives
 
-**Q18 — Mutation checks as an oracle rung.** *(Evidence arrived five times —
-milestones 1, 2, 4, 5, and 6.)*
+**Q18 — Mutation checks as an oracle rung.** *(Evidence arrived seven times —
+milestones 1, 2, 4, 5, 6, 7, and 8. At this point the rung is not in question;
+what remains open is only its shape.)*
 Run against milestone 1's own span tests, two of three mutants survived: every
 origin could be `Unknown`, or every span could start at byte 0, with the suite
 staying green. Only arity was actually checked. Fixed by adding `.spans`
@@ -143,6 +144,21 @@ clone), and the two are behaviourally identical, so no test can separate them.
 The interesting result came from instrumentation instead, and refuted ADR-041's
 own rationale (erratum E-13). Worth naming as a limit of the rung: **a mutation
 check answers behavioural claims only.**
+
+Milestones 7 and 8 found a fourth kind, twice, and it is the one that scales
+worst: **a hole in the corpus rather than a defect in the code**. Seven's read
+path could ignore the handle generation entirely, because nothing ever read
+*through* a stale handle; eight dropped four separate fields from an `Image`
+and the strongest property in the project — cutting at every instruction
+boundary, over nine programs, in two forms — noticed none of them. Nothing was
+wrong with the implementation either time. What was wrong was the belief that
+the suite was checking it, and no amount of strengthening a property fixes
+that, because a property only sees the state its inputs create.
+
+Both passes also predicted every survivor, which is the argument for
+pre-registration rather than for mutation testing: writing the table down is
+when the holes became visible. Filled in afterwards they would have read as
+discoveries.
 
 **So the finding is broader than "tests can be dead."** A mutation check also
 finds duplicated enforcement, which nothing else in this loop looks for, and

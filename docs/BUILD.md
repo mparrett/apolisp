@@ -48,7 +48,7 @@ Each milestone is a runnable artifact.
 | 5 | Macro expansion + quasiquote + gensym | **Done** (`6c4785f`) — `defmacro` is a prelude macro; expansion is deterministic per unit |
 | 6 | Collections, strings, bytes | **Done** (`de916cc`) — `tests/lang/` runs through the binary, and caught two bugs on its first run |
 | 7 | Host handle table + blocking file/stdio | **Done** (`1e7555e`) — `with-open` closes on all four paths; a stale id reaches nothing |
-| 8 | Fuel suspension + `Image` + resume | Round-trip property passes; live handles are refused |
+| 8 | Fuel suspension + `Image` + resume | **Done** (`ab75b1b`) — the round-trip cuts at *every* instruction boundary; live handles are refused |
 | 9 | REPL | Becomes the primary development interface |
 | 10 | Host adapters: terminal, TCP, JSON | Outside the line budget |
 
@@ -170,6 +170,20 @@ detail:
   **buffered in-memory host**, so emitted effects are part of the comparison
   rather than escaping it. **This is the oracle for constraint #2** — without it,
   that constraint is an aspiration rather than a property (ADR-029).
+
+  Landed at milestone 8 in `tests/snapshot.rs`, in two forms: cut at *every*
+  instruction boundary and round-trip once, and cut at every boundary and
+  round-trip *repeatedly* to the end. The second is a different claim — that
+  loss does not accumulate, which a field restored to a plausible default
+  survives once and fails over fifty.
+
+  **Its limit is worth knowing before trusting it.** A round-trip property
+  tests the encoding of whatever its corpus constructs and nothing about what
+  it does not. Milestone 8's mutation pass dropped four separate fields from
+  the `Image` — the gensym counter, the handle free list, the handle
+  generations, and the sign of a negative zero — and this property, in both
+  forms, over nine programs, noticed none of them. Adding a piece of state to
+  the VM means adding a program that creates it; the property will not ask.
 - **Differential testing.** For the subset that overlaps Clojure semantics, diff
   against Babashka. Scope before building — see Q16.
 

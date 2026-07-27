@@ -1077,6 +1077,9 @@ equality; a printer emitting unreadable tokens is a defect now.
 *(New, 2026-07-26. Resolves the part of Q20 that milestone 2 forces. Q20 stays
 open for the rest.)*
 
+*Decision stands; one claim corrected and one reason strengthened by erratum
+E-11.*
+
 **Decision.** The compact table Q20 asked for, scoped to the three edges a
 compiler cannot avoid answering:
 
@@ -1224,3 +1227,36 @@ the one that helped.
 The original design conversation (`archive/lispy-language-vm-convo-2026-07-25.md`)
 lists a five-stage version with *one crate with inline modules* as its own step;
 ADR-015 compressed that to four. Under either count, file modules were skipped.
+
+**E-11 — ADR-033, the rest-argument deviation.** Two corrections to an entry
+whose decision stands.
+
+*The reversibility claim is wrong.* The entry says "widening to accept `nil`
+later is safe." It is not a widening — a rest parameter is either always a list
+or `nil`-when-empty, and swapping between them breaks code in both directions.
+Under the empty-list rule a body may call `(count more)` unguarded; switch to
+`nil` and that call needs a `nil`-tolerant `count`. Under the `nil` rule a body
+may test `(if more ...)`; switch to the empty list and the test is always true.
+Neither direction is free.
+
+*What is actually safe* is a house idiom plus one library property: make the
+core functions `nil`-tolerant — `(count nil)` → 0, `(empty? nil)` → true, as
+Clojure has them — and write `(empty? more)` rather than `(if more ...)` or
+`(nil? more)`. Code written that way behaves identically under either rule, so
+the choice stops being a semantic fork. Milestone 6 owns delivering that
+tolerance; the idiom applies from the first variadic function written.
+
+*The load-bearing reason is stronger than the one given.* The entry argues from
+one parameter having one type. The better argument is that Clojure's `nil` rest
+argument is one instance of **nil-punning**, where empty and absent deliberately
+collapse — `(seq [])` → `nil`, `(next [1])` → `nil`. That is coherent inside a
+language built on lazy seqs. ADR-012 already declined laziness, so there is no
+`seq` and no seq abstraction for nil-punning to inhabit; adopting `nil` here
+would import a single artifact of a system this language does not have. Taking
+it would mean adopting nil-punning as a policy, not as one calling convention.
+
+*Also considered and not taken:* an empty **vector** rather than an empty list.
+Nearly free today, since `ListObj` and `VecObj` are both `Vec<Value>` and
+arguments already occupy contiguous slots. Declined because it would quietly
+constrain Q20's still-open cross-type sequential equality, which currently
+answers `false` for list-versus-vector.

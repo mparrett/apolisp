@@ -28,6 +28,11 @@ answer by default.
 sets, and cross-type collection equality. Exception values now sit with **Q23**,
 which is the same question from the host side.
 
+Add one to the milestone-6 list: **do the core functions accept `nil` where they
+accept a collection** — `(count nil)` → 0, `(empty? nil)` → true? Erratum E-11
+makes this the thing that keeps ADR-033's rest-argument rule from being a
+semantic fork, so it is no longer only a convenience question.
+
 Wanted: **one compact table** — in v1 / deliberately different from Clojure /
 deferred — covering only the edges milestones 1–6 actually hit. Explicitly not a
 grammar, not a standard-library plan. If it starts becoming either, stop.

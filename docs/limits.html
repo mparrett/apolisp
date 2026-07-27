@@ -1,0 +1,468 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>apolisp — what a mutation check cannot find</title>
+<meta name="description" content="Three more milestones of a Lisp VM. Each round of breaking its own tests hit a different limit of the instrument — a defect nothing could observe, a rule nothing was checking, and a claim no test could answer.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%93%8F%3C/text%3E%3C/svg%3E">
+<style>
+  :root {
+    color-scheme: light dark;
+
+    --ground:    #edf0f3;
+    --panel:     #f8fafb;
+    --panel-2:   #e2e7ec;
+    --ink:       #14181d;
+    --muted:     #525c68;
+    --faint:     #7f8996;
+    --accent:    #1f5f7a;
+    --accent-w:  #d7e6ed;
+    --dead:      #9c3327;
+    --dead-w:    #f3ddd9;
+    --live:      #14614f;
+    --live-w:    #d6eae4;
+    --hair:      #ccd4db;
+    --hair-2:    #b0bac4;
+
+    --serif: "Charter", "Bitstream Charter", "Iowan Old Style", Georgia, ui-serif, serif;
+    --util:  "Avenir Next", Avenir, Futura, Optima, ui-sans-serif, system-ui, sans-serif;
+    --mono:  ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+
+    --measure: 64ch;
+    --rule: 1px solid var(--hair);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground:   #131619;
+      --panel:    #191d21;
+      --panel-2:  #22272d;
+      --ink:      #e3e7ec;
+      --muted:    #98a2ae;
+      --faint:    #6b7581;
+      --accent:   #6cb6d4;
+      --accent-w: #14313d;
+      --dead:     #e0837a;
+      --dead-w:   #38201d;
+      --live:     #5cc0a8;
+      --live-w:   #123029;
+      --hair:     #2a3037;
+      --hair-2:   #3a424b;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:#131619; --panel:#191d21; --panel-2:#22272d; --ink:#e3e7ec;
+    --muted:#98a2ae; --faint:#6b7581; --accent:#6cb6d4; --accent-w:#14313d;
+    --dead:#e0837a; --dead-w:#38201d; --live:#5cc0a8; --live-w:#123029;
+    --hair:#2a3037; --hair-2:#3a424b;
+  }
+  :root[data-theme="light"] {
+    --ground:#edf0f3; --panel:#f8fafb; --panel-2:#e2e7ec; --ink:#14181d;
+    --muted:#525c68; --faint:#7f8996; --accent:#1f5f7a; --accent-w:#d7e6ed;
+    --dead:#9c3327; --dead-w:#f3ddd9; --live:#14614f; --live-w:#d6eae4;
+    --hair:#ccd4db; --hair-2:#b0bac4;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--serif);
+    font-size: 1.0625rem;
+    line-height: 1.62;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  .wrap {
+    max-width: calc(var(--measure) + 4rem);
+    margin: 0 auto;
+    padding: 3.5rem 2rem 6rem;
+  }
+
+  header { border-bottom: var(--rule); padding-bottom: 2rem; margin-bottom: 2.5rem; }
+
+  h1 {
+    font-size: clamp(1.9rem, 5.2vw, 2.7rem);
+    line-height: 1.12;
+    letter-spacing: -0.018em;
+    margin: 0 0 0.9rem;
+    font-weight: 600;
+  }
+
+  .dek {
+    font-size: 1.15rem;
+    line-height: 1.5;
+    color: var(--muted);
+    margin: 0 0 1.4rem;
+  }
+
+  .byline {
+    font-family: var(--util);
+    font-size: 0.775rem;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--faint);
+    margin: 0;
+    /* The spans have no whitespace between them, so without this the whole
+       line is one unbreakable run and the page scrolls sideways on a phone. */
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+  }
+  .byline span { white-space: nowrap; }
+  .byline .sep { margin: 0 0.55rem; opacity: 0.5; }
+
+  section { margin: 0 0 3rem; }
+
+  .eyebrow {
+    display: block;
+    font-family: var(--util);
+    font-size: 0.7rem;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 0.5rem;
+  }
+
+  h2 {
+    font-size: clamp(1.3rem, 3.4vw, 1.6rem);
+    line-height: 1.22;
+    letter-spacing: -0.012em;
+    margin: 0 0 1rem;
+    font-weight: 600;
+  }
+
+  h3 {
+    font-family: var(--util);
+    font-size: 0.95rem;
+    letter-spacing: 0.01em;
+    margin: 1.8rem 0 0.6rem;
+    font-weight: 600;
+  }
+
+  p { margin: 0 0 1.05rem; max-width: var(--measure); }
+
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+  code {
+    font-family: var(--mono);
+    font-size: 0.86em;
+    background: var(--panel-2);
+    padding: 0.08em 0.32em;
+    border-radius: 3px;
+  }
+
+  pre {
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    line-height: 1.55;
+    background: var(--panel);
+    border: var(--rule);
+    border-left: 3px solid var(--hair-2);
+    border-radius: 4px;
+    padding: 0.95rem 1.1rem;
+    overflow-x: auto;
+    margin: 0 0 1.2rem;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; }
+  pre .hi { color: var(--dead); font-style: normal; }
+  pre .dim { color: var(--faint); }
+
+  .note {
+    border: var(--rule);
+    border-left: 3px solid var(--hair-2);
+    background: var(--panel);
+    border-radius: 4px;
+    padding: 1rem 1.15rem 0.4rem;
+    margin: 0 0 1.3rem;
+    max-width: var(--measure);
+  }
+  .note p { font-size: 0.965rem; }
+  .note .tag {
+    display: block;
+    font-family: var(--util);
+    font-size: 0.7rem;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+  }
+  .note.found { border-left-color: var(--dead); background: var(--dead-w); }
+  .note.found .tag { color: var(--dead); }
+  .note.clean { border-left-color: var(--live); background: var(--live-w); }
+  .note.clean .tag { color: var(--live); }
+
+  .tablewrap { overflow-x: auto; margin: 0 0 1.4rem; }
+  table {
+    border-collapse: collapse;
+    font-family: var(--util);
+    font-size: 0.87rem;
+    width: 100%;
+    min-width: 30rem;
+  }
+  th, td { text-align: left; padding: 0.5rem 0.85rem 0.5rem 0; border-bottom: var(--rule); vertical-align: top; }
+  th {
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--faint);
+    font-weight: 600;
+    border-bottom: 1px solid var(--hair-2);
+  }
+  td.v { white-space: nowrap; font-weight: 600; }
+  td.v.survived { color: var(--dead); }
+  td.v.died { color: var(--live); }
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+    gap: 1px;
+    background: var(--hair);
+    border: var(--rule);
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 0 0 1.5rem;
+  }
+  .stat { background: var(--panel); padding: 0.85rem 0.95rem; }
+  .stat b {
+    display: block;
+    font-family: var(--util);
+    font-size: 1.35rem;
+    letter-spacing: -0.02em;
+    font-weight: 600;
+    line-height: 1.1;
+  }
+  .stat span {
+    font-family: var(--util);
+    font-size: 0.68rem;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+
+  blockquote {
+    margin: 0 0 1.2rem;
+    padding-left: 1.1rem;
+    border-left: 2px solid var(--accent);
+    color: var(--muted);
+    font-style: italic;
+    max-width: var(--measure);
+  }
+  blockquote p { margin-bottom: 0; }
+
+  ul { max-width: var(--measure); padding-left: 1.15rem; margin: 0 0 1.1rem; }
+  li { margin-bottom: 0.45rem; }
+
+  hr { border: 0; border-top: var(--rule); margin: 2.5rem 0; }
+
+  footer {
+    border-top: var(--rule);
+    padding-top: 1.6rem;
+    color: var(--faint);
+    font-family: var(--util);
+    font-size: 0.8rem;
+    line-height: 1.6;
+  }
+  footer p { max-width: var(--measure); }
+</style></head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>What a mutation check cannot find</h1>
+  <p class="dek">Three more milestones of a small Lisp VM. The habit from last time — break your own tests on purpose, predictions written first — kept paying, and kept running into its own edges. Each round found something the previous round&rsquo;s instrument was structurally unable to see.</p>
+  <p class="byline">
+    <span>apolisp</span><span class="sep">/</span><span>Rust, zero dependencies</span><span class="sep">/</span><span>6 of 10 milestones</span><span class="sep">/</span><span>41 decision records</span>
+  </p>
+</header>
+
+<section>
+  <span class="eyebrow">Previously</span>
+  <h2>The instrument, and what it was for</h2>
+
+  <p>apolisp is a small Lisp in the Clojure dialect with its own VM, in Rust, for one user. The binding constraint is that the whole core stays holdable at once — a context-window budget of about 7,000 lines — which makes a test suite that merely <em>exists</em> too expensive. Every test has to be doing identifiable work.</p>
+
+  <p>So each milestone ends the same way: pick the handful of lines the milestone actually rests on, write down what should happen if each one is broken, break it, run the suite, restore. Ten minutes. The <a href="oracle.html">first three milestones</a> found three distinct kinds of failure that way — a test that could not fail, a rule enforced twice so neither mechanism could be attributed, and a corpus that never distinguished a correct implementation from a plausible wrong one.</p>
+
+  <p>The three milestones since — errors and unwinding, macros, collections — found three more. None of them is a dead test, and two of them a mutation check could not have answered at all.</p>
+</section>
+
+<section>
+  <span class="eyebrow">Round five · milestone 4</span>
+  <h2>A defect nothing could observe</h2>
+
+  <p>Milestone 4 is <code>try</code>/<code>throw</code>/<code>finally</code> and the handler stack. Unwinding is hand-written here: an explicit frame stack means dropping frames, running pending cleanups exactly once, and resuming — no Rust unwinding involved, because the whole design rests on the Rust stack being empty at every instruction boundary.</p>
+
+  <p>Five mutants, predictions first. Four died as expected. The fifth was predicted to survive, and did:</p>
+
+  <div class="note found">
+    <span class="tag">Unwinding drops the frames and keeps their slots</span>
+    <p>Every test stayed green. Not because the code was untested — because the defect <em>cannot be seen from outside the VM</em>.</p>
+  </div>
+
+  <p>The leak is bounded. A call&rsquo;s argument window sits inside its caller&rsquo;s frame, so the next call reuses the same slot range and never grows past the deepest point already reached. No high-water mark can move. And no value is ever wrong, because the callee prologue fills everything above its arguments with <code>nil</code> — a line that exists for an entirely different reason, so that a frame&rsquo;s contents are a function of the call rather than of whatever ran there last.</p>
+
+  <p>So the mutant is real — dead values retained for the life of the run, and carried into any snapshot — and unobservable. The first response was a test: a tail loop that throws four frames deep and catches, two hundred times, comparing high-water marks against ten iterations.</p>
+
+  <div class="note found">
+    <span class="tag">The test written to catch it was also dead</span>
+    <p>It passed under the mutant. Writing a second dead test to cover the first one is the milestone-1 failure repeated deliberately, which is a poor way to spend a budget.</p>
+  </div>
+
+  <p>The fix is structural, and it is the previous chapter&rsquo;s lesson arriving in a new place: make it one mechanism instead of two that have to agree.</p>
+
+<pre><code><span class="dim">;; the only place a frame is released — returning and unwinding share it</span>
+fn drop_frame(ex: &amp;mut Execution) -&gt; Frame {
+    let f = ex.frames.pop().expect("a frame to drop");
+    ex.slots.truncate(f.ret_len);
+    f
+}
+</code></pre>
+
+  <p>&ldquo;Unwinding forgets to give the slots back&rdquo; is no longer expressible as a local change. Writing it means breaking returning too, and that is caught by eight tests.</p>
+
+  <p>One more from this round, worth keeping for its shape. A mutant that stopped merging a displaced cleanup error into the one that replaced it was caught — but not by any assertion about errors. It was caught by a check that the run finishes with an empty handler stack, which exists because dropping a handler pop is the first mutation anyone would try. The assertion was doing work no test about the feature was doing.</p>
+</section>
+
+<section>
+  <span class="eyebrow">Round six · milestone 5</span>
+  <h2>A rule everybody knows and nothing was checking</h2>
+
+  <p>Milestone 5 is macro expansion, quasiquote, and gensym. Six mutants. Four died as predicted, one refuted a prediction in a useful direction, and one survived the entire suite — seventy-five tests, every golden file byte-identical.</p>
+
+<pre><code><span class="dim">;; the mutant: expand a macro&rsquo;s arguments before invoking it</span>
+
+(defmacro inner [] :expanded)
+(defmacro outer [x] `(quote ~x))
+(outer (inner))
+
+<span class="dim">;; correct:</span>  (quote (inner))
+<span class="hi">;; mutant:</span>   (quote :expanded)
+</code></pre>
+
+  <p>A macro receives <em>forms</em> — unevaluated, and unexpanded. It is the most basic rule macros have, it is the first line of every tutorial about them, and nothing in the suite observed it.</p>
+
+  <p>The reason is worth sitting with. Every macro in the test suite <em>used</em> its arguments as code, and for those, expanding early and expanding late produce identical output. Telling the two apart requires a macro that keeps an argument as <strong>data</strong> — which is a shape nobody writes by accident, and which therefore did not exist in the corpus until a mutant demanded it.</p>
+
+  <div class="note found">
+    <span class="tag">The corpus claimed to cover a case it did not</span>
+    <p>Another mutant dropped everything after a splice in a template. It should have been caught by the corpus. It was caught by one unit test — because every splice in the corpus happened to be the <em>last</em> item, so an expander that dropped the tail expanded the whole file correctly.</p>
+    <p>The file carried a comment saying it had &ldquo;a splice, and a tail the splice does not swallow&rdquo;. It did not. The comment was written first, by someone who had read the chapter about corpora that look representative rather than distinguish, and never checked against a wrong implementation.</p>
+  </div>
+
+  <p>The refutation in the other direction is the pleasant one. A mutant that damaged the origins attached to macro output — the positions that make an error inside a macro point at the call site — was predicted to be invisible to every golden file, on the grounds that origins never appear in printed forms. Wrong: the disassembly prints a source position per instruction, and those come from exactly those origins. <strong>The bytecode golden is an origin oracle for expanded code</strong>, which is a stronger position than milestone 1 was ever in.</p>
+
+  <div class="note found">
+    <span class="tag">A measurement trap, found the hard way</span>
+    <p><code>cargo test</code> stops at the first failing test <em>binary</em>. Two mutants in this round looked far weaker than they were, because the tests that would have killed them lived in a later binary that never ran. Count with <code>--no-fail-fast</code>, or the pass systematically under-reports the coverage it exists to measure.</p>
+  </div>
+</section>
+
+<section>
+  <span class="eyebrow">Round seven · milestone 6</span>
+  <h2>Two questions the instrument cannot answer</h2>
+
+  <p>Milestone 6 is collections, strings, bytes, equality, and the numeric tower — and the rung the build doc has been promising since the beginning: a test suite written <em>in the language itself</em>, run through the real binary.</p>
+
+  <p>It found two bugs on its first run. The first was shallow and mine: a map constructor that kept duplicate keys. The second was neither.</p>
+
+<pre><code><span class="dim">;; two distinct literals, one constant-pool entry</span>
+(println -0.0 0.0)
+
+  constants
+    k0  -0.0          <span class="hi">;; 0.0 deduplicated into -0.0</span>
+
+<span class="dim">;; so, in any chunk that mentioned -0.0 anywhere:</span>
+(/ 1.0 0.0)  <span class="hi">=&gt;  ##-Inf</span>
+</code></pre>
+
+  <p>The constant pool deduplicated by Rust&rsquo;s <code>PartialEq</code>, and IEEE says <code>-0.0 == 0.0</code>. So two constants that no program should confuse shared an entry, and a division silently produced negative infinity. That code shipped in <strong>milestone 2</strong> and had been live for four milestones. It was unobservable until this one, because until this one the language had no float division and no equality to notice with.</p>
+
+  <div class="note found">
+    <span class="tag">A bug only a different rung could see</span>
+    <p>No mutant would have found it either, because it was not a wrong line — it was a line that was right until the language grew a way to look at it. What found it was a new <em>kind</em> of oracle sitting at a different altitude.</p>
+  </div>
+
+  <p>Constants now compare by bit pattern, which is a third equality distinct from both Rust&rsquo;s and the language&rsquo;s: two constants may share an entry only when no program can tell them apart. The language&rsquo;s own <code>=</code> still says <code>-0.0</code> equals <code>0.0</code>, because that is what IEEE says and what Clojure does.</p>
+
+  <p>The mutation pass then made the second point on its own. Seven of eight mutants died, and every semantic one — numeric equality crossing types, list-versus-vector equality, map order becoming identity, duplicate keys, the constant-pool rule, <code>conj</code> prepending instead of appending — was caught by the in-language suite <em>and by nothing else</em>. The Rust tests were never going to see them.</p>
+
+  <h3>The eighth mutant could not die</h3>
+
+  <p>The decision record for this milestone had a performance argument in it. Collections are flat vectors with copy-on-write: <code>Rc::make_mut</code> mutates when the value is not shared and clones when it is, so — the entry claimed — a fresh accumulator in a loop has one reference and mutates a buffer it already owns. That is the whole answer to the open question about whether the language needs transients.</p>
+
+  <p>The mutant: replace <code>Rc::make_mut</code> with an unconditional clone. It survived, and it was always going to survive, because the two are behaviourally identical. <strong>A mutation check answers behavioural claims only.</strong></p>
+
+  <p>So the pass switched instruments. Prediction, written down first: the refcount at a primitive call is 2 rather than 1, because the collection is live in the caller&rsquo;s argument window while the primitive holds its own clone — so <code>make_mut</code> copies every time and the win does not exist.</p>
+
+<pre><code><span class="dim">;; instrumented conj, building a five-element vector</span>
+conj: strong=1 <span class="hi">copied=true</span>
+conj: strong=1 <span class="hi">copied=true</span>
+conj: strong=1 <span class="hi">copied=true</span>
+conj: strong=1 <span class="hi">copied=true</span>
+conj: strong=1 <span class="hi">copied=true</span>
+</code></pre>
+
+  <p>Confirmed, and worse than predicted. It is not only the argument window: in a loop the accumulator is <em>also</em> still bound to a live local until the tail call replaces it. Even nested construction copies, because the inner result sits in a slot and the primitive clones out of it. The transient win is not there at all.</p>
+
+  <div class="note found">
+    <span class="tag">Ten minutes falsified a committed, reviewed paragraph</span>
+    <p>The decision stands — flat vectors with copy-on-write is still the right shape, and <code>make_mut</code> is still how you write it. What was wrong is the reason, and the reason is the thing that gets reused. Getting the win needs the compiler to kill a slot on its last use, or a call protocol where a primitive consumes its arguments. Neither is a collections question.</p>
+  </div>
+
+  <p>That correction went into the errata rather than over the original text. The log is append-only: a wrong reason that reached the right conclusion is worth fixing precisely because someone will reason from it again.</p>
+</section>
+
+<section>
+  <span class="eyebrow">What it adds up to</span>
+  <h2>Seven rounds, six kinds of failure</h2>
+
+  <p>The first three kinds were about tests. These three are about the apparatus around them:</p>
+
+  <ul>
+    <li><strong>A defect with no observable.</strong> Real, and invisible to every value, every golden, and every high-water mark. A test cannot be written for it — the honest response is to remove the way to write the bug.</li>
+    <li><strong>A rule so basic nobody encoded it.</strong> Not missed through carelessness: the ordinary uses of the feature cannot distinguish it, so only a shape nobody writes by accident separates right from wrong.</li>
+    <li><strong>A claim that is not behavioural.</strong> Mutation is structurally incapable here. The instrument is a number, and the discipline is the same one — write the prediction down first.</li>
+  </ul>
+
+  <p>The other thing seven rounds shows is that <em>what catches a bug is rarely the rung you would have guessed</em>. Origin damage in macro output was caught by the bytecode disassembly. A displaced-error bug was caught by an assertion about handler-stack depth. A four-milestone-old miscompilation in the compiler was caught by a test suite written in the language, which exists to test the language and not the compiler. Rungs at different altitudes see different things, and the overlap is where the confidence actually comes from.</p>
+
+  <div class="note found">
+    <span class="tag">Knowing about a failure mode still does not prevent it</span>
+    <p>Chapter one opened with that, about a sibling project&rsquo;s mutant being reproduced in milestone 1 after being written down as a warning. It happened twice more. The undistinguishing-corpus lesson recurred in milestone 5, in a file whose comment cited it. And the procedural scar — never fix anything while a mutant is applied, because <code>git checkout</code> reverts both — recurred in milestone 4 in a new form: the checkout ate an uncommitted refactor instead. The rule was not about fixes. It is that <code>git checkout</code> does not know which of your changes was the mutant.</p>
+  </div>
+</section>
+
+<section>
+  <span class="eyebrow">Where it stands</span>
+  <h2>Six milestones in</h2>
+
+  <div class="stats">
+    <div class="stat"><b>4,684</b><span>core lines / ~7,000</span></div>
+    <div class="stat"><b>79</b><span>tests, debug + release</span></div>
+    <div class="stat"><b>9</b><span>corpus programs</span></div>
+    <div class="stat"><b>41</b><span>decision records</span></div>
+    <div class="stat"><b>13</b><span>errata</span></div>
+    <div class="stat"><b>4</b><span>oracle rungs, all live</span></div>
+  </div>
+
+  <p>The pipeline has no holes left. Read, expand, compile, run — the smoke script exits 0 for the first time, and the &ldquo;not built yet&rdquo; exit code that let it report a pending stage was deleted along with the last gap, because an unreachable branch is one nobody tests.</p>
+
+  <p>Every corpus program now carries five snapshots: the forms it reads to, those forms with their span origins, the forms after macro expansion, the bytecode, and — for the ones that run to a defined end, including the ones that fail — a transcript. A failure is a pinnable artifact now, which took deciding what an error <em>is</em>: a thrown value is any value, and a VM-raised fault is a throw with a fixed shape, so <code>try</code> protects against an arity error exactly as it protects against a <code>throw</code>.</p>
+
+  <p>Macros are real in the sense that matters: <code>defmacro</code> is not a form the expander knows. It is a macro, written in the language, in a twenty-line prelude compiled into the binary, over the one primitive the expander does know. And the gensym counter it shares with user code turns out to be load-bearing for hygiene rather than incidental — reset it between the prelude and your file, and the prelude&rsquo;s <code>or</code> would capture a template that binds the same generated name.</p>
+
+  <p>What is still not proven is the thing the whole design is for. The execution state is plain data so that a running computation can be suspended, serialized, moved, and resumed — and that claim gets its oracle at milestone 8: run to fuel exhaustion, snapshot, resume in a fresh VM, compare the entire transcript against an uninterrupted run, emitted effects included.</p>
+
+  <p>Chapter one ended on that sentence too. It is still the most important property in the project and still an aspiration rather than a fact, which is the only honest way to describe an untested claim — and is, more or less, the point of everything above.</p>
+</section>
+
+<footer>
+  <p>apolisp is a personal project with one user and no stability promise. Its decision log is append-only; corrections go in errata rather than over the original, which is how a paragraph that was reviewed, committed, and wrong gets fixed without erasing that it was believed. Every mutation pass quoted here is recorded in <code>docs/notes/</code> with its predictions, its commit, and whether it was refuted.</p>
+</footer>
+
+</div>
+</body>
+</html>

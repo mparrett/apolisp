@@ -1,0 +1,40 @@
+#!/usr/bin/env sh
+# Advisory pre-commit hook. Install with `just hooks`.
+#
+# This NEVER blocks a commit. It exits 0 no matter what it finds. The point is
+# that formatting and lint findings get noticed the same day rather than
+# discovered by an outside reviewer three commits later, which is what happened
+# on the first pass of this project. Fixing them in a follow-up commit is fine —
+# and is in fact the house style, since formatting never rides with behaviour.
+#
+# Silent when there is nothing to say.
+
+fail=0
+note() {
+    if [ "$fail" -eq 0 ]; then
+        printf '\n--- pre-commit advisory (not blocking) ---\n'
+        fail=1
+    fi
+    printf '%s\n' "$1"
+}
+
+if ! cargo fmt --all -- --check >/dev/null 2>&1; then
+    note 'formatting: `just fmt`, then commit it on its own'
+fi
+
+if ! cargo clippy --all-targets --quiet -- -D warnings >/dev/null 2>&1; then
+    note 'clippy:     `just lint` to read them'
+fi
+
+# The one rule BUILD.md says would destroy the approach if it slipped. The hook
+# cannot tell a reviewed golden update from an unreviewed one — only that one is
+# happening, and that this is the moment the rule applies.
+if git diff --cached --name-only | grep -qE '^tests/corpus/.*\.(forms|spans|expanded|disasm|out)$'; then
+    note 'goldens:    a golden file is staged. The oracle is review-gated: read'
+    note '            the diff and say why in the message. Regenerating one to'
+    note '            go green is a failed task, not a fix (BUILD.md).'
+fi
+
+[ "$fail" -eq 1 ] && printf -- '------------------------------------------\n\n'
+
+exit 0

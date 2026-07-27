@@ -27,15 +27,28 @@ fmt:
 fmt-check:
     cargo fmt --all -- --check
 
-# On demand rather than in `verify`: a blanket warnings-as-errors policy is
-# machinery this project does not need yet, but the lints are worth reading
-# before a commit.
 lint:
     cargo clippy --all-targets -- -D warnings
 
+# Q10 is open and release turns on overflow checks, so the two profiles must not
+# be allowed to drift apart unobserved.
+test-release:
+    cargo test --release
+
 # Everything that should be green before a commit.
-verify: fmt-check check test
+#
+# fmt-check and lint are in here rather than left on the side. The first pass of
+# this project shipped unformatted code with a clippy error, and the reason is
+# that neither was in the one command anyone runs — a gate you have to remember
+# is not a gate.
+verify: fmt-check check lint test
     cargo run --quiet -- sizes
+
+# Install the advisory pre-commit hook (hooks/pre-commit). It never blocks a
+# commit; it just makes formatting and lint findings visible the same day.
+hooks:
+    git config core.hooksPath hooks
+    @echo 'advisory pre-commit hook installed — it warns, it never blocks'
 
 # Regenerate golden files. Deliberately not part of `test`: a golden update is
 # a behavioural change, and the review-gated rule (BUILD.md) means a human reads

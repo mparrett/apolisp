@@ -47,6 +47,10 @@ after it is still design, and the design is meant to be read in this order.
 
 ## Working rules
 
+`AGENTS.md` is the short version, loaded into every agent session; `CLAUDE.md`
+is a symlink to it. Run `just hooks` once to install the advisory pre-commit
+hook, and `just verify` before a commit.
+
 - A decision that is not in `ADR.md` has not been made. Ask, or open a question.
 - Changing an ADR means adding one that supersedes it — never editing in place,
   never a version bump.

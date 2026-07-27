@@ -41,7 +41,8 @@ defers to. Then, as needed:
 ## Commands
 
 ```
-just verify       # the gate: fmt, check, clippy, tests, Value size
+just verify       # the gate: fmt, check, clippy, tests, subtraction build, Value size
+just subtract     # ADR-013's harness: build and test with a host capability cut out
 just test         # rung 3 and the properties
 just smoke        # rung 2 — NONZERO ON PURPOSE while any stage is pending
 just bless        # regenerate goldens; then read every hunk before committing

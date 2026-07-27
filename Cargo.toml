@@ -5,6 +5,15 @@ edition = "2021"
 
 [dependencies]
 
+# ADR-013: features gate *host capability* and never language semantics, so
+# there is one language here and not 2ⁿ. They exist as the subtraction test
+# harness rather than for users — building with an adapter cut out is how
+# "seams exist for subtraction" stays a fact. `just verify` builds without
+# them, because a seam nothing compiles is a seam nobody can trust.
+[features]
+default = ["fs"]
+fs = []
+
 [profile.release]
 # ADR-037 makes *language* arithmetic checked explicitly, so the two profiles
 # agree without this. It stays for the other half: Rust-level arithmetic inside

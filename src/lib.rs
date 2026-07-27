@@ -4610,13 +4610,23 @@ pub mod prim {
 pub mod host {
     use crate::value::{kind_name, BytesObj, HandleId, Value};
     use crate::vm::{Fault, Kind, Vm};
-    use std::io::{Read, Write};
+    use std::io::Read;
+    // Only a file is written through a `Write`. `io/stdout` is the buffered
+    // host and goes through `Vm::emit`, so without `fs` nothing in this module
+    // writes to the outside world at all — which is the subtraction working.
+    #[cfg(feature = "fs")]
+    use std::io::Write;
     use std::rc::Rc;
 
     /// A live host resource. Cutting a variant is what ADR-013 means by a seam
     /// for subtraction: the primitive that constructs it goes with it, and
     /// nothing in the VM changes.
     pub enum Host {
+        /// ADR-013's subtraction harness, and the first place it is real: build
+        /// without `fs` and this variant, the primitive that constructs it, and
+        /// the three arms that read it all go. Nothing else in the VM changes,
+        /// which is the claim the feature exists to keep testable.
+        #[cfg(feature = "fs")]
         File(std::fs::File),
         Stdin,
         /// The buffered in-memory host, *not* a file descriptor. ADR-029 needs
@@ -4755,6 +4765,7 @@ pub mod host {
         }
     }
 
+    #[cfg(feature = "fs")]
     fn string_arg<'a>(v: &'a Value, op: &str) -> Result<&'a str, Fault> {
         match v {
             Value::Str(s) => Ok(&s.0),
@@ -4765,16 +4776,8 @@ pub mod host {
         }
     }
 
-    pub fn install(vm: &mut Vm) {
-        // Not functions. ADR-038 made a primitive an ordinary global, so the
-        // two standard streams are *values* in the global table — one handle
-        // each, created once, rather than a native that mints a new one per
-        // call and leaks a table slot every time it is asked.
-        let stdin = vm.open_handle(Host::Stdin);
-        let stdout = vm.open_handle(Host::Stdout);
-        vm.set_named_global("io/stdin", Value::Handle(stdin));
-        vm.set_named_global("io/stdout", Value::Handle(stdout));
-
+    #[cfg(feature = "fs")]
+    fn install_fs(vm: &mut Vm) {
         vm.native("io/open", 2, false, |vm, a| {
             let path = string_arg(&a[0], "io/open")?.to_string();
             let mode = match &a[1] {
@@ -4804,6 +4807,20 @@ pub mod host {
                 Err(e) => Err(host_failed(IoOp::Open, Some(path), &e)),
             }
         });
+    }
+
+    pub fn install(vm: &mut Vm) {
+        // Not functions. ADR-038 made a primitive an ordinary global, so the
+        // two standard streams are *values* in the global table — one handle
+        // each, created once, rather than a native that mints a new one per
+        // call and leaks a table slot every time it is asked.
+        let stdin = vm.open_handle(Host::Stdin);
+        let stdout = vm.open_handle(Host::Stdout);
+        vm.set_named_global("io/stdin", Value::Handle(stdin));
+        vm.set_named_global("io/stdout", Value::Handle(stdout));
+
+        #[cfg(feature = "fs")]
+        install_fs(vm);
 
         vm.native("io/close", 1, false, |vm, a| {
             let id = handle_arg(&a[0], "io/close")?;
@@ -4838,6 +4855,7 @@ pub mod host {
             };
             let mut buf = vec![0u8; n];
             let got = match vm.host_mut(id).ok_or_else(|| not_live(IoOp::Read))? {
+                #[cfg(feature = "fs")]
                 Host::File(f) => f.read(&mut buf),
                 Host::Stdin => std::io::stdin().read(&mut buf),
                 Host::Stdout => return Err(misuse("`io/read` cannot read from `io/stdout`")),
@@ -4858,6 +4876,7 @@ pub mod host {
             let id = handle_arg(&a[0], "io/read-all")?;
             let mut buf = Vec::new();
             let got = match vm.host_mut(id).ok_or_else(|| not_live(IoOp::Read))? {
+                #[cfg(feature = "fs")]
                 Host::File(f) => f.read_to_end(&mut buf),
                 Host::Stdin => std::io::stdin().read_to_end(&mut buf),
                 Host::Stdout => return Err(misuse("`io/read-all` cannot read from `io/stdout`")),
@@ -4902,6 +4921,7 @@ pub mod host {
                 };
             }
             match vm.host_mut(id).ok_or_else(|| not_live(IoOp::Write))? {
+                #[cfg(feature = "fs")]
                 Host::File(f) => f
                     .write_all(&bytes)
                     .map(|()| n)

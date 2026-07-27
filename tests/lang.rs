@@ -24,9 +24,49 @@ fn suites() -> Vec<PathBuf> {
         .filter_map(|e| e.ok().map(|e| e.path()))
         .filter(|p| p.extension().is_some_and(|e| e == "xs"))
         .filter(|p| p.file_name().is_some_and(|n| n != "harness.xs"))
+        // The one suite that needs a capability rather than a language feature.
+        // ADR-013 gates the filesystem and nothing else here, so this is the
+        // only line the subtraction costs the oracle.
+        .filter(|p| cfg!(feature = "fs") || p.file_name().is_some_and(|n| n != "io.xs"))
         .collect();
     files.sort();
     files
+}
+
+/// ADR-013's claim, as a test rather than a feeling: cutting a host capability
+/// removes the *primitive* and leaves the language alone. Only runs in the
+/// subtracted build, which is why `just verify` builds one.
+#[test]
+#[cfg(not(feature = "fs"))]
+fn without_fs_the_filesystem_primitive_is_unbound_and_nothing_else_changes() {
+    let joined = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("subtracted.xs");
+    // `with-open` is a prelude macro over `try`/`finally`, so it still expands;
+    // what is missing is the global it calls. A capability that took a language
+    // feature with it would fail here at expansion instead.
+    std::fs::write(
+        &joined,
+        "(println (try (io/open \"x\" :read) (catch e (get e :kind))))\n\
+         (println (io/write io/stdout \"stdout survives\\n\"))\n",
+    )
+    .expect("writes");
+    let out = Command::new(bin())
+        .arg("run")
+        .arg(&joined)
+        .output()
+        .expect("runs");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        out.status.success(),
+        "the subtracted build still runs\n{stdout}"
+    );
+    assert!(
+        stdout.contains(":unbound"),
+        "`io/open` should be an ordinary unbound global, got {stdout}"
+    );
+    assert!(
+        stdout.contains("stdout survives"),
+        "stdio is not gated by `fs`, got {stdout}"
+    );
 }
 
 /// A writable directory the suite can name, emptied per run.

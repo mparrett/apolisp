@@ -41,8 +41,20 @@ test-release:
 # this project shipped unformatted code with a clippy error, and the reason is
 # that neither was in the one command anyone runs — a gate you have to remember
 # is not a gate.
-verify: fmt-check check lint test
+verify: fmt-check check lint test subtract
     cargo run --quiet -- sizes
+
+# ADR-013's subtraction harness, built rather than asserted. The features exist
+# for exactly this: cutting a host capability out and finding that the language
+# is untouched. Milestone 7 was the first milestone with a capability to cut, so
+# this is the first run where the claim can be false.
+#
+# It is a full `test` and not a `check` on purpose. Compiling proves the cfgs
+# line up; running proves `io/open` degrades to an ordinary unbound global and
+# takes nothing else with it.
+subtract:
+    cargo clippy --no-default-features --all-targets -- -D warnings
+    cargo test --no-default-features
 
 # Install the advisory pre-commit hook (hooks/pre-commit). It never blocks a
 # commit; it just makes formatting and lint findings visible the same day.

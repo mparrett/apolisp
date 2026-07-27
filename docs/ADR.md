@@ -2218,6 +2218,122 @@ want an `Image` per input, which is a harder shape than one `Image` per run.
 
 ---
 
+### ADR-044 — A REPL session is one unit, and one chunk
+
+*(New, 2026-07-27. Resolves Q1. Resolves Q29's REPL half and names why the
+other half stays open. Says what ADR-040's "compilation unit" and ADR-008's
+"parse unit" mean when there is no file.)*
+
+**Decision.** Five parts.
+
+**1. A REPL session is one compilation unit and one parse unit.** Not one per
+input. Macros defined in one input are in scope in the next, the gensym counter
+runs monotonically across the whole session and never restarts, and the reader
+configuration — when there is any — is the session's to change freely. That
+last clause is Q1, answered the way Q1 proposed: mutate freely at the REPL,
+declare at the top of a file.
+
+**2. A session has one `Chunk`, and each input is compiled into it.** Protos are
+appended; existing indices never move. Evaluating input *n* means running the
+top-level proto that input *n* just added, not proto 0.
+
+**3. Therefore Q29 does not arise here.** A `Closure` still names its proto by a
+bare index into one chunk (ADR-034 unchanged), `Value` and `Closure` are
+untouched, the dispatch loop gains nothing, and `Image` still carries one
+fingerprint for one caller-supplied chunk. There is no chunk registry and no
+chunk id on a closure.
+
+**4. The prelude half of Q29 stays open, and this is why.** The same mechanism
+would fix it — compile the prelude into the unit's chunk and a prelude
+*function* becomes possible. Not taken: the prelude's protos would then appear
+in every chunk, so every `.disasm` golden in the corpus would carry them, and
+they would grow with the prelude forever. `map` and `reduce` still do not live
+in the prelude, and the reason is now a golden-file cost rather than an
+impossibility.
+
+**5. A failed input does not end the session, and input is plain stdin.** A
+throw prints its transcript and the loop continues with the VM it already had.
+Lines are read and buffered until a form is complete; there is no history, no
+cursor movement, and no dependency. The session's semantics live in a `session`
+module in `src/lib.rs`; prompts, stdin, and exit codes stay in `src/main.rs`
+(ADR-031).
+
+**Why.**
+
+*One session, one unit is one sentence that settles three questions,* which is
+the argument for it. Macros persisting, the gensym counter not restarting, and
+the reader table's scope are the same question asked about three subsystems,
+and answering them separately would have produced three rules to keep in
+agreement. It also makes part 2 the natural shape rather than a trick: if the
+session is the unit, the session having one chunk is what "a unit is compiled
+into a chunk" already said.
+
+The gensym half is the load-bearing one. A counter that restarted per input
+would let input 2 mint a name input 1 had already used, and a fresh symbol that
+is not fresh is the one thing gensym may not produce. Nothing about *file*
+compilation changes — a file is still a unit, the counter still resets between
+files, and every `.expanded` golden is untouched.
+
+*Q29 is answered by removing the condition rather than by satisfying it.* The
+question asks how compiled code can be shared *between* chunks; the answer is
+that a REPL does not need two. The registry `QUESTIONS.md` proposed is the more
+general fix and it is real, but its cost lands where there is least room: a
+closure carrying a chunk id must resolve that id after an `Image` is restored,
+so `restore` would have to serialize every `Chunk` — protos, instructions,
+constants, spans — or take a registry from its caller, and the image row is at
+400 of 500. Appending protos costs a function that compiles into an existing
+chunk and an entry point that starts at a given proto. Nothing else moves.
+
+The registry stays available. What would force it is migration — an `Image`
+resumed against code assembled differently — and ADR-029 already promises
+same-build, fresh-VM only.
+
+*Errors leaving the session alive is not a new promise,* it is ADR-039's
+existing one being used: there is one failure path, unwinding runs every
+pending cleanup, and `tests/vm.rs` already pins that the machine is usable
+afterwards. A REPL that died on a typo would be a REPL nobody develops in,
+which is the stated exit condition.
+
+*Plain stdin, because the terminal is milestone 10's and outside the budget.*
+`BUILD.md` puts host adapters outside the line budget precisely so that
+terminal handling does not compete with language work; taking `crossterm` now
+would spend the REPL's 600 lines on the one part of milestone 9 that a later
+milestone was going to do for free.
+
+**Cost.** The chunk grows for the life of a session and nothing reclaims it:
+every input's top-level proto is retained forever, whether or not anything
+still refers to it. Bounded by typing speed, which is why it is acceptable and
+not why it is right.
+
+An `Image` taken at input 5 will not restore against the chunk as it stands at
+input 7, because the fingerprint covers the whole growing chunk. Snapshotting a
+REPL session therefore works only if nothing is evaluated in between, which is
+close to useless. ADR-043 left "an `Image` per input" as milestone 9's harder
+shape and this entry does not deliver it.
+
+No line editing at all: no history, no arrow keys, no completion, and a typo on
+a long line is retyped. That is a worse interactive experience than the exit
+condition implies, and it is deliberate.
+
+A prelude function is still impossible, now for a reason about golden files
+rather than about closures.
+
+**Rejected.** *A VM-owned chunk registry* — see why; more general, and its cost
+falls on the `Image`. *One unit per input* — a gensym counter that restarts can
+mint a name it already handed out. *Compiling the prelude into every unit's
+chunk* — puts the prelude's protos in every `.disasm` golden and grows them
+with the prelude. *`crossterm` now* — spends the language budget on the one
+part of this milestone that is outside it. *A REPL that exits on a thrown
+value* — ADR-039 already leaves the machine usable, so ending the session would
+be discarding a guarantee that is already paid for.
+
+**Open.** Q12 — one namespace — is untouched and a REPL makes it more visible,
+because every input shares one global table and shadowing is how it will be
+noticed. Whether a session can be *saved* — an `Image` plus its chunk — is the
+shape ADR-043's open clause wanted and this entry does not reach.
+
+---
+
 ## Errata
 
 Factual corrections to entries whose **decision still stands**. A wrong reason is

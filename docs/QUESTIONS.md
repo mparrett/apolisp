@@ -11,7 +11,7 @@ design review of 2026-07-25.
 Q3 (→ADR-025), Q4 (→ADR-028), Q7 (→ADR-029), Q9 (→ADR-029), Q10 (→ADR-037),
 Q11 (→ADR-027), Q13 (→ADR-041), Q17 (→ADR-027), Q21 (→ADR-030), Q23 (→ADR-039),
 Q24 (→ADR-038), Q25 (→ADR-038), Q26 (→ADR-041), Q6 (→ADR-041), Q27 (→ADR-042),
-Q8 (→ADR-043), Q22 (→ADR-043).*
+Q8 (→ADR-043), Q22 (→ADR-043), Q1 (→ADR-044).*
 
 ---
 
@@ -82,28 +82,24 @@ the macro has to either reject that shape or accept the frame.
 
 ## Before milestone 9 — REPL
 
-**Q29 — Can compiled code be shared between chunks?**
+**Q29 — Can compiled code be shared between chunks?** *(REPL half resolved by
+ADR-044.)*
 A `Closure` names its proto by index into the chunk it was compiled in
 (ADR-034), so a closure is meaningless outside that chunk. The expander already
-works around this by keeping a macro's chunk beside the macro. Two things want
-the general fix: a **prelude function** — `map` and `reduce` cannot live there,
-because the unit being compiled does not have the prelude's chunk (ADR-041 part
-6) — and the **REPL** at milestone 9, where every input is a chunk and a
-function defined in one must be callable from the next.
+works around this by keeping a macro's chunk beside the macro.
 
-The shape is probably a VM-owned chunk registry with `Closure` carrying a chunk
-id, which puts one indirection in the dispatch loop and makes `Image` carry the
-registry. Decide with a REPL in hand rather than before.
+**The REPL half is gone rather than answered.** ADR-044 gives a session one
+chunk and appends each input's protos to it, so indices never move and no
+closure ever leaves its chunk. The registry this question proposed was not
+built, because a closure carrying a chunk id has to resolve that id after an
+`Image` is restored, which puts every `Chunk` into the DTO.
 
-**Q1 — Reader table scope in the REPL.**
-ADR-008 freezes reader config per file. Is a REPL *session* its own parse unit,
-with a freely mutable table? Proposed: yes — mutate freely at the REPL, declare
-at the top of a file.
-
-Deliberately left open. ADR-008 as written is sufficient to build the reader:
-config is per parse unit and frozen for the duration, and the code is identical
-either way. Only an outright overrule would change milestone 1, and that costs
-order-dependent `.forms` snapshots — the failure mode ADR-008 exists to prevent.
+**What remains is the prelude function.** `map` and `reduce` still cannot live
+in `prelude.xs`, and the reason has changed: ADR-044's mechanism would fix it —
+compile the prelude into the unit's chunk — but then the prelude's protos land
+in every `.disasm` golden in the corpus and grow with the prelude forever. That
+is a cost to weigh, not an impossibility. Weigh it when something actually
+wants a function there; writing `map` per file has not hurt yet.
 
 ## No milestone — decide when evidence arrives
 

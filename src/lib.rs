@@ -406,10 +406,21 @@ pub mod reader {
     use crate::value::{Interner, ListObj, LocatedForm, MapObj, Origins, StrObj, Value, VecObj};
     use std::rc::Rc;
 
+    /// ADR-036. Every phase in front of the VM recurses on the host stack — the
+    /// reader, the origin walkers, `Rc`'s drop glue over a nested list, the
+    /// resolver, the lowering — and each of them recurses at most once per level
+    /// of form nesting. So bounding depth here bounds all of them, and this is
+    /// the only place that checks.
+    ///
+    /// Sized for the smallest stack this runs on, which is a 2 MB cargo test
+    /// thread rather than the 8 MB main thread.
+    pub const MAX_NESTING: usize = 256;
+
     pub fn read_all(src: &str, interner: &mut Interner) -> Result<Vec<LocatedForm>, LispErr> {
         let mut r = Reader {
             src,
             pos: 0,
+            depth: 0,
             interner,
         };
         let mut out = Vec::new();
@@ -425,6 +436,7 @@ pub mod reader {
     struct Reader<'a> {
         src: &'a str,
         pos: usize,
+        depth: usize,
         interner: &'a mut Interner,
     }
 
@@ -461,7 +473,23 @@ pub mod reader {
             LispErr::at(Span::new(self.pos, self.pos), msg)
         }
 
+        /// The depth bound (ADR-036) lives here rather than in each recursive
+        /// case, because this is the single point every one of them goes
+        /// through. Without it a deeply nested file overflows the host stack and
+        /// the process is killed, which is a stack overflow presenting as a
+        /// crash rather than as a diagnostic.
         fn read_form(&mut self) -> Result<LocatedForm, LispErr> {
+            if self.depth >= MAX_NESTING {
+                self.skip_ws();
+                return Err(self.err_here(format!("nested more than {MAX_NESTING} deep (ADR-036)")));
+            }
+            self.depth += 1;
+            let form = self.read_form_inner();
+            self.depth -= 1;
+            form
+        }
+
+        fn read_form_inner(&mut self) -> Result<LocatedForm, LispErr> {
             self.skip_ws();
             let start = self.pos;
             let b = match self.peek() {
@@ -1751,10 +1779,17 @@ pub mod compile {
             let mut f = FnLower::new(def);
             let dst = f.alloc(1);
             f.body(self, &def.body, dst, true, def.origin);
+            // The return belongs to the expression whose value it returns, not
+            // to the `fn` form. For the top-level proto those differ by the
+            // whole file: `def.origin` is the *first* form, so a `RETURN` was
+            // reporting a position with no relationship to it (ADR-023 point 2
+            // exists so a frame's position means something).
+            //
             // Unreachable after a tail call, and emitted anyway. One dead
             // instruction is cheaper than a special case in the single place a
             // function's exit is guaranteed to exist.
-            f.emit(Instr::Return { src: dst }, def.origin);
+            let exit = def.body.last().map(|e| e.origin).unwrap_or(def.origin);
+            f.emit(Instr::Return { src: dst }, exit);
             self.protos[idx] = Some(Proto {
                 name: def.name,
                 params: def.params,
@@ -1873,10 +1908,14 @@ pub mod compile {
             match &e.core {
                 Core::Literal(v) => self.konst(v, dst, o),
                 Core::Local(id) => {
+                    // No `src == dst` guard: `dst` is always an `alloc` result,
+                    // `alloc` never returns a slot twice, and a local's slot is
+                    // either a parameter index or a different `alloc` result —
+                    // so the two can never coincide. A guard here would be dead
+                    // code that reads as a peephole optimization, which is the
+                    // shape the milestone-2 mutation pass already found once.
                     let src = self.slots[*id as usize];
-                    if src != dst {
-                        self.emit(Instr::Move { dst, src }, o);
-                    }
+                    self.emit(Instr::Move { dst, src }, o);
                 }
                 Core::Capture(i) => {
                     self.emit(Instr::GetCapture { dst, idx: *i }, o);

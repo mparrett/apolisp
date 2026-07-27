@@ -64,4 +64,4 @@ proto 0  <top>  params 0  slots 37
     0053  SETCELL     [r34] <- r33           21:1
     0054  CONST       r0 <- k6               25:21
     0055  SETGLOBAL   answer <- r0           25:1
-    0056  RETURN      r0                     3:1
+    0056  RETURN      r0                     25:1

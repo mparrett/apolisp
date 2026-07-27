@@ -63,4 +63,4 @@ proto 0  <top>  params 0  slots 52
     0049  GETGLOBAL   r50 <- b               10:5
     0050  GETGLOBAL   r51 <- c               10:8
     0051  TAILCALL    r49(2)                 10:1
-    0052  RETURN      r0                     2:1
+    0052  RETURN      r0                     10:1

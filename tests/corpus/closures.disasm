@@ -5,7 +5,7 @@ proto 0  <top>  params 0  slots 3
     0002  CLOSURE     r2 <- proto 4          12:3
     0003  SETGLOBAL   count-down <- r2       11:1
     0004  CLOSURE     r0 <- proto 5          19:1
-    0005  RETURN      r0                     3:1
+    0005  RETURN      r0                     19:1
 
 proto 1  <fn>  params 1  slots 3
   constants
@@ -13,7 +13,7 @@ proto 1  <fn>  params 1  slots 3
   code
     0000  CONST       r2 <- k0               5:13
     0001  CLOSURE     r1 <- proto 2          6:7
-    0002  RETURN      r1                     4:3
+    0002  RETURN      r1                     5:5
 
 proto 2  <fn>  params 1  slots 2
   captures
@@ -21,7 +21,7 @@ proto 2  <fn>  params 1  slots 2
     c1  local r2
   code
     0000  CLOSURE     r1 <- proto 3          7:9
-    0001  RETURN      r1                     6:7
+    0001  RETURN      r1                     7:9
 
 proto 3  <fn>  params 1  slots 7
   captures
@@ -35,7 +35,7 @@ proto 3  <fn>  params 1  slots 7
     0003  GETCAP      r5 <- c2               7:27
     0004  MOVE        r6 <- r0               7:29
     0005  TAILCALL    r2(4)                  7:17
-    0006  RETURN      r1                     7:9
+    0006  RETURN      r1                     7:17
 
 proto 4  count-down  params 2  slots 16
   constants
@@ -58,9 +58,9 @@ proto 4  count-down  params 2  slots 16
     0014  MOVE        r15 <- r0              15:34
     0015  CALL        r9 <- r13(2)           15:27
     0016  TAILCALL    r7(2)                  15:7
-    0017  RETURN      r2                     12:3
+    0017  RETURN      r2                     13:5
 
 proto 5  <fn>  params 1 &rest  slots 3
   code
     0000  MOVE        r2 <- r1               19:21
-    0001  RETURN      r2                     19:1
+    0001  RETURN      r2                     19:21

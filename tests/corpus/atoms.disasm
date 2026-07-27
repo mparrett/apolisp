@@ -26,4 +26,4 @@ proto 0  <top>  params 0  slots 14
     0011  GETGLOBAL   r12 <- some/qualified  13:1
     0012  CONST       r13 <- k9              14:1
     0013  CONST       r0 <- k10              15:1
-    0014  RETURN      r0                     2:1
+    0014  RETURN      r0                     15:1

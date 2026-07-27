@@ -11,7 +11,7 @@
 
 use apolisp::bytecode::{CaptureSrc, Chunk, Instr, Proto, Slot};
 use apolisp::error::SpanOrigin;
-use apolisp::value::Interner;
+use apolisp::value::{Interner, Value};
 use apolisp::{bytecode, compile, error, reader};
 
 mod common;
@@ -26,13 +26,37 @@ fn compile_ok(src: &str) -> (Chunk, Interner) {
     (chunk, interner)
 }
 
+/// The error from reading *or* compiling. The depth bound (ADR-036) is a reader
+/// error reached through `apolisp compile`, so a helper that insisted on reading
+/// first could not see it.
 fn compile_err(src: &str) -> String {
     let mut interner = Interner::new();
-    let forms = reader::read_all(src, &mut interner).expect("the test source reads");
+    let forms = match reader::read_all(src, &mut interner) {
+        Ok(forms) => forms,
+        Err(e) => return e.render("<test>", src),
+    };
     match compile::compile(&forms, &mut interner) {
         Ok(_) => panic!("{src:?} should not compile"),
         Err(e) => e.render("<test>", src),
     }
+}
+
+/// The slot a constant's value lands in, for asking which binding an expression
+/// actually read.
+fn slot_holding(p: &Proto, want: &Value) -> Slot {
+    let k = p
+        .consts
+        .iter()
+        .position(|c| c == want)
+        .unwrap_or_else(|| panic!("no constant equal to {want:?} in {:?}", p.consts))
+        as u32;
+    p.code
+        .iter()
+        .find_map(|i| match *i {
+            Instr::Const { dst, k: got } if got == k => Some(dst),
+            _ => None,
+        })
+        .expect("the constant is loaded somewhere")
 }
 
 fn count(p: &Proto, f: impl Fn(&Instr) -> bool) -> usize {
@@ -64,6 +88,13 @@ fn disasm_snapshots_match() {
 fn every_instruction_has_an_origin() {
     for path in common::corpus_files() {
         let src = std::fs::read_to_string(&path).unwrap();
+        // A file with no forms has no source text to point at, and `Unknown`
+        // says so rather than lying (ADR-026). That case is pinned separately;
+        // asserting `Source` over it here would fail on a legal program.
+        let mut interner = Interner::new();
+        if reader::read_all(&src, &mut interner).unwrap().is_empty() {
+            continue;
+        }
         let (chunk, _) = compile_ok(&src);
         for (i, p) in chunk.protos.iter().enumerate() {
             assert_eq!(
@@ -110,7 +141,7 @@ fn every_instruction_has_an_origin() {
 #[test]
 fn instruction_origins_track_subexpressions_not_the_enclosing_form() {
     let src = "(f\n  1\n  2)\n";
-    let (chunk, _) = compile_ok(src);
+    let (chunk, interner) = compile_ok(src);
     let top = &chunk.protos[0];
     let lines: Vec<usize> = top
         .lines
@@ -122,12 +153,52 @@ fn instruction_origins_track_subexpressions_not_the_enclosing_form() {
         .collect();
 
     // GETGLOBAL f, CONST 1, CONST 2, TAILCALL, RETURN — the callee and the call
-    // belong to line 1, and each argument to its own line.
+    // belong to line 1, each argument to its own line, and the return to the
+    // expression whose value it returns.
+    //
+    // The interner is the one that read this program: `Interner::new()` here
+    // would panic inside `disassemble` while rendering the failure, replacing
+    // the report with an index-out-of-bounds.
     assert_eq!(
         lines,
         vec![1, 2, 3, 1, 1],
         "origins were {lines:?} for\n{src}\ndisassembly:\n{}",
-        bytecode::disassemble(&chunk, &Interner::new(), src)
+        bytecode::disassemble(&chunk, &interner, src)
+    );
+}
+
+/// ADR-036. Deep nesting is a diagnostic with a position, not a killed process.
+/// Before the bound existed, `compile` aborted with SIGABRT at around 1,400
+/// levels on input the reader accepted at 3,000 — and this test runs on a cargo
+/// test thread, whose stack is a quarter of the main thread's, so passing here
+/// is the measurement that matters.
+#[test]
+fn nesting_past_the_bound_is_a_diagnostic_not_a_crash() {
+    let nest = |n: usize| format!("{}1{}", "(f ".repeat(n), ")".repeat(n));
+
+    // Just inside the bound still compiles, all the way through lowering.
+    let (chunk, _) = compile_ok(&nest(reader::MAX_NESTING - 2));
+    assert!(!chunk.protos[0].code.is_empty());
+
+    let err = compile_err(&nest(reader::MAX_NESTING + 8));
+    assert!(err.contains("nested more than"), "got {err:?}");
+    assert!(
+        err.contains(":1:"),
+        "the bound reports a position — {err:?}"
+    );
+}
+
+/// A file with no forms is legal and has nowhere to point.
+#[test]
+fn a_file_with_no_forms_compiles_to_nil_with_no_position() {
+    let (chunk, _) = compile_ok("; nothing but a comment\n");
+    let p = &chunk.protos[0];
+    assert_eq!(p.code.len(), 2, "CONST nil, RETURN");
+    assert!(
+        p.lines.iter().all(|o| matches!(o, SpanOrigin::Unknown)),
+        "there is no source text here, and `Unknown` says so instead of \
+         inventing a position (ADR-026): {:?}",
+        p.lines
     );
 }
 
@@ -227,6 +298,52 @@ fn a_handler_region_suppresses_tail_calls_and_closing_it_restores_them() {
     );
 }
 
+/// Which positions *are* tail positions, and which are not.
+///
+/// The suppression test above only ever exercised a call in plain operator
+/// position, so setting any individual tail site to `false` — `if`'s branches,
+/// `let`'s body, `do`'s body, a clause-less `try`'s body — left the whole suite
+/// green. So did the opposite slip: passing `tail` through to the *operator*,
+/// which turns `((f) 1)` into "return `(f)`'s value and never call it".
+#[test]
+fn tail_position_is_the_last_expression_and_never_the_operator() {
+    for src in [
+        "(fn [] (g))",
+        "(fn [] (do (a) (g)))",
+        "(fn [] (let [x 1] (g)))",
+        // No clauses means no handler region, so the body keeps tail position.
+        "(fn [] (try (g)))",
+    ] {
+        let (chunk, _) = compile_ok(src);
+        assert_eq!(
+            count(&chunk.protos[1], is_tail_call),
+            1,
+            "{src}: the last expression is in tail position"
+        );
+    }
+
+    // Both branches of a tail `if` are tail positions, not just the first.
+    let (chunk, _) = compile_ok("(fn [] (if a (g) (h)))");
+    assert_eq!(count(&chunk.protos[1], is_tail_call), 2);
+
+    // The operator is evaluated, then called. It is never in tail position,
+    // however tail the call around it is.
+    let (chunk, _) = compile_ok("(fn [] ((f) 1))");
+    let p = &chunk.protos[1];
+    assert_eq!(
+        count(p, is_call),
+        1,
+        "the computed callee is an ordinary call"
+    );
+    assert_eq!(count(p, is_tail_call), 1, "the outer call is the tail one");
+    let call_at = p.code.iter().position(is_call).unwrap();
+    let tail_at = p.code.iter().position(is_tail_call).unwrap();
+    assert!(
+        call_at < tail_at,
+        "the callee is computed before it is called"
+    );
+}
+
 /// The cleanup is emitted twice — the normal path and the path the VM enters
 /// while unwinding (ADR-034) — and exactly one `POPHANDLER` matches each
 /// `PUSH`, which is ADR-028 invariant 1 read off the code.
@@ -298,6 +415,77 @@ fn captures_chain_through_every_level_they_cross() {
     assert_eq!(chunk.protos[2].captures.len(), 1);
 }
 
+// --- ADR-033: `let` is sequential, and shadowing ------------------------------
+
+/// `let` binds left to right and a name is not in scope while its own
+/// initializer is compiled (ADR-033). Hoisting the declaration by two lines
+/// turns `let` into `letrec` and no test noticed — so this one reads the
+/// program where the two differ: under the sequential rule the initializer's
+/// `x` is the outer one, which here means a global.
+#[test]
+fn let_bindings_are_sequential_not_recursive() {
+    let (chunk, i) = compile_ok("(let [x x] x)");
+    let p = &chunk.protos[0];
+    assert!(
+        p.code.iter().any(|ins| matches!(
+            ins, Instr::GetGlobal { name, .. } if i.name(name.0) == "x"
+        )),
+        "the initializer's `x` is the outer binding, not the one being bound"
+    );
+
+    // And a later binding does see an earlier one.
+    let (chunk, _) = compile_ok("(let [a 1 b a] b)");
+    let p = &chunk.protos[0];
+    assert_eq!(
+        count(p, |ins| matches!(ins, Instr::Move { .. })),
+        2,
+        "`b` copies `a`, and the body copies `b`"
+    );
+}
+
+/// An inner binding wins over an outer one, and a later binding in the same
+/// vector wins over an earlier one. Both directions of the scope walk were
+/// reversible without any test failing.
+#[test]
+fn the_innermost_and_latest_binding_wins() {
+    for src in ["(let [x 1] (let [x 2] x))", "(let [x 1 x 2] x)"] {
+        let (chunk, _) = compile_ok(src);
+        let p = &chunk.protos[0];
+        let shadowing = slot_holding(p, &Value::Int(2));
+        let read = p
+            .code
+            .iter()
+            .rev()
+            .find_map(|ins| match *ins {
+                Instr::Move { src, .. } => Some(src),
+                _ => None,
+            })
+            .expect("the body copies the binding it read");
+        assert_eq!(read, shadowing, "{src}: read the wrong `x`");
+    }
+}
+
+/// A parameter shadows the function's own name. Checking the self-name first
+/// would make `(fn f [f] f)` return the function instead of its argument, and
+/// nothing failed when that order was swapped.
+#[test]
+fn a_parameter_shadows_the_functions_own_name() {
+    let (chunk, _) = compile_ok("(fn f [f] f)");
+    let p = &chunk.protos[1];
+    assert_eq!(
+        count(p, |i| matches!(i, Instr::GetSelf { .. })),
+        0,
+        "the parameter wins; `f` here is the argument"
+    );
+
+    // Without the parameter in the way, the same name is the function itself.
+    let (chunk, _) = compile_ok("(fn f [n] f)");
+    assert_eq!(
+        count(&chunk.protos[1], |i| matches!(i, Instr::GetSelf { .. })),
+        1
+    );
+}
+
 // --- ADR-033: arity, order, variadics ----------------------------------------
 
 #[test]
@@ -320,7 +508,15 @@ fn a_parameter_list_ends_in_at_most_one_rest_parameter() {
         (1, true)
     );
 
-    for bad in ["(fn [a &] a)", "(fn [& a b] a)", "(fn [& & a] a)"] {
+    // `(fn [& &] a)` is the only one of these that reaches the clause forbidding
+    // the rest parameter from being named `&`; the others fail on the length
+    // check first, which left that clause unobserved.
+    for bad in [
+        "(fn [a &] a)",
+        "(fn [& a b] a)",
+        "(fn [& & a] a)",
+        "(fn [& &] a)",
+    ] {
         let err = compile_err(bad);
         assert!(err.contains("rest parameter"), "{bad}: {err}");
     }

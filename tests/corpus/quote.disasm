@@ -8,4 +8,4 @@ proto 0  <top>  params 0  slots 4
     0001  CONST       r2 <- k1               4:1
     0002  CONST       r3 <- k2               5:1
     0003  CONST       r0 <- k0               6:1
-    0004  RETURN      r0                     3:1
+    0004  RETURN      r0                     6:1

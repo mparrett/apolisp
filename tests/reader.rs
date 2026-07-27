@@ -1,42 +1,40 @@
 //! Milestone 1 verification (BUILD.md).
 //!
-//! The two properties from ADR-026, the corpus `.forms` snapshots, and the
-//! constraint-#1 checks that have no other home yet.
+//! The two properties from ADR-026, the corpus `.forms` and `.spans` snapshots,
+//! and the constraint-#1 checks that have no other home yet.
 //!
 //! Nothing here regenerates a golden file. If a snapshot disagrees, read the
 //! diff and decide whether the behaviour change was intended — that decision is
 //! the oracle, and automating it away removes the only thing keeping it honest.
 
-use std::path::{Path, PathBuf};
+use apolisp::error::SpanOrigin;
+use apolisp::value::{Interner, LocatedForm, Value};
+use apolisp::{printer, reader, value};
+use std::path::PathBuf;
 use std::process::Command;
 
-// The binary is the interface under test for snapshots; the properties want the
-// library, which a `main.rs`-only crate does not expose. Until there is a
-// `lib.rs`, drive both through the binary and keep the properties in terms of
-// its observable output.
+// Properties call the library directly (ADR-031), so `read(print(read(s)))` is
+// compared on values rather than on printed strings. Snapshots still run the
+// binary, because a golden file pins the artifact `just bless` regenerates and
+// two producers of the same text would drift.
 
 fn repo_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
 }
 
-fn bin() -> PathBuf {
-    let mut p = repo_root();
-    p.push("target");
-    p.push(if cfg!(debug_assertions) { "debug" } else { "release" });
-    p.push("apolisp");
-    p
+/// The binary cargo built for *this* test run. Reconstructing
+/// `target/debug/apolisp` by hand runs a stale artifact under a custom
+/// `CARGO_TARGET_DIR`, which is a green suite testing yesterday's code.
+fn bin() -> &'static str {
+    env!("CARGO_BIN_EXE_apolisp")
 }
 
-fn read_cmd(path: &Path) -> Result<String, String> {
-    run_cmd("read", path)
-}
-
-fn run_cmd(cmd: &str, path: &Path) -> Result<String, String> {
+fn run_cmd(cmd: &str, path: &std::path::Path) -> Result<String, String> {
     let out = Command::new(bin())
         .arg(cmd)
         .arg(path)
         .output()
-        .expect("failed to run apolisp; `cargo build` first");
+        .expect("failed to run apolisp");
     let stdout = String::from_utf8_lossy(&out.stdout).into_owned();
     let stderr = String::from_utf8_lossy(&out.stderr).into_owned();
     if out.status.success() {
@@ -46,31 +44,21 @@ fn run_cmd(cmd: &str, path: &Path) -> Result<String, String> {
     }
 }
 
-/// Read a temporary file's worth of source, without leaving one behind on
-/// failure.
-///
-/// The name carries a per-call counter as well as the pid: cargo runs tests in
-/// parallel threads of one process, so a pid-only name has every test writing
-/// the same path and reading back someone else's source.
-fn read_str(src: &str) -> Result<String, String> {
-    cmd_str("read", src)
+fn read(src: &str) -> Result<(Vec<LocatedForm>, Interner), String> {
+    let mut interner = Interner::new();
+    match reader::read_all(src, &mut interner) {
+        Ok(forms) => Ok((forms, interner)),
+        Err(e) => Err(e.render("<test>", src)),
+    }
 }
 
-/// The same, for the `spans` debug view.
-fn spans_str(src: &str) -> Result<String, String> {
-    cmd_str("spans", src)
-}
-
-fn cmd_str(cmd: &str, src: &str) -> Result<String, String> {
-    use std::sync::atomic::{AtomicUsize, Ordering};
-    static SEQ: AtomicUsize = AtomicUsize::new(0);
-    let n = SEQ.fetch_add(1, Ordering::Relaxed);
-    let mut path = std::env::temp_dir();
-    path.push(format!("apolisp-prop-{}-{n}.xs", std::process::id()));
-    std::fs::write(&path, src).unwrap();
-    let r = run_cmd(cmd, &path);
-    let _ = std::fs::remove_file(&path);
-    r
+fn print_all(forms: &[LocatedForm], interner: &Interner) -> String {
+    let mut out = String::new();
+    for f in forms {
+        out.push_str(&printer::print(&f.root, interner));
+        out.push('\n');
+    }
+    out
 }
 
 fn corpus_files() -> Vec<PathBuf> {
@@ -88,29 +76,76 @@ fn corpus_files() -> Vec<PathBuf> {
     files
 }
 
+// --- Value identity for the round-trip property -----------------------------
+
+/// Structural identity, for asking "did this survive the trip" rather than
+/// "does the language consider these equal".
+///
+/// Deliberately *not* `Value::PartialEq`. Language `=` is Q13's to settle, and
+/// under IEEE rules `##NaN` is not equal to itself — a round-trip test built on
+/// it would report a false failure for a value that arrived perfectly intact.
+/// Floats are therefore compared by bit pattern, which also distinguishes `0.0`
+/// from `-0.0` and so catches a printer that drops the sign.
+///
+/// Symbols and keywords compare by *name*, not by id: the two sides of a
+/// round-trip are read into separate interners, where equal ids would mean
+/// nothing.
+fn same_value(a: &Value, ai: &Interner, b: &Value, bi: &Interner) -> bool {
+    use Value::*;
+    match (a, b) {
+        (Nil, Nil) => true,
+        (Bool(x), Bool(y)) => x == y,
+        (Int(x), Int(y)) => x == y,
+        (Float(x), Float(y)) => x.to_bits() == y.to_bits(),
+        (Str(x), Str(y)) => x.0 == y.0,
+        (Bytes(x), Bytes(y)) => x.0 == y.0,
+        (Sym(x), Sym(y)) => ai.name(x.0) == bi.name(y.0),
+        (Keyword(x), Keyword(y)) => ai.name(x.0) == bi.name(y.0),
+        (List(_), List(_)) | (Vec(_), Vec(_)) | (Map(_), Map(_)) => {
+            let (xs, ys) = (value::children(a), value::children(b));
+            xs.len() == ys.len() && xs.iter().zip(&ys).all(|(x, y)| same_value(x, ai, y, bi))
+        }
+        _ => false,
+    }
+}
+
 // --- Property: reader round-trip -------------------------------------------
 
 /// `read(print(read(s))) == read(s)`, compared on data and ignoring span
 /// origins (ADR-026). Printing moves columns, so a span-sensitive equality here
 /// could only ever fail.
-///
-/// Comparing printed output is the available proxy for comparing values while
-/// the crate has no library target: two forms print identically iff the printer
-/// is a function of the data alone, which is the property being pinned.
+fn assert_round_trips(src: &str, label: &str) {
+    let (once, oi) = read(src).unwrap_or_else(|e| panic!("{label}: {e}"));
+    let printed = print_all(&once, &oi);
+    let (twice, ti) = read(&printed)
+        .unwrap_or_else(|e| panic!("{label}: printed as {printed:?}, which failed to read: {e}"));
+
+    assert_eq!(
+        once.len(),
+        twice.len(),
+        "{label}: {} forms became {} after a round trip via {printed:?}",
+        once.len(),
+        twice.len()
+    );
+    for (i, (a, b)) in once.iter().zip(&twice).enumerate() {
+        assert!(
+            same_value(&a.root, &oi, &b.root, &ti),
+            "{label}: form {i} changed across a round trip\n  printed: {printed:?}\n  \
+             before: {} ({})\n  after:  {} ({})",
+            printer::print(&a.root, &oi),
+            value::kind_name(&a.root),
+            printer::print(&b.root, &ti),
+            value::kind_name(&b.root),
+        );
+    }
+}
+
 #[test]
 fn reader_round_trip() {
     let mut checked = 0;
     for path in corpus_files() {
         let src = std::fs::read_to_string(&path).unwrap();
-        let once = read_cmd(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
-        let twice = read_str(&once)
-            .unwrap_or_else(|e| panic!("{}: reprinting failed to read back: {e}", path.display()));
-        assert_eq!(
-            once,
-            twice,
-            "round-trip diverged for {}\n--- source\n{src}",
-            path.display()
-        );
+        assert_round_trips(&src, &path.display().to_string());
         checked += 1;
     }
     assert!(checked >= 4, "corpus shrank to {checked} files");
@@ -121,53 +156,200 @@ fn round_trip_covers_awkward_scalars() {
     // Cases where a naive printer reads back as a *different* value rather than
     // failing outright — the silent half of printer/reader drift.
     for case in [
-        "1.0",         // must not print as `1`, which reads back as an integer
+        "1.0", // must not print as `1`, which reads back as an integer
         "-0.0",
         "1e10",
+        "##Inf",
+        "##-Inf",
+        "##NaN",
         "\"\"",
         "\"a\\nb\"",
         "\"\\\\\"",
+        "\"héllo 🙂\"",
         "(1.0 2 \"3\" :4 five)",
+        "(δ :χ \"ω\")",
         "{}",
         "()",
         "'()",
+        "{:a 1 :b [2 3]}",
     ] {
-        let once = read_str(case).unwrap_or_else(|e| panic!("{case:?}: {e}"));
-        let twice = read_str(&once).unwrap_or_else(|e| panic!("{case:?} -> {once:?}: {e}"));
-        assert_eq!(once, twice, "round-trip diverged for {case:?}");
+        assert_round_trips(case, case);
     }
+}
+
+/// The type-changing round trip that string comparison could not see.
+///
+/// `1e400` parsed to infinity, printed as `##Inf`, and read back as a *symbol*
+/// named `##Inf`, which printed as `##Inf` again. Both passes produced identical
+/// text while the data changed from float to symbol (ADR-032).
+#[test]
+fn non_finite_floats_do_not_change_type_across_a_round_trip() {
+    for (src, want) in [("##Inf", f64::INFINITY), ("##-Inf", f64::NEG_INFINITY)] {
+        let (forms, _) = read(src).unwrap_or_else(|e| panic!("{src}: {e}"));
+        match forms[0].root {
+            Value::Float(f) => assert_eq!(f, want, "{src} read as the wrong float"),
+            ref other => panic!("{src} read as {}, not a float", value::kind_name(other)),
+        }
+    }
+
+    let (forms, _) = read("##NaN").unwrap();
+    match forms[0].root {
+        Value::Float(f) => assert!(f.is_nan(), "##NaN read as {f}"),
+        ref other => panic!("##NaN read as {}", value::kind_name(other)),
+    }
+
+    // A finite-looking literal that overflows is an error, not a silent
+    // infinity — the same rule the oversized integer already follows.
+    let err = read("1e400").expect_err("1e400 should not read");
+    assert!(err.contains("overflows to infinity"), "got {err:?}");
+}
+
+// --- The hand-written `PartialEq` -------------------------------------------
+
+/// `Value::PartialEq` is hand-written on purpose (`TRAPS.md`) and had no test:
+/// it was unreachable from a test suite that compared printed strings.
+#[test]
+fn value_equality_is_the_hand_written_one() {
+    let mut i = Interner::new();
+    let (a, b) = (i.sym("x"), i.sym("x"));
+    assert_eq!(a, b, "interned symbols with the same name must be equal");
+    let k = i.keyword("x");
+    // Symbols and keywords share the interner, so `x` and `:x` hold the same
+    // id. Equality must not follow the id alone — this is the `TRAPS.md` entry
+    // that keeps them separate variants rather than a flag bit.
+    assert_ne!(a, k, "symbol `x` must not equal keyword `:x`");
+
+    // Q13: floats never compare equal to integers until it is settled.
+    assert_ne!(Value::Int(1), Value::Float(1.0));
+    assert_eq!(Value::Int(1), Value::Int(1));
+
+    // Q13 again: IEEE rules, so NaN is not equal to itself. Pinned so that
+    // settling Q13 has to change a test rather than pass silently.
+    let (forms, _) = read("##NaN").unwrap();
+    assert_ne!(forms[0].root, forms[0].root, "language `=` on NaN is IEEE");
+
+    // Q20: no cross-type sequential equality. Widening later is safe.
+    let (list, li) = read("(1 2)").unwrap();
+    let (vector, _) = read("[1 2]").unwrap();
+    assert_ne!(list[0].root, vector[0].root, "list must not equal vector");
+    let (same, _) = read("(1 2)").unwrap();
+    assert_eq!(list[0].root, same[0].root);
+    // The structural comparison the round-trip property uses agrees on the
+    // parts of this that are not Q13's or Q20's to decide.
+    assert!(same_value(&list[0].root, &li, &same[0].root, &li));
 }
 
 // --- Property: span invariants ---------------------------------------------
 
-/// Every `Source` span lies inside its file, and child-origin arity matches
-/// child count (ADR-026).
+/// Every `Source` span lies inside its file and on character boundaries, and
+/// child-origin arity matches child count (ADR-026).
 ///
-/// This runs through a debug rendering the binary exposes for the purpose; the
-/// invariant is checked over the whole corpus rather than a sample, because the
-/// failure it guards against is a *category* of node having no origin at all.
+/// The invariant is checked over the whole corpus rather than a sample, because
+/// the failure it guards against is a *category* of node having no origin.
+fn assert_spans_hold(src: &str, label: &str) {
+    let (forms, _) = read(src).unwrap_or_else(|e| panic!("{label}: {e}"));
+    let mut problems = Vec::new();
+    for f in &forms {
+        value::check_origins(&f.root, &f.origins, src, &mut problems);
+    }
+    assert!(
+        problems.is_empty(),
+        "{label}: span invariants violated:\n  {}\n--- source\n{src}",
+        problems.join("\n  ")
+    );
+}
+
 #[test]
 fn span_invariants_hold_over_corpus() {
     for path in corpus_files() {
         let src = std::fs::read_to_string(&path).unwrap();
-        let out = Command::new(bin())
-            .arg("spans")
-            .arg(&path)
-            .output()
-            .expect("failed to run apolisp");
-        assert!(
-            out.status.success(),
-            "{}: spans failed: {}",
-            path.display(),
-            String::from_utf8_lossy(&out.stderr)
+        assert_spans_hold(&src, &path.display().to_string());
+    }
+}
+
+/// Multi-byte characters, which the ASCII-only corpus cannot exercise. A span
+/// arithmetic bug is invisible in ASCII, where every offset is a boundary.
+#[test]
+fn non_ascii_forms_read_with_well_formed_spans() {
+    for src in [
+        "\"héllo\"",
+        "(δ 1)",
+        ":χ",
+        "{:α \"ω\"}",
+        "[é 🙂]",
+        "; ω\n(a)",
+    ] {
+        assert_spans_hold(src, src);
+    }
+}
+
+/// Origins cover every syntactic child, including immediates (ADR-026). Checked
+/// on shape rather than on positions, which the `.spans` goldens pin.
+#[test]
+fn every_syntactic_child_has_an_origin() {
+    let (forms, _) = read("{:a [1 2] :b (c \"d\" 1.0)}").unwrap();
+    fn walk(v: &Value, o: &value::Origins) {
+        assert_eq!(
+            o.children.len(),
+            value::child_count(v),
+            "{} has {} children but {} origins",
+            value::kind_name(v),
+            value::child_count(v),
+            o.children.len()
         );
-        let report = String::from_utf8_lossy(&out.stdout);
         assert!(
-            report.contains("ok"),
-            "{}: span invariants violated:\n{report}\n--- source\n{src}",
-            path.display()
+            matches!(o.origin, SpanOrigin::Source(_)),
+            "{} came from source but its origin is {:?}",
+            value::kind_name(v),
+            o.origin
+        );
+        for (c, co) in value::children(v).iter().zip(&o.children) {
+            walk(c, co);
+        }
+    }
+    walk(&forms[0].root, &forms[0].origins);
+}
+
+// --- Golden snapshots -------------------------------------------------------
+
+fn check_goldens(cmd: &str, ext: &str) {
+    let mut missing = Vec::new();
+    let mut diffs = Vec::new();
+
+    for path in corpus_files() {
+        let actual = run_cmd(cmd, &path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+        let golden = path.with_extension(ext);
+        match std::fs::read_to_string(&golden) {
+            Err(_) => missing.push(golden),
+            Ok(expected) if expected != actual => diffs.push(format!(
+                "--- {}\nexpected:\n{expected}\nactual:\n{actual}",
+                golden.display()
+            )),
+            Ok(_) => {}
+        }
+    }
+
+    // A missing golden file is a failure with instructions, never a silent
+    // write. Creating it automatically would mean the first run of a broken
+    // reader pins the broken behaviour.
+    if !missing.is_empty() {
+        let names: Vec<String> = missing
+            .iter()
+            .map(|p| p.file_name().unwrap().to_string_lossy().into_owned())
+            .collect();
+        panic!(
+            "missing golden files: {}\nreview the output and write them by hand \
+             (`apolisp {cmd} <file>`), or run `just bless` once you have read the diff",
+            names.join(", ")
         );
     }
+    assert!(diffs.is_empty(), "{}", diffs.join("\n"));
+}
+
+/// Rung 3 (BUILD.md). One phase per file; milestone 1 owns `.forms`.
+#[test]
+fn forms_snapshots_match() {
+    check_goldens("read", "forms");
 }
 
 /// The arity half of the span invariants is checkable structurally; the *values*
@@ -179,73 +361,7 @@ fn span_invariants_hold_over_corpus() {
 /// `PRIOR-ART.md`, reproduced here before anything depended on it.
 #[test]
 fn spans_snapshots_match() {
-    let mut missing = Vec::new();
-    let mut diffs = Vec::new();
-
-    for path in corpus_files() {
-        let out = Command::new(bin())
-            .arg("spans")
-            .arg(&path)
-            .output()
-            .expect("failed to run apolisp");
-        assert!(out.status.success(), "{}: spans failed", path.display());
-        let actual = String::from_utf8_lossy(&out.stdout).into_owned();
-        let golden = path.with_extension("spans");
-        match std::fs::read_to_string(&golden) {
-            Err(_) => missing.push(golden),
-            Ok(expected) if expected != actual => diffs.push(format!(
-                "--- {}\nexpected:\n{expected}\nactual:\n{actual}",
-                golden.display()
-            )),
-            Ok(_) => {}
-        }
-    }
-
-    assert!(missing.is_empty(), "missing span goldens: {missing:?}");
-    assert!(diffs.is_empty(), "{}", diffs.join("\n"));
-}
-
-// --- Golden snapshots -------------------------------------------------------
-
-/// Rung 3 (BUILD.md). One phase per file; milestone 1 owns `.forms`.
-#[test]
-fn forms_snapshots_match() {
-    let mut missing = Vec::new();
-    let mut diffs = Vec::new();
-
-    for path in corpus_files() {
-        let actual = match read_cmd(&path) {
-            Ok(s) => s,
-            Err(e) => panic!("{}: {e}", path.display()),
-        };
-        let golden = path.with_extension("forms");
-        match std::fs::read_to_string(&golden) {
-            Err(_) => missing.push((golden, actual)),
-            Ok(expected) if expected != actual => {
-                diffs.push(format!(
-                    "--- {}\nexpected:\n{expected}\nactual:\n{actual}",
-                    golden.display()
-                ));
-            }
-            Ok(_) => {}
-        }
-    }
-
-    // A missing golden file is a failure with instructions, never a silent
-    // write. Creating it automatically would mean the first run of a broken
-    // reader pins the broken behaviour.
-    if !missing.is_empty() {
-        let names: Vec<String> = missing
-            .iter()
-            .map(|(p, _)| p.file_name().unwrap().to_string_lossy().into_owned())
-            .collect();
-        panic!(
-            "missing golden files: {}\nreview the output and write them by hand \
-             (`apolisp read <file>`), or run `just bless` once you have read the diff",
-            names.join(", ")
-        );
-    }
-    assert!(diffs.is_empty(), "{}", diffs.join("\n"));
+    check_goldens("spans", "spans");
 }
 
 // --- Constraint #1 ----------------------------------------------------------
@@ -260,9 +376,12 @@ fn forms_snapshots_match() {
 /// 40 over."
 #[test]
 fn core_stays_within_the_line_budget() {
-    // An order of magnitude, not a threshold. Over budget is an ADR, not a
-    // nudge to this constant.
+    // An order of magnitude, not a threshold: ADR-030 puts ±1,000 inside the
+    // noise band, so the tripwire sits at the top of that band rather than at
+    // the working number. Failing at 7,001 would invite the 40-line debate the
+    // ADR exists to prevent.
     const BUDGET: usize = 7_000;
+    const TRIPWIRE: usize = BUDGET + 1_000;
 
     let mut src = repo_root();
     src.push("src");
@@ -277,23 +396,26 @@ fn core_stays_within_the_line_budget() {
     let mut report = String::new();
     for path in &files {
         let text = std::fs::read_to_string(path).unwrap();
-        total += text.lines().count();
-        for (name, n) in layers(&text) {
-            report.push_str(&format!("  {name:<10} {n:5}\n"));
+        let n = text.lines().count();
+        total += n;
+        let name = path.file_name().unwrap().to_string_lossy();
+        report.push_str(&format!("{name}: {n}\n"));
+        for (layer, n) in layers(&text) {
+            report.push_str(&format!("  {layer:<10} {n:5}\n"));
         }
     }
     eprintln!("core: {total}/{BUDGET} lines (ADR-030)\n{report}");
 
     assert!(
-        total <= BUDGET,
-        "core is {total} lines against a budget of ~{BUDGET} (BUILD.md, ADR-030).\n\
-         Raising this constant is an ADR, not an edit.\n{report}"
+        total <= TRIPWIRE,
+        "core is {total} lines against a budget of ~{BUDGET} (BUILD.md, ADR-030),\n\
+         past the {TRIPWIRE}-line edge of the noise band.\n\
+         Raising these constants is an ADR, not an edit.\n{report}"
     );
 }
 
-/// Split a file into its inline `pub mod` sections. Reporting only — the
-/// boundaries survive extraction into files, at which point this reads the
-/// filenames instead (ADR-015).
+/// Split a file into its inline `pub mod` sections. Reporting only — after
+/// extraction into files the per-file totals above carry the same information.
 fn layers(text: &str) -> Vec<(String, usize)> {
     let lines: Vec<&str> = text.lines().collect();
     let mut marks: Vec<(usize, String)> = Vec::new();
@@ -317,15 +439,16 @@ fn layers(text: &str) -> Vec<(String, usize)> {
 
 #[test]
 fn value_size_is_asserted_not_assumed() {
-    // ADR-025 keeps ADR-010's one surviving clause. Checked in the binary,
-    // where the type lives; this test pins that the check is actually wired up.
-    let out = Command::new(bin())
-        .arg("sizes")
-        .output()
-        .expect("failed to run apolisp");
-    let report = String::from_utf8_lossy(&out.stdout);
-    assert!(out.status.success(), "size assertion failed: {report}");
-    assert!(report.contains("Value"), "unexpected report: {report}");
+    // ADR-025 keeps ADR-010's one surviving clause. E-8 measured 16 bytes
+    // against a predicted 24; the assertion is the limit, and the exact size
+    // prints so a regression is visible before it crosses the line.
+    let n = value::value_size();
+    eprintln!("Value: {n} bytes, Origins: {} bytes", value::origins_size());
+    assert!(
+        n <= value::VALUE_SIZE_LIMIT,
+        "Value is {n} bytes against a limit of {} (ADR-025)",
+        value::VALUE_SIZE_LIMIT
+    );
 }
 
 // --- Errors -----------------------------------------------------------------
@@ -343,7 +466,7 @@ fn reader_errors_carry_a_position() {
         (")", "unmatched `)`"),
         (":", "`:` with no name"),
     ] {
-        let err = read_str(src).expect_err(&format!("{src:?} should not read"));
+        let err = read(src).expect_err(&format!("{src:?} should not read"));
         assert!(
             err.contains(want),
             "{src:?}: expected {want:?}, got {err:?}"
@@ -360,21 +483,24 @@ fn unclosed_delimiter_points_at_the_opener() {
     // In a long file the opening delimiter is the only position that says
     // anything; pointing at EOF is technically true and useless.
     let src = "(a\nb\nc\nd\n";
-    let err = read_str(src).expect_err("should not read");
-    assert!(err.contains(":1:1:"), "expected the opener at 1:1, got {err:?}");
+    let err = read(src).expect_err("should not read");
+    assert!(
+        err.contains(":1:1:"),
+        "expected the opener at 1:1, got {err:?}"
+    );
 }
 
 /// Non-ASCII source must reach a `LispErr`, not a panic.
 ///
 /// The escape span was built by subtracting a byte count from the position
 /// after the escaped character, which lands inside any multi-byte one and
-/// panics `line_col` while rendering. A reader bug presenting as a crash on
-/// the very input it rejects is the worst available failure mode, so the class
-/// is pinned here and by the character-boundary span invariant.
+/// panics `line_col` while rendering. A reader bug presenting as a crash on the
+/// very input it rejects is the worst available failure mode, so the class is
+/// pinned here and by the character-boundary span invariant.
 #[test]
 fn a_multibyte_escape_is_an_error_not_a_panic() {
     for src in ["\"\\€\"", "\"\\é\"", "\"a\\🙂b\""] {
-        let err = read_str(src).expect_err(&format!("{src:?} should not read"));
+        let err = read(src).expect_err(&format!("{src:?} should not read"));
         assert!(
             err.contains("unknown escape"),
             "{src:?}: expected an unknown-escape error, got {err:?}"
@@ -386,27 +512,25 @@ fn a_multibyte_escape_is_an_error_not_a_panic() {
     }
     // The message names the character the source wrote, not the first byte of
     // its encoding.
-    let err = read_str("\"\\€\"").unwrap_err();
+    let err = read("\"\\€\"").unwrap_err();
     assert!(err.contains("`\\€`"), "escape misreported: {err:?}");
-}
-
-/// Multi-byte characters in the forms that do read, so the spans covering them
-/// are exercised by the boundary invariant rather than only by the escape path.
-#[test]
-fn non_ascii_forms_read_with_well_formed_spans() {
-    for src in ["\"héllo\"", "(δ 1)", ":χ", "{:α \"ω\"}", "[é 🙂]"] {
-        read_str(src).unwrap_or_else(|e| panic!("{src:?} should read: {e}"));
-        let spans = spans_str(src).unwrap_or_else(|e| panic!("{src:?} spans: {e}"));
-        assert!(
-            spans.contains("ok: span invariants hold"),
-            "{src:?}: {spans}"
-        );
-    }
 }
 
 #[test]
 fn a_number_that_does_not_fit_is_an_error_not_a_symbol() {
     // Falling through to a symbol would be a silent wrong answer.
-    let err = read_str("99999999999999999999999").expect_err("should not read");
+    let err = read("99999999999999999999999").expect_err("should not read");
     assert!(err.contains("number"), "got {err:?}");
+}
+
+/// The CLI is the artifact the goldens pin, so its contract gets one test:
+/// unimplemented stages fail loudly rather than no-opping (BUILD.md rung 2).
+#[test]
+fn unimplemented_stages_fail_rather_than_no_op() {
+    let mut path = repo_root();
+    path.push("tests/corpus/hello.xs");
+    for cmd in ["expand", "compile", "run"] {
+        let err = run_cmd(cmd, &path).expect_err(&format!("`{cmd}` should not succeed yet"));
+        assert!(err.contains("not implemented"), "`{cmd}`: {err:?}");
+    }
 }

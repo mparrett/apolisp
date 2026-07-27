@@ -41,7 +41,7 @@ Each milestone is a runnable artifact.
 | 4 | Errors, `try`/`throw`/`finally`, handler stack | **Done** (`aa7a20b`) — `control.xs` and `errors.xs` transcripts; cleanup counted on all four paths |
 | 5 | Macro expansion + quasiquote + gensym | **Done** (`6c4785f`) — `defmacro` is a prelude macro; expansion is deterministic per unit |
 | 6 | Collections, strings, bytes | **Done** (`de916cc`) — `tests/lang/` runs through the binary, and caught two bugs on its first run |
-| 7 | Host handle table + blocking file/stdio | `with-open` works; handles are generational |
+| 7 | Host handle table + blocking file/stdio | **Done** (`1e7555e`) — `with-open` closes on all four paths; a stale id reaches nothing |
 | 8 | Fuel suspension + `Image` + resume | Round-trip property passes; live handles are refused |
 | 9 | REPL | Becomes the primary development interface |
 | 10 | Host adapters: terminal, TCP, JSON | Outside the line budget |
@@ -133,6 +133,14 @@ miscompilation that had been live since milestone 2 (`-0.0` and `0.0` sharing a
 constant-pool entry, so `(/ 1.0 0.0)` could produce `##-Inf`). The milestone-6
 mutation pass then found that this rung is the *only* thing that catches any of
 the semantics milestone 6 added — see `notes/milestone-6-mutants.md`.
+
+Milestone 7 qualifies that, and the qualifier is what keeps the rungs from
+collapsing into one. Rung 4 remains the only thing that catches a *semantic*
+mutation, but an invariant no program can observe needs a Rust test: a handle
+table that queued a freed slot twice passed the entire in-language suite,
+because no program can ask the VM how many slots it holds. Where a claim is
+about the machine rather than about the language, `tests/` is the only rung
+that can hold it (`notes/milestone-7-mutants.md`).
 
 ## Property tests
 

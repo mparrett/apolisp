@@ -54,6 +54,28 @@ does not terminate on a cell cycle — which ADR-003 explicitly permits (Q8).
 catch a handle that was valid in the source VM and meaningless in the target.
 Every adapter declares its reacquisition semantics or refuses.
 
+**`get` cannot tell an absent key from a nil one.** `(get m :k)` answers `nil`
+for both, so an assertion written as `(= nil (get m :k))` passes against exactly
+the shape it was written to forbid. ADR-042 makes `:path` present only when the
+operation names one, and the test pinning that survived a mutation which emitted
+`:path nil` — see `notes/milestone-7-mutants.md`. Use `contains?` whenever
+absence is the thing being claimed, and pin the key set with `count` when the
+shape as a whole matters. The same hazard reaches any program that dispatches on
+an optional key.
+
+**The generation bumps when a slot is reused, not when it is released.** Bumping
+at `close` looks like the obvious place and makes the id that just closed the
+resource stale, so the second `close` a correct `with-open` performs — the body
+closed explicitly, the cleanup closes again — reports the aliasing error instead
+of being the no-op ADR-016 requires. Idempotent close and stale detection are
+only compatible in that order.
+
+**Adding a gensym to the prelude renumbers every later one.** The counter runs
+while the prelude expands (ADR-040 resets it per unit, not per form), so a new
+prelude macro that uses `x#` shifts `v#` in `and` and `or` for every unit after
+it, and every `.expanded` golden moves. The diff will look like a regression in
+programs that never call the new macro.
+
 **Manual unwinding.** With an explicit frame stack, `try`/`finally` unwinding is
 hand-written. A Rust `?` early-return that skips frame cleanup leaks frames. Rust
 panics must never cross the VM loop.

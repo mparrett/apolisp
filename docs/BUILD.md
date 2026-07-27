@@ -39,7 +39,7 @@ Each milestone is a runnable artifact.
 | 2 | Core AST + slot compiler + disassembler | **Done** (`38d109c`) — `.disasm` goldens for six corpus programs |
 | 3 | VM: frames, calls, closures, `if`/`let`/`fn`, tail calls | **Done** (`8ff2c9f`) — smoke runs `run`; 100k tail calls peak at the same frame *and* slot count as 10 |
 | 4 | Errors, `try`/`throw`/`finally`, handler stack | **Done** (`aa7a20b`) — `control.xs` and `errors.xs` transcripts; cleanup counted on all four paths |
-| 5 | Macro expansion + quasiquote + gensym | `defmacro` in-language; deterministic output |
+| 5 | Macro expansion + quasiquote + gensym | **Done** (`6c4785f`) — `defmacro` is a prelude macro; expansion is deterministic per unit |
 | 6 | Collections, strings, bytes | In-language test suite begins |
 | 7 | Host handle table + blocking file/stdio | `with-open` works; handles are generational |
 | 8 | Fuel suspension + `Image` + resume | Round-trip property passes; live handles are refused |
@@ -60,13 +60,16 @@ Climb in this order:
 program end to end; exit nonzero on failure. Write this *before* the reader is
 finished — a failing smoke test is a better queue than an empty one.
 
-The stages run in **pipeline** order, which is not the order they are built in:
-expand is milestone 5 while compile and run are 2 and 3. So a pending stage does
-not stop the run. The driver exits `3` for "not built yet", and smoke reports
-that stage as pending and carries on; any other nonzero exit is a real failure
-and stops immediately. Smoke stays nonzero while anything is pending — that is
-the queue — but a milestone that lands is reachable the day it lands rather than
-waiting on a later one.
+The stages run in **pipeline** order, which was not the order they were built
+in: expand is milestone 5 while compile and run were 2 and 3. While the pipeline
+had holes, the driver exited `3` for "not built yet" and smoke reported that
+stage as pending and carried on — so a milestone was reachable the day it landed
+rather than waiting on a later one, and smoke stayed nonzero while anything
+remained. That was the queue.
+
+Milestone 5 filled the last hole and the mechanism went with it: an unreachable
+branch is one nobody tests. Smoke now runs four stages, and any nonzero exit is
+a failure.
 
 **Rung 3 — behavior is pinned.** A corpus of `.xs` programs, each with a committed
 snapshot per phase:
@@ -79,6 +82,12 @@ tests/corpus/<name>.expanded   # post-macroexpansion forms
 tests/corpus/<name>.disasm     # bytecode disassembly (milestone 2)
 tests/corpus/<name>.out        # execution transcript (milestone 3, see below)
 ```
+
+`.expanded` is milestone 5's, and on a program with no macros it is identical
+to `.forms` — which is what makes the diff between the two readable as "what
+expansion did". A macro's output origins are pinned by `.disasm` rather than
+here: the disassembly prints a source position per instruction, and those come
+from the origins the expander attached.
 
 `.spans` is the fifth, added by ADR-026 point 3. It exists because origins live
 outside the value graph, so the printed form cannot show them, and a mutation

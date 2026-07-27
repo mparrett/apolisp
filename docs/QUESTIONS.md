@@ -180,8 +180,8 @@ order-dependent `.forms` snapshots — the failure mode ADR-008 exists to preven
 
 ## No milestone — decide when evidence arrives
 
-**Q18 — Mutation checks as an oracle rung.** *(Evidence arrived three times —
-milestones 1, 2, and 4.)*
+**Q18 — Mutation checks as an oracle rung.** *(Evidence arrived four times —
+milestones 1, 2, 4, and 5.)*
 Run against milestone 1's own span tests, two of three mutants survived: every
 origin could be `Unknown`, or every span could start at byte 0, with the suite
 staying green. Only arity was actually checked. Fixed by adding `.spans`
@@ -200,6 +200,15 @@ can observe** — bounded, so no high-water mark moves, and nil-filled, so no
 value is wrong. The test written for it was dead too. Fixed by making the
 release of a frame one shared mechanism rather than two that agree, so the
 mutation stops being expressible. See `docs/notes/milestone-4-mutants.md`.
+
+Milestone 5 ran six against the expander. The interesting one was not a
+survivor at first: a mutant that dropped everything after a splice expanded the
+whole corpus correctly, because every splice in it happened to be last — the
+corpus claimed in a comment to cover the case and did not. The survivor was
+worse. **A macro receiving *expanded* arguments instead of the forms as written
+passed all 75 tests**, because every macro in the suite used its arguments as
+code, where expanding early and expanding late agree. See
+`docs/notes/milestone-5-mutants.md`.
 
 **So the finding is broader than "tests can be dead."** A mutation check also
 finds duplicated enforcement, which nothing else in this loop looks for, and

@@ -29,6 +29,14 @@ compare by id; strings are not, and compare by value. Symbols and keywords share
 an intern table but are distinct variants (ADR-025), so an id alone does not tell
 you which one you have. Mixing any two of the three is a whole bug class.
 
+**A template can capture a name the caller chose.** `` `(let [x 1] ~body) ``
+binds the caller's `x` inside `body`, silently. Clojure refuses to compile that
+form — its syntax-quote qualifies `x`, and a qualified symbol is not a legal
+binding name — and ADR-040 gives that protection up on purpose, because with one
+namespace the rest of qualification does nothing. The replacement is a habit
+rather than a mechanism: **every name a template binds gets a `#`**. `x#` is a
+fresh symbol per template and cannot collide with anything the caller wrote.
+
 **Metadata loss through expansion.** A macro that rebuilds a form without carrying
 spans forward produces errors that point at the expansion instead of the source.
 This degrades silently — the code still runs, the diagnostics just get worse over

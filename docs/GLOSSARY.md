@@ -83,6 +83,20 @@ with one origin per syntactic child of every aggregate. Naming `Generated` and
 where `lines[i]` is the span of instruction *i*. What lets a runtime error or
 backtrace report a position at all.
 
+**auto-gensym** — `x#` inside a template: one fresh symbol per *template*, so
+two occurrences of `x#` in one template are the same name and two templates
+never collide. Lowered by the expander, not the reader (ADR-040). Per template
+rather than per expansion, as in Clojure, because the template is lowered once —
+when the macro is defined.
+
+**prelude** — `src/prelude.xs`, compiled into the binary and expanded ahead of
+every unit. Where `def` and `defmacro` live, in the language, over `set-global!`
+and `set-macro!` (ADR-027, ADR-040).
+
+**compilation unit** — One file, read and expanded together. What a macro's
+scope and the gensym counter are relative to: macros do not survive a unit and
+do not reach an `Image`.
+
 **gensym** — A generated unique symbol, used for capture avoidance. Must be
 deterministic per compilation unit or golden files flap (`BUILD.md`).
 

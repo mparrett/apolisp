@@ -227,7 +227,6 @@ pub mod value {
         pub fn name(&self, id: u32) -> &str {
             &self.names[id as usize]
         }
-
     }
 
     impl Default for Interner {

@@ -10,7 +10,8 @@ design review of 2026-07-25.
 *Resolved: Q1 (→ADR-008 stands, REPL clause deferred), Q2 (→ADR-023, ADR-026),
 Q3 (→ADR-025), Q4 (→ADR-028), Q7 (→ADR-029), Q9 (→ADR-029), Q10 (→ADR-037),
 Q11 (→ADR-027), Q13 (→ADR-041), Q17 (→ADR-027), Q21 (→ADR-030), Q23 (→ADR-039),
-Q24 (→ADR-038), Q25 (→ADR-038), Q26 (→ADR-041), Q6 (→ADR-041), Q27 (→ADR-042).*
+Q24 (→ADR-038), Q25 (→ADR-038), Q26 (→ADR-041), Q6 (→ADR-041), Q27 (→ADR-042),
+Q8 (→ADR-043), Q22 (→ADR-043).*
 
 ---
 
@@ -78,39 +79,6 @@ Attempt `loop`/`recur` as a macro over the core forms and admit it as a fourteen
 special form only on evidence from a real attempt. Note the interaction from
 ADR-028 rule 2: a `recur` inside a `try` with a `finally` is not a tail call, so
 the macro has to either reject that shape or accept the frame.
-
-## Before milestone 8 — serialization
-
-**Q8 — Sharing in the snapshot encoding.**
-ADR-029 makes the DTO object-id based, which handles cell cycles — they become
-ordinary id edges. What remains: `Rc`-shared immutable structure (strings,
-collections, closures) still needs identity preserved across a round-trip, or a
-snapshot expands shared structure into copies. Decide whether that is a
-correctness requirement or an accepted size cost in v1.
-
-**Q22 — Where do clock and randomness enter, and can a run be replayed?**
-Simulators are one of the three workloads this substrate exists for
-(`ETHOS.md`), and the only trace of this in the decisions is ADR-013 listing RNG
-among the gateable host capabilities. Nothing says where nondeterminism enters
-or how it is reproduced.
-
-This is not only a simulator concern. **It is load-bearing for the serialization
-round-trip property**, which `BUILD.md` calls the oracle for constraint #2: that
-property runs to fuel exhaustion, resumes in a fresh VM, and compares the full
-transcript against uninterrupted execution. A program that reads a wall clock or
-an unseeded RNG produces two different transcripts for reasons that have nothing
-to do with the snapshot, so the oracle flaps and — per `BUILD.md`'s own warning
-about flapping goldens — gets disabled. ADR-029 already lists "deterministic
-counters" among the state ADR-005 omitted; this is the same requirement, one
-level up.
-
-The original design conversation proposed passing nondeterministic inputs
-explicitly through runtime services — `clock/monotonic`, `clock/wall`, `rng/new`,
-`rng/next`, `sim/yield` — with a seeded RNG and virtual clock available so a run
-is reproducible, and ADR-014 already budgets `rand` as a dependency.
-
-Decide: are clock and RNG injected capabilities that a snapshot captures, and is
-a seeded, virtual-clock profile a first-class execution mode or a convention?
 
 ## Before milestone 9 — REPL
 

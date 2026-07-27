@@ -14,8 +14,14 @@ what has to be held at once, and a comment occupies the window like anything els
 | VM: frames, calls, closures, errors | 1,400 |
 | Values, collections, strings, bytes | 1,200 |
 | Host handle table + blocking I/O | 700 |
+| Fuel, `Image`, resume | 500 |
 | REPL, disassembler, diagnostics | 600 |
-| **Total core** | **~7,000** |
+| **Total core** | **~7,500** |
+
+The serialization row was added by ADR-043, which is late: ADR-029 invented the
+`Vm`/`Execution`/`Image` split after this table existed, and ADR-030 raised the
+total without noticing the layer had no line. It was unbudgeted for four
+milestones and nothing said so, because only the total is asserted.
 
 **These are orders of magnitude.** ±1,000 on the total is noise; the rows are
 guidance. Only the total is asserted, and the per-layer numbers print on every

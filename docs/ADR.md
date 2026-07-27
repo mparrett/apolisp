@@ -2056,6 +2056,168 @@ clause.
 
 ---
 
+### ADR-043 — Fuel, the `Image` encoding, and the determinism the oracle rests on
+
+*(New, 2026-07-27. Resolves Q22 and Q8. Completes ADR-029 on the encoding side.
+Amends the `BUILD.md` budget table under ADR-030 part 3. Corrects a conflict
+ADR-042 created.)*
+
+**Decision.** Seven parts.
+
+**1. v1 has no nondeterministic source, and that is a decision rather than an
+omission.** No clock, no RNG, no environment read, no directory listing that
+reaches a value. The round-trip property is therefore sound *by construction*:
+there is nothing that could make two runs of the same program differ.
+
+When a clock or an RNG does arrive, it arrives as **VM-owned seeded state
+captured by the `Image`** — a counter and a seed that a snapshot carries and a
+resume restores — and never as a primitive that reads the real world. A host
+adapter that returns the wall clock is the one shape this entry forbids.
+
+**2. The encoding preserves sharing. Every heap value gets an object id.** A
+`Value` in the DTO is a 32-bit id into one object table, and two `Rc`s with the
+same address encode to the same id. This covers strings, collections, closures,
+and byte vectors; cells and handles were already ids (ADR-025, ADR-042).
+
+**3. The DTO is flat, and v1 does not serialize it.** `Image` is `Vec`s and
+`u32`s with no `Rc`, no `Value`, and no borrowed lifetime anywhere inside it.
+The round-trip is `Vm` + `Execution` → `Image` → *fresh* `Vm` + `Execution`, in
+memory. No `serde`, no bytes, no dependency.
+
+**4. Fuel is a counter on `Execution`, decremented once per instruction.**
+Reaching zero suspends at the instruction boundary before the next dispatch and
+produces a third `Outcome`:
+
+```rust
+pub enum Outcome { Returned(Value), Threw(Unwind), Suspended }
+```
+
+`Suspended` carries nothing: the state is the `Execution`, which the caller
+already holds.
+
+**5. The standard streams are declared reconstructible, and only they are.**
+`SnapshotHasLiveHandles` counts handles *beyond* `io/stdin` and `io/stdout`.
+Those two are recreated by `host::install` at the same ids in any VM of the
+same build, so a resume that rebuilds them is restoring them rather than
+inventing them.
+
+**6. The `Image` carries code identity, not code.** A chunk fingerprint, and
+`resume` takes the chunk from its caller and refuses a mismatch. ADR-029 says
+same-build only; a fingerprint is what makes that checkable rather than assumed.
+
+The intern table travels **whole**, as its `names` vector — the `index` map is
+derived and is rebuilt on resume. Symbol ids are positional, and a snapshot
+that omits the table resumes with wrong identities and appears to work, which
+`TRAPS.md` already lists as the dangerous one.
+
+**7. The budget gains a row.**
+
+| Layer | Target |
+|---|---:|
+| Fuel, `Image`, resume | 500 |
+
+with the total moving from ~7,000 to **~7,500**.
+
+**Why.**
+
+*Answering Q22 with "neither" is a real answer and not a deferral, because the
+half that is load-bearing is the half about the oracle.* `BUILD.md` makes the
+round-trip property the oracle for constraint #2: run to fuel exhaustion,
+resume in a fresh VM, compare the whole transcript. A program that reads a wall
+clock produces two transcripts for reasons that have nothing to do with the
+snapshot, the property flaps, and — by this project's own rule about flapping
+goldens — gets disabled, at which point constraint #2 has no oracle at all. The
+property is being written *now*, so the guarantee it needs has to exist now.
+
+Building the seeded clock and RNG instead would prove the `Image` carries
+counter state, which is otherwise an untested claim. It is the better version
+of this entry and it is not v1's: it spends from a 500-line row alongside fuel
+and resume, and a simulator that needs reproducible time can pass time in as an
+argument, which is a thing the language can already do.
+
+*Sharing is preserved because the alternative is exponential and reachable in
+ten lines.* `(def b [a a])` twice over multiplies by four; four levels is
+sixteen copies of one vector. Nothing in v1 can *observe* the difference —
+`=` is structural, there is no `identical?`, and cells are already ids — so
+this is not a semantics question, which is exactly what makes it easy to get
+wrong and expensive to fix later. ADR-029 already said the DTO is object-id
+based; treating that as a statement about cells only would have been reading it
+narrowly to save an id table.
+
+*Not taking serde keeps this milestone about the graph model.* The hard part of
+a snapshot is the encoding — identity, cycles, ordering — and a flat id-based
+`Image` is exactly the thing that has to be right. Once no `Rc` appears inside
+it, a derive is plumbing, which is what ADR-029 claimed and what this entry
+gets to leave as a claim honestly rather than by assertion. It also keeps
+`Cargo.toml` at zero dependencies for one more milestone.
+
+*Fuel decrements per instruction rather than per call or per backward branch,*
+because the suspension point has to be somewhere a snapshot is legal, and
+ADR-029 legalises exactly one place: an instruction boundary in compiled code.
+Counting calls would suspend inside a native, which ADR-042 part 3 forbids;
+counting backward branches would never suspend a straight-line program.
+
+*Declaring the standard streams reconstructible is a correction, and it is the
+reason this part exists.* ADR-042 made `io/stdin` and `io/stdout` permanent
+entries in the handle table, so `open_handles()` is never zero and ADR-029's
+refusal would reject **every** snapshot — milestone 7 made milestone 8's exit
+condition unreachable, silently, and nothing failed because nothing yet asked.
+ADR-029 anticipated the shape of the fix in its own words ("caches and host
+registry entries are declared either reconstructible or excluded"); what it did
+not anticipate is that a *handle* could be reconstructible. It can, for exactly
+these two, because they name nothing the host has to reopen: `Host::Stdout` is
+the buffered output and `Host::Stdin` is a stream a fresh VM addresses the same
+way. A file is not, and never becomes one by this argument.
+
+*The budget row is written before the code because rule 4 is about that
+ordering.* The table in `BUILD.md` sums to 7,000 across seven layers and has no
+row for serialization: ADR-029 created the `Vm`/`Execution`/`Image` split after
+the table existed, and ADR-030 amended the total without adding a line. So this
+layer has been unbudgeted since it was invented, and the difference between
+deciding 500 now and recording 500 afterwards is the difference between a
+budget and a measurement. 500 against ~1,200 uncommitted lines leaves the REPL
+its 600 and keeps a margin ADR-030 already calls noise.
+
+**Cost.** A fuel check on the dispatch loop, which is the hot path, on every
+instruction. ADR-029 named this cost; it is now real.
+
+The object table is built with a pointer-keyed map during encode, so encoding
+is not a pure function of the value graph — it depends on `Rc` addresses, which
+are stable within a run and meaningless across one. Nothing may ever compare
+two `Image`s for equality; the round-trip property compares transcripts, and
+that is the only comparison this design supports.
+
+Preserving sharing means the decoder must handle a forward reference, because
+an object can name an id it has not reached yet. A cell cycle is what ADR-029
+built ids for and it is still the only cycle, but the decode is now two passes
+rather than one for every object kind.
+
+A fingerprint that matches does not prove the chunks are the same, only that
+they hash the same. Same-build is the promise and a fingerprint is the cheap
+check on it, not a proof.
+
+And "no nondeterministic source" is a rule with no enforcement. Nothing stops
+the next primitive from calling `SystemTime::now()`; what exists is this entry
+and a reviewer.
+
+**Rejected.** *A seeded RNG and virtual clock in v1* — see why; the better
+version of this entry, not v1's. *Leaving Q22 open* — the property being
+written this milestone is the thing that needs the answer. *Expanding shared
+structure into copies* — exponential, and reachable in ten lines. *`serde` now*
+— the graph model is the milestone; the derive is not. *Fuel per call or per
+backward branch* — suspends where a snapshot is illegal, or does not suspend.
+*Refusing a snapshot while stdio is open* — makes every snapshot illegal, which
+is what ADR-042 accidentally did. *Carrying the chunk in the `Image`* — ADR-029
+says code identity, and same-build means the caller already has the code.
+*Fitting serialization inside the VM row* — hides an unbudgeted layer inside a
+budgeted one, which is the thing per-layer reporting exists to make visible.
+
+**Open.** Whether a resumed `Execution` can be resumed *again* — nothing here
+forbids it and nothing tests it. Q29 still blocks a REPL, and milestone 9 will
+want an `Image` per input, which is a harder shape than one `Image` per run.
+
+---
+
 ## Errata
 
 Factual corrections to entries whose **decision still stands**. A wrong reason is

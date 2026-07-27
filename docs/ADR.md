@@ -1401,6 +1401,131 @@ become language unwinding.
 
 ---
 
+### ADR-037 — Integer overflow throws
+
+*(New, 2026-07-26. Resolves Q10.)*
+
+**Decision.** Integer arithmetic is checked. Overflow raises a language error
+rather than wrapping or saturating. No automatic promotion to a wider type and no
+bignums.
+
+**Why.** Constraint #4 orders correctness above efficiency, and wrapping turns a
+caught error into a wrong answer — the same objection ADR-033 used to reject
+implicit `nil` for missing arguments. Simulators are one of the three workloads
+this substrate exists for (`ETHOS.md`), and a counter that silently wraps is the
+failure mode they cannot detect.
+
+It is also the only option that makes the two build profiles agree by
+construction. Rust panics on overflow in debug and wraps in release, so an
+unchecked implementation is two different languages depending on how it was
+built; `just test-release` exists in the gate because of exactly this, and
+`TRAPS.md` has carried the entry since before there was code. Checked arithmetic
+removes the divergence rather than testing for it.
+
+Clojure agrees on the spelling that matters: `+` throws on long overflow and
+`+'` is the promoting variant. Ported code that overflows will fail loudly in
+both languages.
+
+**Cost.** One predictable, well-branch-predicted comparison per arithmetic
+operation. `../wallisp` measured architecture as the lever and everything else as
+a rounding error (`PRIOR-ART.md`), so this is not where the time goes; if it ever
+shows up, it is a pre-registered experiment. No bignums means a program that
+needs them has to say so, and nothing in v1 offers a promoting variant — adding
+`+'` later is a library question, not a language one.
+
+**Rejected.** *Wrapping* — a silent wrong answer, and the failure mode with no
+diagnostic. *Saturating* — invents a value the program never computed and breaks
+the algebra quietly, since `(+ x 1)` can equal `x`. *Automatic promotion to
+bignum* — a second numeric representation, a second equality rule, and Q13 is not
+even settled for the two that exist.
+
+---
+
+### ADR-038 — The call protocol: native functions, primitives as globals, and how a frame is sized
+
+*(New, 2026-07-26. Resolves Q24 and Q25. Completes ADR-034's calling convention
+on the run-time side.)*
+
+**Decision.** Four parts.
+
+**1. A native function is a kind of closure, reached through the ordinary
+`Call`.** `Closure` stops being a placeholder and becomes:
+
+```rust
+pub enum Closure {
+    Fn { proto: ProtoIdx, captures: Rc<[Value]> },
+    Native(NativeId),
+}
+```
+
+`Value` is untouched — still `Fn(Rc<Closure>)`, still 16 bytes — so ADR-025
+stands unamended. No new instruction: `HostCall` remains unbuilt and arrives with
+the handle table at milestone 7, where ADR-013 puts it.
+
+**2. Primitives are ordinary entries in the global table.** `+` is a `Value` you
+can pass to `map`, and ADR-027's rebind operation works on it like any other
+global.
+
+**3. The VM sizes a frame `max(proto.slots, argc)`, and a variadic prologue packs
+in place.** The prologue collects slots `params-1 ..< argc` into a list and
+writes it back to slot `params-1`. Packing in place is safe because those slots
+are dead the moment they are collected: the prologue runs before the function's
+first instruction, so nothing else can observe them.
+
+**4. Until Q23, a VM-raised failure is not a language value.** Arity mismatch,
+overflow, an unbound global, and calling a non-function produce a host-side fault
+carrying a message and an origin, which ends the run with a diagnostic. `throw`
+carries a language `Value`, as ADR-007 requires. With no handler stack until
+milestone 4, both simply end the run, so nothing yet depends on the two being the
+same shape — which is the point.
+
+**Why.**
+
+*Native functions inside `Closure`* is the option that changes the least. A
+`Value::Native` variant would supersede ADR-025 over a distinction the call path
+does not need, and would widen every match in the printer, in equality, and
+eventually in the serializer. Dedicated `ADD`/`SUB`/`LT` instructions would be
+faster and would stop `+` from being a value — `(map + xs)` would have nothing to
+pass — which makes arithmetic a special case rather than a library. That option
+stays reachable later as a pure optimization over this one, which is the right
+order under ADR-021.
+
+*Primitives as globals* follows from ADR-027 having exactly one namespace and one
+rebind operation. The wart is real and already familiar: `(set-global! + ...)`
+breaks arithmetic, exactly as ADR-035's `(set-global! vector ...)` breaks vector
+literals. `../let-rs` made the same choice and `PRIOR-ART.md` flags it as the
+thing an inline cache has to invalidate against — worth knowing now, not worth
+avoiding now.
+
+*`max(slots, argc)`* is forced. ADR-034 removed any maximum arity, so the
+compiler cannot record how large a variadic frame might need to be; recording
+"unbounded" would be the VM sizing the frame anyway, with a field in `Proto` that
+never says anything.
+
+*Faults are not values yet* keeps Q23 genuinely open. The alternative — inventing
+a shape for VM errors now, most likely a string — would answer Q23 by accident in
+the exact way rule 3 exists to prevent, and milestone 4 would inherit it as a
+fait accompli rather than a decision.
+
+**Cost.** Two call paths in the dispatch loop instead of one, though they share
+the argument window. A native function has no `Proto`, so it has no `lines` and
+contributes no position to a backtrace beyond its name. Rebinding a primitive
+global breaks the language, silently, with no diagnostic. And VM faults are not
+catchable at all until Q23 is answered — `try` cannot handle an overflow yet,
+only an explicit `throw`.
+
+**Rejected.** *`Value::Native`* — supersedes ADR-025 for no gain at the call
+site. *Dedicated arithmetic instructions* — see why; available later. *A
+`HostCall` opcode now* — ADR-013 scopes it to host capability, and arithmetic is
+not on that entry's own list. *A max-arity field in `Proto`* — see why. *Making
+VM faults language values now* — answers Q23 sideways.
+
+**Open.** Whether host faults and language `throw` produce the same shape is
+still Q23, and it is what milestone 4 has to settle before a `.out` transcript
+can pin a failure.
+
+---
+
 ## Errata
 
 Factual corrections to entries whose **decision still stands**. A wrong reason is

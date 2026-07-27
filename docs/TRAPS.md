@@ -7,8 +7,11 @@ pass over existing code whenever a subsystem lands.
 **Truthiness.** Only `nil` and `false` are falsy. `0`, `""`, and empty collections
 are truthy. Easy to get wrong in every conditional opcode.
 
-**Integer overflow.** Rust panics in debug and wraps in release. Decide the
-language semantics once (Q10) and implement it explicitly so the two builds agree.
+**Integer overflow.** Rust panics in debug and wraps in release. ADR-037 settles
+it: arithmetic is checked and overflow throws, so the two builds agree by
+construction rather than by testing. The trap survives as a rule about *new*
+arithmetic — a `+` written with the plain operator instead of `checked_add` is a
+silent divergence between profiles that nothing in debug will show you.
 *Test the release build.*
 
 **Equality vs. identity.** Derived `PartialEq` on `Value` follows Rust's variant

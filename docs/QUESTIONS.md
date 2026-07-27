@@ -8,8 +8,9 @@ Sources: SPEC v0.1 Part V, the spec review of 2026-07-25, and the pre-project
 design review of 2026-07-25.
 
 *Resolved: Q1 (→ADR-008 stands, REPL clause deferred), Q2 (→ADR-023, ADR-026),
-Q3 (→ADR-025), Q4 (→ADR-028), Q7 (→ADR-029), Q9 (→ADR-029), Q11 (→ADR-027),
-Q17 (→ADR-027), Q21 (→ADR-030).*
+Q3 (→ADR-025), Q4 (→ADR-028), Q7 (→ADR-029), Q9 (→ADR-029), Q10 (→ADR-037),
+Q11 (→ADR-027), Q17 (→ADR-027), Q21 (→ADR-030), Q24 (→ADR-038),
+Q25 (→ADR-038).*
 
 ---
 
@@ -49,38 +50,6 @@ and no entry records rejecting it, so this is an omission rather than a
 decision. Answering "yes, characters exist" means superseding ADR-025.
 
 ## Before milestone 3 — VM, calls, closures
-
-**Q24 — How big is a variadic callee's frame?**
-ADR-034 fixes the calling convention as "the callee's frame receives the
-arguments in its own slots `0..argc`" and removes any maximum arity. For a fixed
--arity callee those agree with `Proto.slots`, because the arity check makes
-`argc` equal the parameter count. For a variadic one they do not: `(fn [a & b] a)`
-compiles to `params 2, slots 3`, and a ten-argument call has ten values to place
-before the prologue can pack the extras into a list.
-
-Two shapes, and the compiler cannot pick between them because both are the VM's:
-size every frame `max(slots, argc)` and let the prologue pack in place, or give
-the prologue a scratch region the compiler reserves. Nothing in `Proto` says
-which, and nothing permits packing in place. Found by the milestone-2 review;
-milestone 3 has to answer it before the first variadic call runs.
-
-**Q25 — How is a primitive called?**
-Milestone 3's exit condition needs `+`, `-`, and `<` to exist, and nothing says
-what they *are*. ADR-013 gives the VM "exactly one generic `HostCall` opcode" for
-host capability, but its own list of host capability is terminal, HTTP, JSON,
-filesystem, and RNG — arithmetic is not on it, so `+` is not a `HostCall`.
-ADR-025's `Closure` is an empty struct standing in for a decision not yet made,
-and ADR-034's instruction list has no `HostCall` in it either.
-
-Decide together: whether `Value::Fn` covers both a bytecode closure and a native
-function, whether primitives live in the global table (`../let-rs` put them there,
-so `(define +)` overwrites them — worth reading before inline caching, since
-redefinition is what a cache invalidates against), and whether `HostCall` joins
-the instruction set now or at milestone 7 with the handle table.
-
-**Q10 — Integer overflow semantics.**
-Wrap, saturate, or throw. Rust panics in debug and wraps in release, so this
-must be explicit or the two builds disagree. Test the release build.
 
 **Q13 — Numeric equality and hashing.**
 Does `1` equal `1.0`? Decide with hashing in the same breath — equal values must

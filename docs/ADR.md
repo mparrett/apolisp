@@ -1526,6 +1526,115 @@ can pin a failure.
 
 ---
 
+### ADR-039 — What an error is: a fault is a throw, and a thrown value is any value
+
+*(New, 2026-07-27. Resolves Q23. Supersedes ADR-038 clause 4, which held the
+question open on purpose. Answers ADR-034's Open clause on catch dispatch.)*
+
+**Decision.** Five parts.
+
+**1. A thrown value is any `Value`.** `throw` imposes no shape and validates
+nothing: `(throw 42)` and `(throw {:type :app-error})` are both legal. The
+language half of Q23 is that there is no language half — an error is a value,
+and which values are errors is a convention programs adopt.
+
+**2. A VM-raised fault is a throw.** An arity mismatch, an overflow, an unbound
+global, a call to a non-function: each raises the same unwinding as `throw`, so
+each runs pending `finally` blocks and can be bound by a `catch`. At run time
+there is exactly one failure path, and `vm::run` loses its `Err` channel to say
+so.
+
+**3. A fault's value is a map of three keys.**
+
+```clojure
+{:type :vm-error :kind :unbound :message "`ready?` is not bound"}
+```
+
+`:kind` is a closed vocabulary *within* a `:type`. For `:vm-error` in v1 it is
+`:arity`, `:unbound`, `:not-callable`, `:type`, `:overflow`, `:undecided`, and
+`:internal`. The vocabulary grows in the entry that adds the subsystem raising
+the kinds, not by whoever writes the message: milestone 7's host errors arrive
+as `:type :io-error` with ADR-013's capability list supplying the kinds and
+extra keys (`:operation`, `:path`) beside them, which is the shape the original
+design conversation proposed.
+
+`:message` is prose for a human. `:kind` is the contract — a program that
+matches on the message text is matching on something this project reserves the
+right to reword.
+
+**4. Position and suppression travel beside the value, not inside it.** The
+in-flight unwind carries three things: the value, the `SpanOrigin` of the
+instruction that raised it, and a `suppressed` list. A `catch` binds the value
+alone. This is ADR-026's rule for origins applied to errors — the same reason,
+that a position is about *where a value came from* rather than about the value.
+
+That makes ADR-028 invariant 3 expressible for any thrown value, `(throw 42)`
+included: when a cleanup throws while unwinding, the cleanup's error wins and
+the parked original moves onto its `suppressed` list. A `.out` transcript prints
+both, under `--- at` and `--- suppressed`.
+
+**5. One `catch` clause, no filter, still.** ADR-034 left multiple clauses and
+any dispatch on the thrown value waiting on this entry. The answer is that
+dispatch is a library concern, not a language feature: once maps are readable
+(milestone 6) a handler body does its own `:kind` test, and `catch` stays the
+one-symbol binding ADR-034 specified.
+
+**Why.**
+
+*Faults converge with `throw` because the alternative is two unwinding paths
+that differ only in the last step.* Both have to drop frames, both have to run
+every pending `finally` exactly once, and both end the run when nothing catches
+them; keeping them apart buys one thing — `catch` cannot see a fault — at the
+price of writing that machinery twice and keeping the two copies in agreement.
+The concrete case that decides it is milestone 7's `with-open`, which ADR-028
+promised as `try`/`finally` lowering: if an arity error inside the body skips
+cleanup, a handle leaks on exactly the failures nobody predicted, and the
+promise is worth less than the words in it.
+
+*The taxonomy is closed per `:type` because a vocabulary nobody can enumerate is
+not a vocabulary.* A program that wants to retry on `:not-found` and give up on
+`:permission-denied` needs the set to be finite and stable; an open set of
+keywords invented at the raise site is a formatted string wearing a colon.
+Closing it per `:type` rather than globally is what lets milestone 7 add its
+kinds without superseding this entry.
+
+*Suppression lives on the unwind record because a thrown value can be an
+integer.* Attaching the original to the winner works only when the winner is a
+map, and `(throw 42)` from inside a cleanup is precisely the case invariant 3
+exists for. The alternative — a metadata channel on `Value` — is a second
+decision, taken to serve one field, on a `Value` that ADR-025 froze at 16 bytes.
+
+**Cost.** A bare `(catch e ...)` now swallows a typo: an unbound global inside a
+protected body becomes a caught value instead of a diagnostic. That is the
+Clojure behaviour for `(catch Exception e ...)` and it is a `TRAPS.md` entry
+rather than a mechanism, because the alternative is a filter language nothing
+else in v1 needs.
+
+A program cannot read the suppressed original in v1 — it reaches the transcript
+and nothing else. Every fault allocates a three-entry map and interns nothing
+(the keywords are interned once, at VM construction). And the fault messages are
+now language-visible strings, which is a surface this project has to be
+deliberate about rewording even though `:kind` is the part that is promised.
+
+**Rejected.** *Faults stay uncatchable, unwinding but never caught* — the two
+paths, and no program can recover from an overflow it can predict. *Faults stay
+terminal, skipping cleanup* — breaks ADR-028 invariant 1 the first time a fault
+happens inside a `try`. *A fault is a string* — the smallest change, and it
+declines the half of Q23 worth answering: no program can dispatch on what went
+wrong. *A flat `{:error :unbound :message ...}`* — one keyword space for every
+subsystem, so milestone 7 either overloads it or supersedes this. *A
+`Value::Error` variant or an exception type* — supersedes ADR-025 for something
+a map already prints, compares, and serializes. *Suppressed assoc'd onto the
+winning value* — see why.
+
+**Open.** Whether a program can ever read the suppressed chain (it needs either
+value metadata or a primitive that reaches into the unwind) waits for a real
+use. Whether `:message` should be a structure formatted at print time rather
+than a string is the same question one level down, and waits for the same
+evidence.
+
+---
+
 ## Errata
 
 Factual corrections to entries whose **decision still stands**. A wrong reason is

@@ -9,7 +9,7 @@ design review of 2026-07-25.
 
 *Resolved: Q1 (→ADR-008 stands, REPL clause deferred), Q2 (→ADR-023, ADR-026),
 Q3 (→ADR-025), Q4 (→ADR-028), Q7 (→ADR-029), Q9 (→ADR-029), Q10 (→ADR-037),
-Q11 (→ADR-027), Q17 (→ADR-027), Q21 (→ADR-030), Q24 (→ADR-038),
+Q11 (→ADR-027), Q17 (→ADR-027), Q21 (→ADR-030), Q23 (→ADR-039), Q24 (→ADR-038),
 Q25 (→ADR-038).*
 
 ---
@@ -30,8 +30,9 @@ literal without it: `[a b]` in code position is `(vector a b)`. That says what a
 literal *means*, not which ones exist.
 
 **Still open:** duplicate map keys, which collection literals exist, characters,
-sets, and cross-type collection equality. Exception values now sit with **Q23**,
-which is the same question from the host side.
+sets, and cross-type collection equality. Exception values are settled by
+**ADR-039**: a thrown value is any value, and only VM-raised faults have a fixed
+shape.
 
 Add one to the milestone-6 list: **do the core functions accept `nil` where they
 accept a collection** — `(count nil)` → 0, `(empty? nil)` → true? Erratum E-11
@@ -88,30 +89,6 @@ special form only on evidence from a real attempt. Note the interaction from
 ADR-028 rule 2: a `recur` inside a `try` with a `finally` is not a tail call, so
 the macro has to either reject that shape or accept the frame.
 
-## Before milestone 4 — errors
-
-**Q23 — What is an error, as a value?**
-`ETHOS.md` puts error quality outside the priority ranking entirely, and ADR-014
-lists error semantics as owned outright and never delegated. Neither says what an
-error *is*. Milestone 4 puts failure transcripts in the corpus, and a `.out` file
-cannot pin a thrown value whose shape is undecided.
-
-The original design conversation proposed structured values with a small closed
-vocabulary of kinds rather than formatted strings:
-
-```clojure
-{:type :io-error :operation :open :path "data.txt" :kind :not-found}
-```
-
-with `:not-found :permission-denied :closed :timeout :interrupted :invalid-data
-:would-block :connection-reset :other`, and the raw host code preserved as
-metadata so programs do not depend on platform-specific numbers. None of that is
-recorded anywhere. Q20 parks "exception values" as part of the v1 surface, which
-is the language half; this is the host half and it lands at milestones 4 and 7.
-
-Decide whether the taxonomy is closed, and whether host errors and language
-`throw` produce the same shape.
-
 ## Before milestone 6 — collections
 
 **Q6 — Collection representation and transients.**
@@ -119,6 +96,29 @@ ADR-011 says one representation each and still does not name it. With ADR-012
 making reduce-into-a-collection the default idiom, an assoc-vec map with
 copy-on-`assoc` and no transients is O(n²) for the most common operation in the
 language. Name the representation; decide whether transients exist.
+
+## Before milestone 7 — the host handle table
+
+**Q27 — The `:io-error` kinds.**
+ADR-039 fixes the shape of a VM-raised fault and says the `:kind` vocabulary is
+closed *within* a `:type`, growing in the entry that adds the subsystem raising
+it. Milestone 7 is the next such entry, and the vocabulary the original design
+conversation proposed is worth deciding against rather than reinventing:
+
+```clojure
+{:type :io-error :operation :open :path "data.txt" :kind :not-found}
+```
+
+with `:not-found :permission-denied :closed :timeout :interrupted :invalid-data
+:would-block :connection-reset :other`, and the raw host code preserved beside
+it so programs never depend on platform-specific numbers.
+
+Two things to decide then, not now: whether `:other` earns its place (an escape
+hatch weakens a closed vocabulary, and every error that lands in it is one
+nobody can dispatch on), and where the raw host code goes now that ADR-039 has
+ruled out a metadata channel on `Value` — a fourth key is the obvious answer and
+it makes the map's key set open, which is a different promise from the one
+ADR-039 makes about `:kind`.
 
 ## Before milestone 8 — serialization
 

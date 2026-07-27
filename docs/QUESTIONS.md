@@ -81,6 +81,19 @@ which is what read-time syntax-quote resolution (ADR-024) needs. The open part i
 what forces a real module system, and whether `require`/aliasing can stay a
 library concern over the global table.
 
+**Q28 — Does the expander evaluate the top level as it goes?**
+ADR-040 expands a unit form by form but never *runs* one, so a macro body sees
+primitives and previously defined macros and nothing else: a function defined
+with `def` earlier in the same file does not exist when a macro runs. Clojure
+compiles and evaluates the top level form by form, which removes the limit and
+buys it a real cost — every top-level form's side effects happen at compile
+time, and a file that launches a thread or opens a socket does so while being
+compiled.
+
+Decide when a macro actually wants a helper. Two smaller options exist and
+should be weighed first: writing the helper as a macro, or letting a macro
+body's helpers live in the prelude.
+
 **Q5 — `loop`/`recur`: macro or core form?**
 ADR-028 settles proper tail calls, which is what this was waiting on — a
 self-call in tail position now runs in constant space, so the machinery exists.

@@ -638,6 +638,10 @@ code* — Clojure says yes and pays for it everywhere; nothing in v1 needs it.
 
 *Read as "Clojure-style capture avoidance" — see erratum E-7.*
 
+*Read-time resolution superseded by ADR-040: with one namespace it resolves to
+itself. The decision that hygiene is a property of symbol identity, and that
+metadata carries spans and nothing else, stands.*
+
 *(New, 2026-07-25. Supersedes the hygiene half of ADR-009.)*
 
 **Decision.** Macro hygiene is a property of symbol *identity*, not of form
@@ -1632,6 +1636,121 @@ value metadata or a primitive that reaches into the unwind) waits for a real
 use. Whether `:message` should be a structure formatted at print time rather
 than a string is the same question one level down, and waits for the same
 evidence.
+
+---
+
+### ADR-040 — Macros: one form the expander knows, a prelude, and hygiene by gensym
+
+*(New, 2026-07-27. Supersedes ADR-024's read-time resolution clause; its
+unbundling of hygiene from metadata stands. Completes ADR-027's promise that
+`def` and `defmacro` are library macros. Second entry point for ADR-036.)*
+
+**Decision.** Five parts.
+
+**1. The expander knows exactly one new form: `(set-macro! name expr)`.** It
+expands `expr`, compiles it, runs it, and keeps the resulting closure as a macro
+for the rest of the compilation unit. The form itself expands to `(quote name)`
+— it has already had its whole effect, and the top level stays a sequence of
+expressions. `def` and `defmacro` are then written *in the language*, in
+`src/prelude.xs`, which is compiled into the binary and expanded ahead of every
+unit.
+
+**2. Macros live in the expander, not the `Vm`.** A macro is a property of a
+compilation unit. Nothing about it reaches an `Image` (ADR-029), and two units
+compiled by one VM cannot see each other's macros. A macro is a closure *plus
+the chunk it was compiled in*, because a closure names its proto by index
+(ADR-034) and means nothing without it.
+
+**3. Quasiquote is lowered by the expander, into ordinary calls.** The reader
+desugars the punctuation only — `` `x `` reads as `(quasiquote x)`, exactly as
+`'x` already read as `(quote x)` — and the expander turns a template into
+`list`, `concat`, `vector`, `vec`, and `hash-map` calls, all ordinary globals
+(ADR-038). Only symbols are quoted; everything else evaluates to itself. Three
+new primitives fall out: `concat`, `vec`, and `gensym`.
+
+**4. Hygiene is auto-gensym plus `gensym`, and syntax-quote does not qualify.**
+`x#` inside a template becomes one fresh symbol per template, so two occurrences
+in a template are the same name and two templates never collide. `(gensym)`
+covers the case where a macro computes a name. Counters are per compilation
+unit.
+
+**5. Macro output carries the call site; what it passed through keeps its own
+position.** A node the expander can still identify — by object identity, at any
+depth, against the arguments it handed the macro — keeps the `Source` origin it
+was read at. Everything else is `Generated(call site)`. Nothing becomes
+`Unknown` here, which refines ADR-026: a macro call always *has* a call site,
+and reporting it beats reporting nothing.
+
+**Why.**
+
+*One form rather than a built-in `defmacro`.* ADR-027 said `def` and `defmacro`
+are library macros, and without metadata to mark macro-ness (ADR-024 gave that
+up deliberately) something has to install one. Making the primitive
+`set-macro!` rather than `defmacro` keeps the built-in at its smallest — bind a
+name to a function — and puts the part with syntax, destructuring, and a
+template in the language, where it can be read and changed without touching
+Rust. That the prelude is *itself* a macro definition is the exit condition
+being met rather than described.
+
+*The lowering is in the expander because the reader has no business knowing
+about gensym.* ADR-024 put resolution at read time for hygiene reasons that part
+4 removes; with those gone, what is left is a template-to-calls rewrite, and
+doing it in the expander keeps `.forms` showing what was written and
+`.expanded` showing what it became. Each golden then shows one phase's job.
+
+*Qualification buys two things, and one of them is vacuous here.* Clojure's
+syntax-quote qualifies symbols so that a macro's references resolve where the
+macro was *defined* and so that a template cannot bind a name the caller chose —
+a qualified symbol is not a legal binding form. With ADR-027's single namespace
+the first is meaningless: there is nowhere else for a name to resolve to.
+The second is real, and the price of it is three couplings — the reader would
+have to know the thirteen core form names to leave them unqualified, the
+resolver would have to reject qualified binding names, and global lookup would
+have to canonicalize `ns/foo` to `foo` for as long as there is one namespace.
+That is a large mechanism whose only surviving job is to make one class of
+mistake impossible, and `x#` makes the same mistake easy to avoid. Qualification
+is what Q12 buys when a second namespace exists, and this entry is what it would
+supersede.
+
+Auto-gensym is per *template*, not per expansion, which is also Clojure's
+behaviour and for the same reason: the template is lowered once, when the macro
+is defined. Two expansions of one macro therefore share a generated name. That
+is safe — the name cannot collide with anything the caller wrote, and a macro
+nested inside itself shadows in the ordinary way.
+
+**Cost.** A template can still capture: `` `(let [x 1] ~body) `` binds the
+caller's `x`, silently, where Clojure would refuse to compile it. That is a
+`TRAPS.md` entry rather than a mechanism, and it is the one thing this entry
+gives up against ADR-024 as written.
+
+A macro body sees primitives and macros, and nothing else the unit defines: the
+expander does not evaluate top-level forms as it goes, so a function defined
+with `def` earlier in the file does not exist when a macro runs. Clojure's
+model, where the top level is compiled and evaluated form by form, is what
+removes that limit; whether to adopt it is **Q28**.
+
+Nested quasiquote is refused rather than half-supported, and so is `~@` inside a
+map template — splicing pairs needs `apply`, which v1 does not have. Both are
+diagnostics with a position, not silent wrong answers.
+
+The prelude is a new kind of file: language code inside the compiler's binary.
+It counts against the ADR-030 budget, and it is the easiest place in a project
+like this for a standard library to start growing by accident.
+
+**Rejected.** *A built-in `defmacro`* — smallest, and it makes the milestone's
+exit condition something the host does rather than the language. *Macro-ness as
+a `Closure::Macro` variant, macros in the global table* — one table instead of
+two, at the price of superseding ADR-038 and widening every match over
+`Closure`; and it would put macros in an `Image`, which is where they least
+belong. *Lowering quasiquote in the reader (Clojure's placement)* — makes the
+reader namespace- and gensym-aware, which ADR-024's own cost paragraph called a
+real coupling, for no benefit once qualification is gone. *Read-time
+qualification* — see why.
+
+**Open.** Q28 (does the expander evaluate the top level as it goes) and Q12 (a
+second namespace, which is when qualification stops being vacuous). Whether
+`loop`/`recur` is expressible as a macro over the core is still Q5, now
+answerable: the machinery it was waiting on exists.
 
 ---
 

@@ -1879,6 +1879,183 @@ says so.
 
 ---
 
+### ADR-042 — The host boundary: io errors, no `HostCall`, and the handle table
+
+*(New, 2026-07-27. Resolves Q27. Narrows ADR-013's opcode clause. Adds the
+`:io-error` half of ADR-039 clause 3's vocabulary.)*
+
+**Decision.** Five parts.
+
+**1. An io failure is a throw of a map with four keys, plus `:path` where one
+exists.**
+
+```clojure
+{:type :io-error :operation :open :path "data.txt"
+ :kind :not-found :message "no such file"}
+```
+
+`:kind` for `:io-error` in v1 is `:not-found`, `:permission-denied`, `:closed`,
+`:invalid-data`, `:interrupted`, and `:other`. The three network kinds the
+original design conversation proposed — `:timeout`, `:would-block`,
+`:connection-reset` — are **not** in this entry, because nothing milestone 7
+builds can raise one; they arrive with the adapter that does, which is what
+ADR-039 clause 3 means by a vocabulary growing in the entry that adds the
+subsystem raising it.
+
+`:operation` is the primitive that failed, as a keyword. `:path` is present only
+when the operation names one, so a `stdin` failure has four keys and an `open`
+has five.
+
+**2. The raw host error code is not preserved, and `:message` is ours.** There
+is no `:code` key. The prose in `:message` is constructed from our own kind
+table, not forwarded from `std::io::Error`'s `Display`.
+
+**3. There is no `HostCall` opcode.** An io primitive is a native like `+` is:
+an ordinary entry in the global table, found by name, called by `Call`, handed
+`&mut Vm` (ADR-038 parts 1 and 2). ADR-013's opcode clause is narrowed to
+nothing; its *gating* clause is untouched, and Cargo features remain the
+subtraction harness.
+
+The rule that makes this sufficient: **a host call is atomic.** It completes or
+it throws, and the VM never suspends inside one. There is no `Pending` outcome
+and no way to re-enter a native.
+
+**4. The handle table is VM-owned, generational, and hand-rolled.** A `u32`
+index and a `u32` generation, a free list of reclaimed indices, and an occupancy
+count. `close` is **idempotent on a live-or-already-closed handle and an error
+on a stale one** — the two are different questions and only the second is a bug.
+`Vm::open_handles()` answers ADR-029's "is anything open" as a subtraction, not
+a scan.
+
+`Value::Buffer` stays unused. A read allocates and returns fresh `Bytes`;
+nothing writes into a caller-supplied buffer.
+
+**5. `with-open` is a prelude macro, and no corpus program does io.** It lowers
+to `try`/`finally` in `src/prelude.xs` (ADR-016, ADR-041 part 6). Io tests live
+in `tests/lang/io.xs`, and the lang runner prepends a generated
+`(def tmp-dir "…")` naming a per-run directory under `CARGO_TARGET_TMPDIR`.
+
+**Why.**
+
+*The kinds ship short because a kind nobody can raise is a guess with a colon in
+front of it.* Pinning `:connection-reset` now means milestone 10 either fits a
+real socket error into a name chosen before any socket existed, or supersedes
+this entry — and the second is the honest outcome, so the first is the trap.
+ADR-039 already built the mechanism for adding kinds later; using it is cheaper
+than predicting.
+
+*`:other` earns its place because the alternative is a lie about the host.*
+`std::io::ErrorKind` is `#[non_exhaustive]`, and the set of things an operating
+system can refuse is not ours to close. A vocabulary with no escape hatch would
+route an unmapped disk error into `:vm-error`/`:internal`, which claims the VM
+is broken about something that is merely unusual. `:other` is documented as *do
+not dispatch on this, read the message* — it weakens the vocabulary exactly as
+much as reality does, and no more.
+
+*The raw code is dropped for determinism, not for tidiness.* An errno differs
+across platforms and `std::io::Error`'s `Display` differs with it — "No such
+file or directory (os error 2)" on one host, other words on another. ADR-039
+makes a thrown value printable into a `.out` transcript, so either one would put
+a machine-specific string in a golden file, and BUILD.md's rule is that a
+flapping golden gets disabled and then there is no oracle. Owning the prose also
+keeps `:message` what ADR-039 said it was: text this project reserves the right
+to reword, which is only true if this project writes it.
+
+Dropping it also keeps the key set closed, which a `:code` key would have
+opened — a different promise from the one ADR-039 makes about `:kind`, made for
+one field. Adding the key later is purely additive, so this is the cheap
+direction to be wrong in.
+
+*The opcode is not built because ADR-038 already delivered everything it was
+for.* A native is reached by `Call` and gets `&mut Vm`, which is the entire
+requirement of a blocking `read`. Building `HostCall` on top would add a third
+arm to the dispatch loop and a second registry beside the native table, to reach
+the same function by a different name.
+
+The one thing an opcode genuinely buys is a **resume point**: a `HostCall`
+instruction leaves the PC on itself, so "retry the instruction" is the natural
+way back in after a host call that could not complete. Under `Call` the resume
+point is inside a native with no `Proto` and no frame, so there is nothing to
+resume to. That matters the day a host cannot block — wasm — and it is deferred
+rather than ignored, because part 3's atomicity rule forbids the suspension it
+would serve. Milestone 8 has to refuse the case anyway: ADR-029 already refuses
+an `Image` while a handle is live, and an `Image` taken with a native on the
+Rust stack is impossible under ADR-004 in either design. An opcode would be
+buying a resume point for a suspension both designs forbid.
+
+*The table is hand-rolled because `Value` already fixed the key type and ADR-016
+needs a distinction the library merges.* `Value::Handle(HandleId)` is frozen at
+`(u32, u32)` inside a 16-byte `Value` (ADR-025), so `slotmap`'s `KeyData` could
+not *be* the identity — it would sit behind a conversion at every boundary and
+milestone 8's serializer would have to reach inside a foreign type to write an
+`Image`. And `SlotMap::remove` returns `None` for both an already-removed key
+and a stale one, which is precisely the pair part 4 separates. Measured against
+a written draft, the arena is ~40 lines, ~30 of them code, against a 700-line
+host row. ADR-014 pre-approves the dependency and it is still declined: what it
+would save is smaller than what stays ours either way.
+
+The generational pattern is not being invented here — `slotmap`, `slab`, and
+every ECS do the same thing, and `Vm::new_cell` is already a degenerate version
+of it. What is new is the reclamation half: ADR-025 keeps a cell for the VM's
+lifetime, so its generation is written once and never bumped, and a handle table
+is the first thing in this system that frees a slot.
+
+*`close` splits idempotence from staleness because they are opposite signals.*
+Closing an already-closed handle is what a correct `with-open` does when the
+body closed explicitly, and erroring there would make the safe idiom the
+dangerous one. A stale handle is a live resource being addressed through a dead
+name — the aliasing bug ADR-016 put a generation in the id to catch — and
+swallowing it converts a use-after-close into silence.
+
+*Reads return fresh `Bytes` because there is no mutable byte value.* ADR-016's
+sketch was `(io/read h buf)`, written before ADR-041 made collections immutable
+and copy-on-write. Filling a caller's buffer needs a mutable one, which is what
+`Value::Buffer` would become — a second mutability story in a language that has
+exactly one, for an allocation this scale cannot measure. The variant stays in
+the enum unused rather than being given a job to justify it.
+
+**Cost.** `:other` is a bucket, and every error that lands in it is one no
+program can dispatch on; the kind table is the thing to extend when a real
+program needs to.
+
+A varying key set — four keys or five — means a handler that reads `:path`
+unconditionally gets `nil` on a stdio failure. The alternative was a `:path` of
+`nil` on every stdio error, which is a key that says nothing, present so the
+count stays even.
+
+Dropping the raw code means a failure we cannot classify arrives as `:other`
+with prose, and the number that would have identified it is gone. The `.out`
+transcript is the only place it could have gone, and that is the place it must
+not be.
+
+No `HostCall` means the wasm and async question is answered by refusal rather
+than by design: when a host cannot block, this entry is what has to be
+superseded, and the resume point is the specific thing that will need
+inventing.
+
+Handles are not reclaimed by scope, only by `close` or by the VM's end. A
+program that opens in a loop and never closes exhausts file descriptors, and the
+generation counter on a heavily reused index wraps at 2³² with no check.
+
+**Rejected.** *All nine proposed kinds* — see why. *A closed vocabulary with no
+`:other`* — misreports the host as an internal fault. *A `:code` key* — opens
+the key set and puts a platform-specific integer where a golden can print it.
+*A `HostCall` opcode* — narrows to ADR-038's existing `Call` with a second
+registry attached. *`slotmap`* — the key type is already frozen and the hard
+half stays ours. *`with-open` as a function* — a primitive calling a language
+closure re-enters the dispatch loop on the Rust stack, which ADR-004 forbids
+(ADR-041 part 6). *An `io/temp-dir` primitive* — a line in the host row that
+exists only so a test can find a directory the runner already knows. *A corpus
+program that opens a file* — puts a machine-specific path or error in a golden,
+which is the failure BUILD.md's determinism rule exists to prevent.
+
+**Open.** Whether `:interrupted` should be retried by the primitive rather than
+thrown — `EINTR` is arguably the host's problem and not the program's, and the
+answer wants a real program that hits it. The wasm resume point, per the cost
+clause.
+
+---
+
 ## Errata
 
 Factual corrections to entries whose **decision still stands**. A wrong reason is

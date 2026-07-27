@@ -10,7 +10,7 @@ design review of 2026-07-25.
 *Resolved: Q1 (→ADR-008 stands, REPL clause deferred), Q2 (→ADR-023, ADR-026),
 Q3 (→ADR-025), Q4 (→ADR-028), Q7 (→ADR-029), Q9 (→ADR-029), Q10 (→ADR-037),
 Q11 (→ADR-027), Q13 (→ADR-041), Q17 (→ADR-027), Q21 (→ADR-030), Q23 (→ADR-039),
-Q24 (→ADR-038), Q25 (→ADR-038), Q26 (→ADR-041), Q6 (→ADR-041).*
+Q24 (→ADR-038), Q25 (→ADR-038), Q26 (→ADR-041), Q6 (→ADR-041), Q27 (→ADR-042).*
 
 ---
 
@@ -78,29 +78,6 @@ Attempt `loop`/`recur` as a macro over the core forms and admit it as a fourteen
 special form only on evidence from a real attempt. Note the interaction from
 ADR-028 rule 2: a `recur` inside a `try` with a `finally` is not a tail call, so
 the macro has to either reject that shape or accept the frame.
-
-## Before milestone 7 — the host handle table
-
-**Q27 — The `:io-error` kinds.**
-ADR-039 fixes the shape of a VM-raised fault and says the `:kind` vocabulary is
-closed *within* a `:type`, growing in the entry that adds the subsystem raising
-it. Milestone 7 is the next such entry, and the vocabulary the original design
-conversation proposed is worth deciding against rather than reinventing:
-
-```clojure
-{:type :io-error :operation :open :path "data.txt" :kind :not-found}
-```
-
-with `:not-found :permission-denied :closed :timeout :interrupted :invalid-data
-:would-block :connection-reset :other`, and the raw host code preserved beside
-it so programs never depend on platform-specific numbers.
-
-Two things to decide then, not now: whether `:other` earns its place (an escape
-hatch weakens a closed vocabulary, and every error that lands in it is one
-nobody can dispatch on), and where the raw host code goes now that ADR-039 has
-ruled out a metadata channel on `Value` — a fourth key is the obvious answer and
-it makes the map's key set open, which is a different promise from the one
-ADR-039 makes about `:kind`.
 
 ## Before milestone 8 — serialization
 

@@ -1,0 +1,459 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>apolisp — the tests were green and two of them were dead</title>
+<meta name="description" content="Three milestones of a Lisp VM, and what a deliberate attempt to break its own tests found each time — a different kind of failure every round.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%94%AC%3C/text%3E%3C/svg%3E">
+<style>
+  :root {
+    color-scheme: light dark;
+
+    --ground:    #edf0f3;
+    --panel:     #f8fafb;
+    --panel-2:   #e2e7ec;
+    --ink:       #14181d;
+    --muted:     #525c68;
+    --faint:     #7f8996;
+    --accent:    #1f5f7a;
+    --accent-w:  #d7e6ed;
+    --dead:      #9c3327;
+    --dead-w:    #f3ddd9;
+    --live:      #14614f;
+    --live-w:    #d6eae4;
+    --hair:      #ccd4db;
+    --hair-2:    #b0bac4;
+
+    --serif: "Charter", "Bitstream Charter", "Iowan Old Style", Georgia, ui-serif, serif;
+    --util:  "Avenir Next", Avenir, Futura, Optima, ui-sans-serif, system-ui, sans-serif;
+    --mono:  ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+
+    --measure: 64ch;
+    --rule: 1px solid var(--hair);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground:   #131619;
+      --panel:    #191d21;
+      --panel-2:  #22272d;
+      --ink:      #e3e7ec;
+      --muted:    #98a2ae;
+      --faint:    #6b7581;
+      --accent:   #6cb6d4;
+      --accent-w: #14313d;
+      --dead:     #e0837a;
+      --dead-w:   #38201d;
+      --live:     #5cc0a8;
+      --live-w:   #123029;
+      --hair:     #2a3037;
+      --hair-2:   #3a424b;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:#131619; --panel:#191d21; --panel-2:#22272d; --ink:#e3e7ec;
+    --muted:#98a2ae; --faint:#6b7581; --accent:#6cb6d4; --accent-w:#14313d;
+    --dead:#e0837a; --dead-w:#38201d; --live:#5cc0a8; --live-w:#123029;
+    --hair:#2a3037; --hair-2:#3a424b;
+  }
+  :root[data-theme="light"] {
+    --ground:#edf0f3; --panel:#f8fafb; --panel-2:#e2e7ec; --ink:#14181d;
+    --muted:#525c68; --faint:#7f8996; --accent:#1f5f7a; --accent-w:#d7e6ed;
+    --dead:#9c3327; --dead-w:#f3ddd9; --live:#14614f; --live-w:#d6eae4;
+    --hair:#ccd4db; --hair-2:#b0bac4;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--serif);
+    font-size: 1.0625rem;
+    line-height: 1.62;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  .wrap {
+    max-width: calc(var(--measure) + 4rem);
+    margin: 0 auto;
+    padding: 3.5rem 2rem 6rem;
+  }
+
+  header { border-bottom: var(--rule); padding-bottom: 2rem; margin-bottom: 2.5rem; }
+
+  h1 {
+    font-size: clamp(1.9rem, 5.2vw, 2.7rem);
+    line-height: 1.12;
+    letter-spacing: -0.018em;
+    margin: 0 0 0.9rem;
+    font-weight: 600;
+  }
+
+  .dek {
+    font-size: 1.15rem;
+    line-height: 1.5;
+    color: var(--muted);
+    margin: 0 0 1.4rem;
+  }
+
+  .byline {
+    font-family: var(--util);
+    font-size: 0.775rem;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--faint);
+    margin: 0;
+  }
+  .byline span { white-space: nowrap; }
+  .byline .sep { margin: 0 0.55rem; opacity: 0.5; }
+
+  section { margin: 0 0 3rem; }
+
+  .eyebrow {
+    display: block;
+    font-family: var(--util);
+    font-size: 0.7rem;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 0.5rem;
+  }
+
+  h2 {
+    font-size: clamp(1.3rem, 3.4vw, 1.6rem);
+    line-height: 1.22;
+    letter-spacing: -0.012em;
+    margin: 0 0 1rem;
+    font-weight: 600;
+  }
+
+  h3 {
+    font-family: var(--util);
+    font-size: 0.95rem;
+    letter-spacing: 0.01em;
+    margin: 1.8rem 0 0.6rem;
+    font-weight: 600;
+  }
+
+  p { margin: 0 0 1.05rem; max-width: var(--measure); }
+
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+  code {
+    font-family: var(--mono);
+    font-size: 0.86em;
+    background: var(--panel-2);
+    padding: 0.08em 0.32em;
+    border-radius: 3px;
+  }
+
+  pre {
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    line-height: 1.55;
+    background: var(--panel);
+    border: var(--rule);
+    border-left: 3px solid var(--hair-2);
+    border-radius: 4px;
+    padding: 0.95rem 1.1rem;
+    overflow-x: auto;
+    margin: 0 0 1.2rem;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; }
+  pre .hi { color: var(--dead); font-style: normal; }
+  pre .dim { color: var(--faint); }
+
+  .note {
+    border: var(--rule);
+    border-left: 3px solid var(--hair-2);
+    background: var(--panel);
+    border-radius: 4px;
+    padding: 1rem 1.15rem 0.4rem;
+    margin: 0 0 1.3rem;
+    max-width: var(--measure);
+  }
+  .note p { font-size: 0.965rem; }
+  .note .tag {
+    display: block;
+    font-family: var(--util);
+    font-size: 0.7rem;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+  }
+  .note.found { border-left-color: var(--dead); background: var(--dead-w); }
+  .note.found .tag { color: var(--dead); }
+  .note.clean { border-left-color: var(--live); background: var(--live-w); }
+  .note.clean .tag { color: var(--live); }
+
+  .tablewrap { overflow-x: auto; margin: 0 0 1.4rem; }
+  table {
+    border-collapse: collapse;
+    font-family: var(--util);
+    font-size: 0.87rem;
+    width: 100%;
+    min-width: 30rem;
+  }
+  th, td { text-align: left; padding: 0.5rem 0.85rem 0.5rem 0; border-bottom: var(--rule); vertical-align: top; }
+  th {
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--faint);
+    font-weight: 600;
+    border-bottom: 1px solid var(--hair-2);
+  }
+  td.v { white-space: nowrap; font-weight: 600; }
+  td.v.survived { color: var(--dead); }
+  td.v.died { color: var(--live); }
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+    gap: 1px;
+    background: var(--hair);
+    border: var(--rule);
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 0 0 1.5rem;
+  }
+  .stat { background: var(--panel); padding: 0.85rem 0.95rem; }
+  .stat b {
+    display: block;
+    font-family: var(--util);
+    font-size: 1.35rem;
+    letter-spacing: -0.02em;
+    font-weight: 600;
+    line-height: 1.1;
+  }
+  .stat span {
+    font-family: var(--util);
+    font-size: 0.68rem;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+
+  blockquote {
+    margin: 0 0 1.2rem;
+    padding-left: 1.1rem;
+    border-left: 2px solid var(--accent);
+    color: var(--muted);
+    font-style: italic;
+    max-width: var(--measure);
+  }
+  blockquote p { margin-bottom: 0; }
+
+  ul { max-width: var(--measure); padding-left: 1.15rem; margin: 0 0 1.1rem; }
+  li { margin-bottom: 0.45rem; }
+
+  hr { border: 0; border-top: var(--rule); margin: 2.5rem 0; }
+
+  footer {
+    border-top: var(--rule);
+    padding-top: 1.6rem;
+    color: var(--faint);
+    font-family: var(--util);
+    font-size: 0.8rem;
+    line-height: 1.6;
+  }
+  footer p { max-width: var(--measure); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>The tests were green and two of them were dead</h1>
+  <p class="dek">Three milestones of a small Lisp VM, and four rounds of deliberately trying to break its own test suite. Each round that found something found a <em>different kind</em> of failure — and the round that found nothing is part of the result.</p>
+  <p class="byline">
+    <span>apolisp</span><span class="sep">/</span><span>Rust, zero dependencies</span><span class="sep">/</span><span>3 of 10 milestones</span><span class="sep">/</span><span>38 decision records</span>
+  </p>
+</header>
+
+<section>
+  <span class="eyebrow">The premise</span>
+  <h2>Build the oracle before the language</h2>
+
+  <p>apolisp is a small Lisp in the Clojure dialect with its own register-ish VM, written in Rust for one user. It has no compatibility contract and no stability promise. The interesting constraint isn&rsquo;t performance or features — it&rsquo;s that <em>the entire core has to be holdable at once</em>, by one engineer and by one language model. That is a context-window budget, about 7,000 lines, and every other decision defers to it.</p>
+
+  <p>A budget like that changes what verification is for. You cannot afford a test suite that merely exists; you need one where each test is doing identifiable work, because the suite competes for the same attention the code does. So the build order puts the oracle first — a four-rung ladder from <code>cargo check</code> through a smoke script, a golden corpus with one snapshot per compilation phase, and eventually a test suite written in the language itself. The instruction in the build doc is blunt:</p>
+
+  <blockquote><p>Write this <em>before</em> the reader is finished — a failing smoke test is a better queue than an empty one.</p></blockquote>
+
+  <p>And one rule above all others: <strong>never regenerate a golden file to make a test pass.</strong> That is a failed task, not a fix.</p>
+
+  <p>The seed of everything below came from a sibling project. Its notes record a mutant that deleted the compiler&rsquo;s line-counter restore and <em>passed the entire suite</em> — because every test program in its corpus had subexpressions on the same line as the enclosing form. Green corpus, dead mechanism. That went into the prior-art file as a thing to watch for, months before there was any code here to watch.</p>
+
+  <div class="note found">
+    <span class="tag">Knowing about a failure mode did not prevent it</span>
+    <p>Milestone 1 reproduced that exact failure. In the first milestone. After writing it down as a warning.</p>
+  </div>
+</section>
+
+<section>
+  <span class="eyebrow">Round one · milestone 1</span>
+  <h2>A test that could not fail</h2>
+
+  <p>Milestone 1 is a reader, a printer, and source spans. Spans are the awkward part: they have to cover <em>immediates</em> too, so an error can point at a symbol occurrence, but a symbol is a 4-byte interned id with nowhere to hang metadata. The design puts origins in a parallel tree beside the value graph rather than inside it — one origin per syntactic child, positionally.</p>
+
+  <p>That structure gets a property test: every source span lies inside its file, both ends fall on character boundaries, and child-origin arity matches child count. Ten tests green, four corpus programs, everything passing.</p>
+
+  <p>Then, three mutants, with predictions written first.</p>
+
+  <div class="tablewrap">
+  <table>
+    <tr><th>Mutant</th><th>Predicted</th><th>Actual</th></tr>
+    <tr><td>Every leaf origin becomes <code>Unknown</code></td><td>passes — the test is dead</td><td class="v survived">survived</td></tr>
+    <tr><td>Every span starts at byte 0</td><td>passes — the test is dead</td><td class="v survived">survived</td></tr>
+    <tr><td>Drop one child origin</td><td>fails — arity catches it</td><td class="v died">died</td></tr>
+  </table>
+  </div>
+
+  <p>The property was checking <em>arity only</em>. Every span in the system could have been systematically, totally wrong and the whole suite stayed green. The one third that worked was the third that counted things.</p>
+
+  <p>Worse, in a way that is more useful than the bug: the decision record had <em>already specified the fix</em>. Its verification clause called for snapshotting the rendered origins, and the implementation had built the debug renderer and then not snapshotted it. The document was right and the code was short of it, and nothing in the loop noticed except an explicit attempt to break the test.</p>
+
+  <p>Fixed by adding a <code>.spans</code> golden per corpus program. Both surviving mutants now fail.</p>
+</section>
+
+<section>
+  <span class="eyebrow">Round two · milestone 2</span>
+  <h2>A rule enforced twice, so deleting either changed nothing</h2>
+
+  <p>Milestone 2 is the core AST, a slot-based bytecode compiler, and a disassembler. One decision it inherits: tail calls reuse the caller&rsquo;s frame, <em>except</em> that a call in tail position inside a <code>try</code> with a <code>finally</code> is not a tail call, because the frame is still needed to run the cleanup.</p>
+
+  <p>That rule got a test. It asserted both directions — a pending <code>finally</code> suppresses the tail call, and closing the region brings it back. Four mutants ran against the new compiler; three died as predicted. The fourth deleted the region check that the rule&rsquo;s own test was written for.</p>
+
+  <div class="note found">
+    <span class="tag">The suite stayed entirely green</span>
+    <p>The rule was implemented <em>twice</em>. The <code>try</code> lowering cleared the &ldquo;this is a tail position&rdquo; flag before descending into a protected body, <em>and</em> the call site checked an open-handler-region counter before emitting a tail call. Because the flag was already false by the time any call was reached, the counter could never fire.</p>
+    <p>It read as belt-and-braces. It was dead code wearing a safety net&rsquo;s clothes — and the test could not distinguish the two, because both of its assertions were true under the mutant. The <em>other</em> mechanism was carrying them.</p>
+  </div>
+
+  <p>The fix was deletion, not another test. The lowering now passes the flag through untouched and the counter is the single enforcement point, at the site where the decision is actually made. The mutant now fails.</p>
+
+  <p>The confirmation is the part worth keeping: <strong>no golden file changed.</strong> Removing the redundant clause produced byte-identical bytecode across the whole corpus, which is exactly what &ldquo;this branch was unreachable&rdquo; should look like from the outside.</p>
+
+  <p>So a mutation check does not only find dead tests. It finds <em>duplicated enforcement</em> — two mechanisms implementing one rule, with no way for the suite to say which is working. Adding a test that pinned both would have preserved the ambiguity rather than resolving it.</p>
+</section>
+
+<section>
+  <span class="eyebrow">Round three · a fresh reader</span>
+  <h2>Correct code that nobody was watching</h2>
+
+  <p>The process doc keeps one tool in reserve: a diff-only review by a fresh context, given the change and none of the reasoning behind it, tasked only with enumerating why it is broken. Milestone 2 got one. It ran its own mutations and found seven more survivors — all of them in code that was <em>correct</em>, and none of it observed.</p>
+
+  <p>The one to remember is a single token.</p>
+
+<pre><code>;; ((f) 1)  — the operator is itself a call
+;; one argument changed from `false` to `tail`:
+
+0000  GETGLOBAL   r3 &lt;- f
+0001  <span class="hi">TAILCALL    r3(0)</span>      <span class="dim">;; returns (f)&rsquo;s value. Never calls it with 1.</span>
+0002  CONST       r2 &lt;- k0
+0003  TAILCALL    r1(1)      <span class="dim">;; unreachable — and r1 was never written</span>
+</code></pre>
+
+  <p>A function that computes its own callee now returns the callee instead of calling it. Silent, total, and wrong. All 31 tests passed. Every golden file was byte-identical.</p>
+
+  <div class="note found">
+    <span class="tag">The cause was corpus shape, not test design</span>
+    <p>The tail-call test existed, asserted both directions, and was written by someone thinking carefully about the rule. It only ever exercised a call whose operator was a plain symbol — because <em>no program in the corpus had a call whose operator was itself a call</em>.</p>
+    <p>The corpus had been assembled to look representative. That is not the same thing as being assembled to <em>distinguish</em>. A program earns its place in a corpus because some plausible wrong implementation compiles it differently.</p>
+  </div>
+
+  <p>The other six were the same shape: a decision with a home in the decision log and no test, so the log read as enforced when only the code was carrying it. Sequential <code>let</code> bindings could become <code>letrec</code>. The scope walk could resolve outward-in instead of inward-out. A function&rsquo;s own name could beat its parameters, so <code>(fn f [f] f)</code> returned the function instead of its argument. All green, every time.</p>
+
+  <p>The same review found a stack overflow the suite could never have caught, because it wasn&rsquo;t a wrong answer — it was a <em>killed process</em>. The compiler aborted with SIGABRT at around 1,400 levels of nesting, on input the reader happily accepted at 3,000. That became a bounded nesting depth, checked once, in the reader — the only place that needs it, since every later phase recurses at most once per level of form nesting. Checking again downstream would have been the duplicated enforcement the previous round had just finished deleting.</p>
+</section>
+
+<section>
+  <span class="eyebrow">Round four · milestone 3</span>
+  <h2>Reporting the null result</h2>
+
+  <p>Milestone 3 is the VM: an explicit frame stack, closures, proper tail calls, and enough primitives to run something. Seven mutants against its load-bearing lines, predictions written first.</p>
+
+  <div class="tablewrap">
+  <table>
+    <tr><th>Mutant</th><th>Actual</th></tr>
+    <tr><td>A tail call pushes a frame instead of reusing one</td><td class="v died">died (8 tests)</td></tr>
+    <tr><td>The callee prologue&rsquo;s arity check deleted</td><td class="v died">died</td></tr>
+    <tr><td>An empty rest parameter becomes <code>nil</code> instead of <code>()</code></td><td class="v died">died (2)</td></tr>
+    <tr><td><code>0</code> is falsy</td><td class="v died">died</td></tr>
+    <tr><td>Addition wraps instead of checking for overflow</td><td class="v died">died</td></tr>
+    <tr><td>Returning truncates the slot stack to the callee&rsquo;s base</td><td class="v died">died (2)</td></tr>
+    <tr><td><code>GetSelf</code> yields <code>nil</code> rather than the running closure</td><td class="v died">died (4)</td></tr>
+  </table>
+  </div>
+
+  <div class="note clean">
+    <span class="tag">Nothing survived</span>
+    <p>Worth two lines rather than none. The interesting result is the refutation, and &ldquo;no refutation&rdquo; only means anything if the predictions were written down before the run.</p>
+  </div>
+
+  <p>One of those seven has history. The sixth is a bug that genuinely shipped into the working tree during this milestone, and it was found by a program crashing rather than by a test.</p>
+
+  <p>Returning from a call restored the wrong slot-stack length: it truncated to the <em>callee&rsquo;s</em> base instead of the caller&rsquo;s saved length. A caller&rsquo;s frame extends well above its call window — the window is allocated early and the caller keeps using slots after the call returns — so the next high slot write blew up with an index out of bounds, three subsystems away from the cause.</p>
+
+  <p>The fix was small. The useful part was turning the bug into a mutant afterwards and checking that the fix is <em>observed</em> and not merely present. It now fails two tests, so the same slip cannot come back quietly.</p>
+
+  <p>Milestone 3&rsquo;s exit condition got the same treatment. &ldquo;A tail loop runs in constant space&rdquo; is not observable from outside the VM at all — a loop that quietly grew the frame stack still prints the right answer — so the VM reports its high-water marks and the test compares a hundred thousand iterations against ten. Both numbers, frames <em>and</em> slots. Frames alone would have passed an implementation that reused frames and leaked slots, which is exactly what the sibling project measured when it found that tail-call optimization fixed its stack and not its heap.</p>
+</section>
+
+<section>
+  <span class="eyebrow">What it adds up to</span>
+  <h2>Four rounds, three kinds of failure</h2>
+
+  <p>The four passes did not find four instances of one problem. They found three distinct failure modes, and the progression is the actual result:</p>
+
+  <ul>
+    <li><strong>A dead test.</strong> The assertion ran and could not fail. Classic, well-known, and still the first thing found here.</li>
+    <li><strong>Duplicated enforcement.</strong> Two mechanisms implementing one rule, so the suite could not attribute the behaviour to either. No test can find this, because every test passes. The fix is deletion.</li>
+    <li><strong>An undistinguishing corpus.</strong> The test was right, the code was right, and the input space never separated the correct implementation from a plausible wrong one.</li>
+  </ul>
+
+  <p>Only the first is what &ldquo;mutation testing&rdquo; usually means. The second and third are questions about the shape of the verification apparatus, and nothing else in this loop asks them — not the property tests, not the golden corpus, not a careful review by the person who wrote the code.</p>
+
+  <div class="note found">
+    <span class="tag">The honest caveat</span>
+    <p>Self-run mutation found one survivor in milestone 2. A fresh context, given the same diff and none of the reasoning, found seven more in the same code an hour later. Running mutants on your own work is worth doing and is not a substitute for someone who does not already know what the code is supposed to do.</p>
+  </div>
+
+  <p>The cost is low enough to be uninteresting: change a line, run the suite, restore. Ten minutes a milestone. The discipline is entirely in writing the prediction down first, which is what separates a result from a fishing expedition — and which is why the null result in round four is reportable at all.</p>
+
+  <p>There is one procedural scar. Round two&rsquo;s fix was written <em>while a mutant was still applied</em>, and the <code>git checkout</code> that reverted the mutant reverted the fix along with it. Mutate against a clean tree, always.</p>
+</section>
+
+<section>
+  <span class="eyebrow">Where it stands</span>
+  <h2>Three milestones in</h2>
+
+  <div class="stats">
+    <div class="stat"><b>2,932</b><span>core lines / ~7,000</span></div>
+    <div class="stat"><b>53</b><span>tests, debug + release</span></div>
+    <div class="stat"><b>7</b><span>corpus programs</span></div>
+    <div class="stat"><b>38</b><span>decision records</span></div>
+    <div class="stat"><b>12</b><span>errata</span></div>
+    <div class="stat"><b>16</b><span>bytes per Value</span></div>
+  </div>
+
+  <p>The reader, the compiler, and the VM all work. A recursive function runs; a hundred thousand tail calls run in constant space; the smoke script reaches every stage but macro expansion, which is milestone 5 and is <em>supposed</em> to be red.</p>
+
+  <p>The twelve errata are their own small argument for keeping a decision log that can be corrected rather than edited. Two of them came from building rather than reviewing, and both were code sketches inside decision records: a predicted 24-byte value type measured at 16, and a data structure whose sketch could not be implemented as written alongside its own prose. The prose survived two reviews; the code blocks did not survive first contact.</p>
+
+  <p>What is not yet proven is the thing the whole design is <em>for</em>. This VM keeps its entire execution state in plain data — an explicit frame stack, flat slots, arena-indexed cells — so that a running computation can be suspended, serialized, moved, and resumed. That claim gets its oracle at milestone 8: run to fuel exhaustion, snapshot, resume in a fresh VM, and compare the full transcript against an uninterrupted run, effects included.</p>
+
+  <p>Until that test exists, the most important property in the project is an aspiration rather than a fact. Which is, more or less, the point of everything above.</p>
+</section>
+
+<footer>
+  <p>apolisp is a personal project with one user and no stability promise. Its decision log is append-only; corrections go in errata rather than over the original. The sibling projects it borrows evidence from — a register-machine Lisp in Go, and a tiny Lisp implemented eight ways in C — supplied both the mutant that started this and the tail-call measurement that shaped the test for it.</p>
+</footer>
+
+</div>
+</body>
+</html>

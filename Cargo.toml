@@ -6,4 +6,8 @@ edition = "2021"
 [dependencies]
 
 [profile.release]
-overflow-checks = true   # Q10 is open; until it is decided, debug and release must not disagree
+# ADR-037 makes *language* arithmetic checked explicitly, so the two profiles
+# agree without this. It stays for the other half: Rust-level arithmetic inside
+# the VM — slot indices, frame offsets — where an overflow is a host bug and
+# release would otherwise wrap silently.
+overflow-checks = true

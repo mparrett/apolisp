@@ -110,6 +110,53 @@ fn a_thrown_value_does_not_end_the_session() {
     assert_eq!(eval(&mut s, "z"), "9");
 }
 
+/// ADR-028 invariant 3 at the prompt: a cleanup that throws while unwinding
+/// wins, and the error it displaced is retained on the winner's suppressed
+/// chain. The session has to carry that chain out, and the prompt has to print
+/// it — a `.out` transcript has a `--- suppressed` section for the same reason,
+/// and dropping it at the REPL loses the original failure entirely.
+///
+/// Nothing else here constructs a suppressed chain, so removing the printing
+/// survived the whole suite (`notes/milestone-9-mutants.md`).
+#[test]
+fn a_suppressed_error_survives_the_session_and_reaches_the_prompt() {
+    let mut s = Session::new();
+    match s.eval("(try (throw :original) (finally (throw :from-cleanup)))") {
+        Ok(Ended::Threw(u)) => {
+            assert_eq!(printer::print(&u.value, &s.vm.interner), ":from-cleanup");
+            assert_eq!(
+                u.suppressed
+                    .iter()
+                    .map(|v| printer::print(v, &s.vm.interner))
+                    .collect::<Vec<_>>(),
+                vec![":original"],
+                "the displaced error was dropped"
+            );
+        }
+        _ => panic!("the cleanup's throw should have escaped"),
+    }
+
+    let mut child = Command::new(bin())
+        .arg("repl")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .expect("failed to start apolisp");
+    child
+        .stdin
+        .take()
+        .expect("stdin")
+        .write_all(b"(try (throw :original) (finally (throw :from-cleanup)))\n")
+        .expect("writes");
+    let out = child.wait_with_output().expect("runs");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains(":from-cleanup"), "{stdout}");
+    assert!(
+        stdout.contains("--- suppressed") && stdout.contains(":original"),
+        "the prompt dropped the suppressed chain: {stdout}"
+    );
+}
+
 /// A malformed input is a report, not a state change. `emit`ted output from
 /// before a compile failure is the interesting part: there is none, because the
 /// input never ran.

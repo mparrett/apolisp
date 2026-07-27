@@ -55,6 +55,23 @@ decision. Answering "yes, characters exist" means superseding ADR-025.
 Does `1` equal `1.0`? Decide with hashing in the same breath — equal values must
 hash equal. Include `NaN` and `-0.0`, which are where this actually bites.
 
+**Q26 — The numeric tower: what does arithmetic do with a float?**
+ADR-037 settles overflow for integers and says nothing about floats, because
+milestone 3's exit condition needed neither. So the VM's `+`, `-`, `*`, `<`, and
+`>` accept integers and **fault on a float**, naming this question. That is
+deliberate: coercing silently would settle the tower in a match arm, which is
+what rule 3 exists to stop.
+
+Decide together, because they are one question: whether `(+ 1 2.5)` is legal and
+what it produces, whether float arithmetic has its own overflow story (IEEE says
+infinity, ADR-037 says integers throw — those are different answers to the same
+shape of problem), and whether ADR-032's written-not-computed rule for `##Inf`
+survives contact with arithmetic that can *produce* one.
+
+Bears on **Q13**, which asks whether `1` equals `1.0`. A language where they are
+equal and one where `(+ 1 2.5)` is an error are not obviously the same language,
+so answering either alone risks answering the other by accident.
+
 ## Before milestone 5 — macros
 
 **Q12 — When does one namespace stop being enough?**

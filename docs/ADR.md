@@ -981,6 +981,97 @@ taxes exactly the why-comments that make the core holdable.
 
 ---
 
+### ADR-031 — The library/driver split; "until it hurts" arrived at milestone 1
+
+*(New, 2026-07-26. Advances ADR-015 one step along its own progression; does not
+supersede it.)*
+
+**Decision.** `src/lib.rs` holds the language — `error`, `value`, `reader`,
+`printer`, and every module after them, still as inline `mod` blocks in one
+file. `src/main.rs` is the process driver: arguments, file I/O, stdout, exit
+codes, and nothing else. If a change to `main.rs` changes what a program means,
+it is in the wrong file.
+
+Tests call the library for properties and the binary for golden snapshots. The
+binary path comes from `CARGO_BIN_EXE_apolisp`, never from a hand-built
+`target/debug/...`.
+
+**Why.** ADR-015 named the trigger as "a large file strains tooling" and it
+turned out to be the wrong trigger. What actually hurt was the *test boundary*:
+with no library target, `read(print(read(s))) == read(s)` could only be checked
+as *printed strings being equal*, which is a projection of the property rather
+than the property. Under that comparison `1e400` round-tripped from `Float` to
+`Sym` and the test passed (ADR-032, and demonstrated by adding the case to the
+old suite). The hand-written `Value::PartialEq` — a deliberate, load-bearing
+implementation with its own `TRAPS.md` entry — was unreachable from any test at
+all.
+
+Two smaller things came with it: every property spawned a process and wrote a
+temp file, and a hand-built binary path meant a run under a custom
+`CARGO_TARGET_DIR` compiled the tests there and executed the *old* binary in the
+repository, so the suite could pass against a stale artifact.
+
+This is the second step of ADR-015's stated progression — one file → one crate
+with file modules → library + binaries — reached earlier than expected and for a
+reason that entry did not anticipate. The single-reading-view benefit is
+retained: the library is still one file with inline `mod` blocks.
+
+**Cost.** Two files instead of one, and a public API surface that did not exist
+before. `pub` on a module is now a decision rather than a formality, and the
+temptation is to widen it for testing convenience — which is how a test suite
+starts pinning internals. The layer report reads per-file totals as well as
+inline `pub mod` markers.
+
+**Rejected.** *Staying on one file and keeping string comparison* — the property
+would remain a proxy, and the enum whose equality is hand-written would remain
+untested. *`#[cfg(test)]` unit tests inside `main.rs`* — works, but puts the
+oracle inside the artifact it checks and does not fix the stale-binary problem.
+*A workspace or multiple crates* — no deployment boundary asks for one.
+
+---
+
+### ADR-032 — Non-finite float literals are written, not computed
+
+*(New, 2026-07-26. Does not touch Q13, which owns float **equality**.)*
+
+**Decision.** Three tokens read as the floats they name: `##Inf`, `##-Inf`, and
+`##NaN`, which are Clojure's spellings and exactly what the printer already
+emits. A finite-looking literal that overflows the range — `1e400` — is a read
+error naming `##Inf` as the way to say it on purpose.
+
+Underflow is deliberately not symmetric: `1e-400` reads as zero, as it does
+everywhere else. Losing precision near zero is the ordinary condition of
+floating point; losing the value entirely is not.
+
+**Why.** The printer emitted three tokens its own reader could not read. `##Inf`
+came back as a *symbol* named `##Inf`, which printed as `##Inf` again — so the
+data changed type while the text stayed identical, and any string-level
+round-trip check agreed with itself. Closing the hole in the reader is what
+makes the round-trip property able to see the difference at all.
+
+Rejecting `1e400` follows the rule the reader already applies to an oversized
+integer: a literal whose digits are gone is a silent wrong answer, and the
+source said something the value no longer records. Ergonomics is last
+(`ETHOS.md`), and `##Inf` is one token.
+
+**Cost.** A divergence from Clojure, which reads `1e400` as `##Inf`. Anyone
+porting code that relies on overflow-to-infinity gets an error instead. The
+divergence is cheap to reverse — accepting more inputs later is safe — and
+narrowing after the fact is not, which is the direction this errs in.
+
+`##NaN` also puts a value in the reader that is not equal to itself under
+`Value::PartialEq`. That is IEEE and is Q13's to settle; until then the
+round-trip property compares floats by bit pattern, which is the right
+comparison for "did this survive the trip" regardless of how Q13 lands, and
+distinguishes `0.0` from `-0.0` as a bonus.
+
+**Rejected.** *Rejecting non-finite literals entirely* — the printer would still
+have no readable output for a float the VM can produce. *Accepting `1e400` as
+infinity* — Clojure-compatible and silent. *Deferring to Q13* — Q13 owns
+equality; a printer emitting unreadable tokens is a defect now.
+
+---
+
 ## Errata
 
 Factual corrections to entries whose **decision still stands**. A wrong reason is

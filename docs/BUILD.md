@@ -36,7 +36,7 @@ Each milestone is a runnable artifact.
 | # | Milestone | Exit condition |
 |---:|---|---|
 | 1 | Reader + printer + forms with span origins | **Done** (`ffcefa7`) — round-trip + span-invariants properties pass |
-| 2 | Core AST + slot compiler + disassembler | Golden `.disasm` for hand-written forms |
+| 2 | Core AST + slot compiler + disassembler | **Done** (`38d109c`) — `.disasm` goldens for six corpus programs |
 | 3 | VM: frames, calls, closures, `if`/`let`/`fn`, tail calls | `smoke.sh` runs a recursive function; a tail loop runs in constant space |
 | 4 | Errors, `try`/`throw`/`finally`, handler stack | Failure transcripts in the corpus; cleanup runs exactly once |
 | 5 | Macro expansion + quasiquote + gensym | `defmacro` in-language; deterministic output |
@@ -76,7 +76,7 @@ tests/corpus/<name>.xs
 tests/corpus/<name>.forms      # reader output, printed
 tests/corpus/<name>.spans      # the same forms with their origins (ADR-026)
 tests/corpus/<name>.expanded   # post-macroexpansion forms
-tests/corpus/<name>.disasm     # bytecode disassembly
+tests/corpus/<name>.disasm     # bytecode disassembly (milestone 2)
 tests/corpus/<name>.out        # execution transcript (see below)
 ```
 

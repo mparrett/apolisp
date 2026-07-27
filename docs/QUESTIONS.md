@@ -15,7 +15,7 @@ Q17 (→ADR-027), Q21 (→ADR-030).*
 
 ## Before milestone 1 — reader, printer, forms
 
-**Q20 — The v1 semantic surface.** *(Partly resolved by ADR-033.)*
+**Q20 — The v1 semantic surface.** *(Partly resolved by ADR-033 and ADR-035.)*
 "A small Lisp in the Clojure dialect" orients but does not decide. Unspecified
 and about to be filled in differently by whoever writes the code first.
 
@@ -23,6 +23,10 @@ and about to be filled in differently by whoever writes the code first.
 behaviour on under/over-supply, and variadic functions. A compiler has to emit
 *something* for each, so whichever got written first would have become the
 answer by default.
+
+**Also answered — ADR-035**, because the compiler could not emit a vector
+literal without it: `[a b]` in code position is `(vector a b)`. That says what a
+literal *means*, not which ones exist.
 
 **Still open:** duplicate map keys, which collection literals exist, characters,
 sets, and cross-type collection equality. Exception values now sit with **Q23**,
@@ -149,13 +153,28 @@ order-dependent `.forms` snapshots — the failure mode ADR-008 exists to preven
 
 ## No milestone — decide when evidence arrives
 
-**Q18 — Mutation checks as an oracle rung.** *(Evidence arrived — milestone 1.)*
+**Q18 — Mutation checks as an oracle rung.** *(Evidence arrived twice —
+milestones 1 and 2.)*
 Run against milestone 1's own span tests, two of three mutants survived: every
 origin could be `Unknown`, or every span could start at byte 0, with the suite
 staying green. Only arity was actually checked. Fixed by adding `.spans`
 goldens, which ADR-026 had already specified and the implementation had skipped.
-See `docs/notes/milestone-1-pilot.md`. The question is now whether this becomes
-a standing rung rather than whether it is worth doing once.
+See `docs/notes/milestone-1-pilot.md`.
+
+Milestone 2 ran four mutants against the compiler and one survived — and it
+found something different in kind. ADR-028 rule 2 was enforced *twice*, by the
+`tail` flag and by the region counter, so deleting either left the suite green
+and no test could say which was doing the work. The fix was to delete the
+redundancy, not to add a test. See `docs/notes/milestone-2-mutants.md`.
+
+**So the finding is broader than "tests can be dead."** A mutation check also
+finds duplicated enforcement, which nothing else in this loop looks for, and
+which a test written to pin the rule will happily pass while the mechanism it
+was written for is dead. Two milestones, two findings, nothing else caught
+either. The remaining question is only what shape the rung takes — `../reg-lisp`
+uses a `verify.sh mutate` over a hand-listed set of load-bearing lines, and that
+still looks right here: worth doing for a handful of lines per milestone, not
+worth a general framework.
 
 `../reg-lisp` found a mutant that never restored the compiler's line counter and
 *passed its entire suite*, because every test program had subexpressions on the

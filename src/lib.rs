@@ -2129,9 +2129,8 @@ pub mod compile {
 pub mod vm {
     use crate::bytecode::{CaptureSrc, Chunk, Instr, Slot};
     use crate::error::SpanOrigin;
-    use crate::printer;
     use crate::value::{
-        CellId, Closure, Interner, KwId, ListObj, MapObj, NativeId, StrObj, SymId, Value, VecObj,
+        CellId, Closure, Interner, KwId, ListObj, MapObj, NativeId, StrObj, SymId, Value,
     };
     use std::rc::Rc;
 
@@ -2239,7 +2238,7 @@ pub mod vm {
         }
     }
 
-    type NativeFn = fn(&mut Vm, &[Value]) -> Result<Value, Fault>;
+    pub type NativeFn = fn(&mut Vm, &[Value]) -> Result<Value, Fault>;
 
     struct Native {
         name: SymId,
@@ -2313,7 +2312,10 @@ pub mod vm {
                 gensym: 0,
                 out: String::new(),
             };
-            vm.install_primitives();
+            // The one edge of the `prim` seam: cut that module out and this
+            // line is the only thing that stops compiling, which is what
+            // ETHOS.md means by a boundary that exists for subtraction.
+            crate::prim::install(&mut vm);
             vm
         }
 
@@ -2352,6 +2354,12 @@ pub mod vm {
             self.gensym = 0;
         }
 
+        /// The buffered host's only write path (ADR-029: emitted effects are
+        /// part of the comparison, not something that escapes it).
+        pub fn emit(&mut self, text: &str) {
+            self.out.push_str(text);
+        }
+
         pub fn take_output(&mut self) -> String {
             std::mem::take(&mut self.out)
         }
@@ -2360,7 +2368,7 @@ pub mod vm {
             self.cells.len()
         }
 
-        fn new_cell(&mut self, value: Value) -> CellId {
+        pub fn new_cell(&mut self, value: Value) -> CellId {
             self.cells.push(CellEntry {
                 generation: 0,
                 value,
@@ -2368,7 +2376,7 @@ pub mod vm {
             CellId((self.cells.len() - 1) as u32, 0)
         }
 
-        fn cell(&self, id: CellId) -> Option<&Value> {
+        pub fn cell(&self, id: CellId) -> Option<&Value> {
             let e = self.cells.get(id.0 as usize)?;
             (e.generation == id.1).then_some(&e.value)
         }
@@ -2406,7 +2414,10 @@ pub mod vm {
             }
         }
 
-        fn native(&mut self, name: &str, min: u32, variadic: bool, f: NativeFn) {
+        /// Register a primitive as an ordinary global (ADR-038). The `prim`
+        /// module is the only caller; the VM has no opinion about which
+        /// functions exist (ADR-013).
+        pub fn native(&mut self, name: &str, min: u32, variadic: bool, f: NativeFn) {
             let sym = SymId(self.interner.intern(name));
             self.natives.push(Native {
                 name: sym,
@@ -3039,164 +3050,6 @@ pub mod vm {
         // arity error gets.
         f(vm, args).map_err(|e| Unwind::new(vm.fault_value(&e), at))
     }
-
-    // --- primitives ---------------------------------------------------------
-
-    /// ADR-038: primitives are ordinary globals, so `+` is a value you can pass
-    /// to `map` and `set-global!` can rebind it — including out from under the
-    /// program, which is the wart that entry accepts.
-    impl Vm {
-        fn install_primitives(&mut self) {
-            self.native("+", 0, true, |_, a| int_fold(a, 0, i64::checked_add, "+"));
-            self.native("*", 0, true, |_, a| int_fold(a, 1, i64::checked_mul, "*"));
-            self.native("-", 1, true, |_, a| {
-                let first = int_arg(&a[0], "-")?;
-                if a.len() == 1 {
-                    return first
-                        .checked_neg()
-                        .map(Value::Int)
-                        .ok_or_else(|| overflow("-"));
-                }
-                let mut acc = first;
-                for v in &a[1..] {
-                    acc = acc
-                        .checked_sub(int_arg(v, "-")?)
-                        .ok_or_else(|| overflow("-"))?;
-                }
-                Ok(Value::Int(acc))
-            });
-            self.native("<", 2, false, |_, a| {
-                Ok(Value::Bool(int_arg(&a[0], "<")? < int_arg(&a[1], "<")?))
-            });
-            self.native(">", 2, false, |_, a| {
-                Ok(Value::Bool(int_arg(&a[0], ">")? > int_arg(&a[1], ">")?))
-            });
-            self.native("println", 0, true, |vm, a| {
-                let line: Vec<String> = a
-                    .iter()
-                    .map(|v| printer::display(v, &vm.interner))
-                    .collect();
-                vm.out.push_str(&line.join(" "));
-                vm.out.push('\n');
-                Ok(Value::Nil)
-            });
-            // ADR-040: the explicit half of capture avoidance. Auto-gensym
-            // (`x#`) covers the common case in a template; this is for a name
-            // a macro has to compute.
-            self.native("gensym", 0, true, |vm, a| {
-                let prefix = match a.first() {
-                    None => "G".to_string(),
-                    Some(Value::Str(s)) => s.0.clone(),
-                    Some(Value::Sym(s)) => vm.interner.name(s.0).to_string(),
-                    Some(other) => {
-                        return Err(fault(
-                            Kind::Type,
-                            format!(
-                                "`gensym` needs a string or symbol prefix, not a {}",
-                                crate::value::kind_name(other)
-                            ),
-                        ))
-                    }
-                };
-                let name = vm.gensym_name(&prefix);
-                Ok(vm.interner.sym(&name))
-            });
-            self.native("list", 0, true, |_, a| {
-                Ok(Value::List(Rc::new(ListObj(a.to_vec()))))
-            });
-            // ADR-035 lowers `[a b]` to a call, so these two are what makes a
-            // collection literal mean anything. The representation itself is
-            // still Q6's, and `hash-map` keeps duplicate keys because Q20 has
-            // not said what to do with them.
-            // Quasiquote's `~@` lowers to this (ADR-040). Deliberately minimal:
-            // it takes the sequential collections that exist and yields a list.
-            // Q6 owns the general one at milestone 6.
-            self.native("concat", 0, true, |_, a| {
-                let mut out = Vec::new();
-                for v in a {
-                    match v {
-                        Value::List(l) => out.extend(l.0.iter().cloned()),
-                        Value::Vec(x) => out.extend(x.0.iter().cloned()),
-                        Value::Nil => {}
-                        other => {
-                            return Err(fault(
-                                Kind::Type,
-                                format!(
-                                    "`concat` needs lists or vectors, not a {}",
-                                    crate::value::kind_name(other)
-                                ),
-                            ))
-                        }
-                    }
-                }
-                Ok(Value::List(Rc::new(ListObj(out))))
-            });
-            // The other half of a vector template's lowering: build a list,
-            // then convert. Also Q6's, eventually.
-            self.native("vec", 1, false, |_, a| match &a[0] {
-                Value::List(l) => Ok(Value::Vec(Rc::new(VecObj(l.0.clone())))),
-                Value::Vec(x) => Ok(Value::Vec(x.clone())),
-                other => Err(fault(
-                    Kind::Type,
-                    format!(
-                        "`vec` needs a list or vector, not a {}",
-                        crate::value::kind_name(other)
-                    ),
-                )),
-            });
-            self.native("vector", 0, true, |_, a| {
-                Ok(Value::Vec(Rc::new(VecObj(a.to_vec()))))
-            });
-            self.native("hash-map", 0, true, |_, a| {
-                if !a.len().is_multiple_of(2) {
-                    return Err(fault(Kind::Arity, "`hash-map` needs a value for every key"));
-                }
-                Ok(Value::Map(Rc::new(MapObj(
-                    a.chunks(2).map(|p| (p[0].clone(), p[1].clone())).collect(),
-                ))))
-            });
-        }
-    }
-
-    fn overflow(op: &str) -> Fault {
-        fault(
-            Kind::Overflow,
-            format!("`{op}` overflowed a 64-bit integer (ADR-037)"),
-        )
-    }
-
-    /// Q26: mixing integers and floats, and float arithmetic at all, is
-    /// undecided. Faulting is the option that does not answer it by accident —
-    /// silently coercing would fix the numeric tower here, in a match arm.
-    fn int_arg(v: &Value, op: &str) -> Result<i64, Fault> {
-        match v {
-            Value::Int(i) => Ok(*i),
-            Value::Float(_) => Err(fault(
-                Kind::Undecided,
-                format!("`{op}` on a float: the numeric tower is undecided (Q26)"),
-            )),
-            other => Err(fault(
-                Kind::Type,
-                format!(
-                    "`{op}` needs an integer, not a {}",
-                    crate::value::kind_name(other)
-                ),
-            )),
-        }
-    }
-
-    fn int_fold(
-        args: &[Value],
-        init: i64,
-        op: fn(i64, i64) -> Option<i64>,
-        name: &str,
-    ) -> Result<Value, Fault> {
-        let mut acc = init;
-        for v in args {
-            acc = op(acc, int_arg(v, name)?).ok_or_else(|| overflow(name))?;
-        }
-        Ok(Value::Int(acc))
-    }
 }
 
 // ---------------------------------------------------------------------------
@@ -3782,5 +3635,174 @@ pub mod expand {
                 .map(|c| generated_origins(c, at))
                 .collect(),
         }
+    }
+}
+
+// ---------------------------------------------------------------------------
+
+/// The primitive set: values, collections, strings, bytes (ADR-038).
+///
+/// Separate from `vm` because the two answer different questions. The VM owns
+/// the call protocol and has no opinion about which functions exist (ADR-013);
+/// this module is that opinion, and cutting it out leaves a machine that runs
+/// bytecode and knows no globals.
+///
+/// Every entry here is an ordinary global, so `+` is a value you can pass to
+/// `map` and `set-global!` can rebind any of them — the wart ADR-038 accepts.
+pub mod prim {
+    use crate::printer;
+    use crate::value::{ListObj, MapObj, Value, VecObj};
+    use crate::vm::{fault, Fault, Kind, Vm};
+    use std::rc::Rc;
+
+    pub fn install(vm: &mut Vm) {
+        vm.native("+", 0, true, |_, a| int_fold(a, 0, i64::checked_add, "+"));
+        vm.native("*", 0, true, |_, a| int_fold(a, 1, i64::checked_mul, "*"));
+        vm.native("-", 1, true, |_, a| {
+            let first = int_arg(&a[0], "-")?;
+            if a.len() == 1 {
+                return first
+                    .checked_neg()
+                    .map(Value::Int)
+                    .ok_or_else(|| overflow("-"));
+            }
+            let mut acc = first;
+            for v in &a[1..] {
+                acc = acc
+                    .checked_sub(int_arg(v, "-")?)
+                    .ok_or_else(|| overflow("-"))?;
+            }
+            Ok(Value::Int(acc))
+        });
+        vm.native("<", 2, false, |_, a| {
+            Ok(Value::Bool(int_arg(&a[0], "<")? < int_arg(&a[1], "<")?))
+        });
+        vm.native(">", 2, false, |_, a| {
+            Ok(Value::Bool(int_arg(&a[0], ">")? > int_arg(&a[1], ">")?))
+        });
+        vm.native("println", 0, true, |vm, a| {
+            let line: Vec<String> = a
+                .iter()
+                .map(|v| printer::display(v, &vm.interner))
+                .collect();
+            vm.emit(&line.join(" "));
+            vm.emit("\n");
+            Ok(Value::Nil)
+        });
+        // ADR-040: the explicit half of capture avoidance. Auto-gensym
+        // (`x#`) covers the common case in a template; this is for a name
+        // a macro has to compute.
+        vm.native("gensym", 0, true, |vm, a| {
+            let prefix = match a.first() {
+                None => "G".to_string(),
+                Some(Value::Str(s)) => s.0.clone(),
+                Some(Value::Sym(s)) => vm.interner.name(s.0).to_string(),
+                Some(other) => {
+                    return Err(fault(
+                        Kind::Type,
+                        format!(
+                            "`gensym` needs a string or symbol prefix, not a {}",
+                            crate::value::kind_name(other)
+                        ),
+                    ))
+                }
+            };
+            let name = vm.gensym_name(&prefix);
+            Ok(vm.interner.sym(&name))
+        });
+        vm.native("list", 0, true, |_, a| {
+            Ok(Value::List(Rc::new(ListObj(a.to_vec()))))
+        });
+        // ADR-035 lowers `[a b]` to a call, so these two are what makes a
+        // collection literal mean anything. The representation itself is
+        // still Q6's, and `hash-map` keeps duplicate keys because Q20 has
+        // not said what to do with them.
+        // Quasiquote's `~@` lowers to this (ADR-040). Deliberately minimal:
+        // it takes the sequential collections that exist and yields a list.
+        // Q6 owns the general one at milestone 6.
+        vm.native("concat", 0, true, |_, a| {
+            let mut out = Vec::new();
+            for v in a {
+                match v {
+                    Value::List(l) => out.extend(l.0.iter().cloned()),
+                    Value::Vec(x) => out.extend(x.0.iter().cloned()),
+                    Value::Nil => {}
+                    other => {
+                        return Err(fault(
+                            Kind::Type,
+                            format!(
+                                "`concat` needs lists or vectors, not a {}",
+                                crate::value::kind_name(other)
+                            ),
+                        ))
+                    }
+                }
+            }
+            Ok(Value::List(Rc::new(ListObj(out))))
+        });
+        // The other half of a vector template's lowering: build a list,
+        // then convert. Also Q6's, eventually.
+        vm.native("vec", 1, false, |_, a| match &a[0] {
+            Value::List(l) => Ok(Value::Vec(Rc::new(VecObj(l.0.clone())))),
+            Value::Vec(x) => Ok(Value::Vec(x.clone())),
+            other => Err(fault(
+                Kind::Type,
+                format!(
+                    "`vec` needs a list or vector, not a {}",
+                    crate::value::kind_name(other)
+                ),
+            )),
+        });
+        vm.native("vector", 0, true, |_, a| {
+            Ok(Value::Vec(Rc::new(VecObj(a.to_vec()))))
+        });
+        vm.native("hash-map", 0, true, |_, a| {
+            if !a.len().is_multiple_of(2) {
+                return Err(fault(Kind::Arity, "`hash-map` needs a value for every key"));
+            }
+            Ok(Value::Map(Rc::new(MapObj(
+                a.chunks(2).map(|p| (p[0].clone(), p[1].clone())).collect(),
+            ))))
+        });
+    }
+
+    fn overflow(op: &str) -> Fault {
+        fault(
+            Kind::Overflow,
+            format!("`{op}` overflowed a 64-bit integer (ADR-037)"),
+        )
+    }
+
+    /// Q26: mixing integers and floats, and float arithmetic at all, is
+    /// undecided. Faulting is the option that does not answer it by accident —
+    /// silently coercing would fix the numeric tower here, in a match arm.
+    fn int_arg(v: &Value, op: &str) -> Result<i64, Fault> {
+        match v {
+            Value::Int(i) => Ok(*i),
+            Value::Float(_) => Err(fault(
+                Kind::Undecided,
+                format!("`{op}` on a float: the numeric tower is undecided (Q26)"),
+            )),
+            other => Err(fault(
+                Kind::Type,
+                format!(
+                    "`{op}` needs an integer, not a {}",
+                    crate::value::kind_name(other)
+                ),
+            )),
+        }
+    }
+
+    fn int_fold(
+        args: &[Value],
+        init: i64,
+        op: fn(i64, i64) -> Option<i64>,
+        name: &str,
+    ) -> Result<Value, Fault> {
+        let mut acc = init;
+        for v in args {
+            acc = op(acc, int_arg(v, name)?).ok_or_else(|| overflow(name))?;
+        }
+        Ok(Value::Int(acc))
     }
 }

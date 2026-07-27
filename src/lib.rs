@@ -58,6 +58,14 @@ pub mod error {
     pub struct LispErr {
         pub msg: String,
         pub origin: SpanOrigin,
+        /// The input ended *mid-form* rather than being wrong. Only the reader
+        /// sets it and only a REPL asks: it is the difference between "keep
+        /// typing" and "that is a syntax error" (ADR-044 part 5).
+        ///
+        /// A flag and not a test on `msg`, for ADR-039 clause 3's reason one
+        /// layer down — prose is text this project reserves the right to
+        /// reword, so nothing may depend on it.
+        pub truncated: bool,
     }
 
     impl LispErr {
@@ -65,6 +73,16 @@ pub mod error {
             LispErr {
                 msg: msg.into(),
                 origin: SpanOrigin::Source(span),
+                truncated: false,
+            }
+        }
+
+        /// The same error, marked as "the input stopped early". Every caller is
+        /// a reader path that ran out of bytes with a form still open.
+        pub fn truncated(self) -> LispErr {
+            LispErr {
+                truncated: true,
+                ..self
             }
         }
 
@@ -75,6 +93,7 @@ pub mod error {
             LispErr {
                 msg: msg.into(),
                 origin,
+                truncated: false,
             }
         }
 
@@ -617,7 +636,7 @@ pub mod reader {
             let start = self.pos;
             let b = match self.peek() {
                 Some(b) => b,
-                None => return Err(self.err_here("unexpected end of input")),
+                None => return Err(self.err_here("unexpected end of input").truncated()),
             };
 
             match b {
@@ -692,7 +711,8 @@ pub mod reader {
                         return Err(LispErr::at(
                             Span::new(start, start + 1),
                             format!("unclosed `{}`", self.src.as_bytes()[start] as char),
-                        ));
+                        )
+                        .truncated());
                     }
                     Some(b) if b == close => {
                         self.pos += 1;
@@ -722,7 +742,9 @@ pub mod reader {
                 self.skip_ws();
                 match self.peek() {
                     None => {
-                        return Err(LispErr::at(Span::new(start, start + 1), "unclosed `{`"));
+                        return Err(
+                            LispErr::at(Span::new(start, start + 1), "unclosed `{`").truncated()
+                        );
                     }
                     Some(b'}') => {
                         self.pos += 1;
@@ -746,7 +768,8 @@ pub mod reader {
                                 return Err(LispErr::at(
                                     Span::new(start, start + 1),
                                     "unclosed `{`",
-                                ))
+                                )
+                                .truncated())
                             }
                             Some(b'}') => {
                                 return Err(LispErr::at(
@@ -795,7 +818,8 @@ pub mod reader {
                         return Err(LispErr::at(
                             Span::new(start, start + 1),
                             "unclosed string literal",
-                        ))
+                        )
+                        .truncated())
                     }
                     Some(b) => b,
                 };
@@ -1916,7 +1940,40 @@ pub mod compile {
     // --- lowering -----------------------------------------------------------
 
     pub fn compile(forms: &[LocatedForm], interner: &mut Interner) -> Result<Chunk, LispErr> {
-        Ok(lower(&resolve(forms, interner)?))
+        let mut chunk = Chunk { protos: Vec::new() };
+        compile_into(&mut chunk, forms, interner)?;
+        Ok(chunk)
+    }
+
+    /// Compile into an existing chunk, appending. Returns the index of the
+    /// top-level proto this call added.
+    ///
+    /// ADR-044 part 2: a REPL session has one chunk, and each input extends it.
+    /// Existing indices never move, which is the whole trick — a closure from
+    /// an earlier input keeps naming a valid proto, so Q29's registry is not
+    /// needed to make one input's function callable from the next.
+    pub fn compile_into(
+        chunk: &mut Chunk,
+        forms: &[LocatedForm],
+        interner: &mut Interner,
+    ) -> Result<u32, LispErr> {
+        let top = resolve(forms, interner)?;
+        // Seeded with what is already there, so the counter that hands out
+        // proto indices continues rather than restarting. Every index a new
+        // instruction names is therefore an index into the whole chunk.
+        let mut lo = Lower {
+            protos: std::mem::take(&mut chunk.protos)
+                .into_iter()
+                .map(Some)
+                .collect(),
+        };
+        let idx = lo.proto(&top, Vec::new());
+        chunk.protos = lo
+            .protos
+            .into_iter()
+            .map(|p| p.expect("every reserved proto is filled in"))
+            .collect();
+        Ok(idx as u32)
     }
 
     /// Core AST to a `Chunk`. Slots come out of one monotonic counter per
@@ -2831,14 +2888,22 @@ pub mod vm {
     /// proto in frame 0, nothing else. Separate from running it because
     /// milestone 8 needs to run a program in more than one sitting.
     pub fn start(chunk: &Chunk) -> Execution {
+        start_at(chunk, 0)
+    }
+
+    /// The same, starting at a named proto rather than at the top of the file.
+    /// ADR-044 part 2: a REPL session's chunk has one top-level proto per
+    /// input, and evaluating input *n* means running the one input *n* added.
+    pub fn start_at(chunk: &Chunk, proto: u32) -> Execution {
         let top = Rc::new(Closure::Fn {
-            proto: 0,
+            proto,
             captures: Rc::from(Vec::new()),
         });
         let mut ex = Execution::new();
-        ex.slots.resize(chunk.protos[0].slots as usize, Value::Nil);
+        ex.slots
+            .resize(chunk.protos[proto as usize].slots as usize, Value::Nil);
         ex.frames.push(Frame {
-            proto: 0,
+            proto,
             pc: 0,
             base: 0,
             dst: 0,
@@ -3474,12 +3539,40 @@ pub mod expand {
         f: Value,
     }
 
+    /// The macro table, separated from the expander so it can outlive one
+    /// call. A file's table lives for one `expand_all`; a REPL session's lives
+    /// for the session, which is ADR-044 part 1 — a `defmacro` typed at the
+    /// prompt has to still be there on the next line.
+    pub struct Macros {
+        /// Looked up, never iterated — so no ordering of this map can reach
+        /// output (BUILD.md, determinism).
+        table: HashMap<SymId, Macro>,
+    }
+
+    impl Macros {
+        /// A table with the prelude already in it. Expanding the prelude is
+        /// once per *unit*, and ADR-044 makes a session one unit — so a session
+        /// pays for it once rather than once per input.
+        pub fn with_prelude(vm: &mut Vm) -> Macros {
+            let mut m = Macros {
+                table: HashMap::new(),
+            };
+            let names = Names::new(&mut vm.interner);
+            let mut ex = Expander {
+                vm,
+                names,
+                macros: &mut m.table,
+                depth: 0,
+            };
+            ex.prelude();
+            m
+        }
+    }
+
     struct Expander<'a> {
         vm: &'a mut Vm,
         names: Names,
-        /// Looked up, never iterated — so no ordering of this map can reach
-        /// output (BUILD.md, determinism).
-        macros: HashMap<SymId, Macro>,
+        macros: &'a mut HashMap<SymId, Macro>,
         depth: usize,
     }
 
@@ -3491,16 +3584,34 @@ pub mod expand {
     /// a call to it.
     pub fn expand_all(forms: Vec<LocatedForm>, vm: &mut Vm) -> Result<Vec<LocatedForm>, LispErr> {
         // Per compilation unit, so the same source expands the same way twice
-        // and a golden can pin it (BUILD.md, determinism).
+        // and a golden can pin it (BUILD.md, determinism). A file is a unit; a
+        // REPL session is also a unit, which is why `expand_in` does *not* do
+        // this (ADR-044 part 1).
         vm.reset_gensym();
+        let mut macros = Macros::with_prelude(vm);
+        expand_in(forms, vm, &mut macros)
+    }
+
+    /// Expand into an existing macro table, and do not touch the gensym
+    /// counter.
+    ///
+    /// Both omissions are the same decision. A REPL session is one unit, so its
+    /// macros accumulate across inputs and its counter runs monotonically to
+    /// the end of the session — a counter that restarted per input could mint a
+    /// name it had already handed out, which is the one thing a fresh symbol
+    /// may not do.
+    pub fn expand_in(
+        forms: Vec<LocatedForm>,
+        vm: &mut Vm,
+        macros: &mut Macros,
+    ) -> Result<Vec<LocatedForm>, LispErr> {
         let names = Names::new(&mut vm.interner);
         let mut ex = Expander {
             vm,
             names,
-            macros: HashMap::new(),
+            macros: &mut macros.table,
             depth: 0,
         };
-        ex.prelude();
         forms.into_iter().map(|f| ex.form(f)).collect()
     }
 
@@ -5420,6 +5531,106 @@ pub mod image {
             Ref::Handle(i, g) => Value::Handle(HandleId(*i, *g)),
             Ref::Buffer(i, g) => Value::Buffer(BufferId(*i, *g)),
             Ref::Obj(id) => objects[*id as usize].clone(),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+
+/// A REPL session: one `Vm`, one `Chunk`, one macro table, one gensym counter
+/// (ADR-044).
+///
+/// The semantics live here and the prompt lives in `src/main.rs`, per ADR-031 —
+/// a change in this module can change what a program means, and a change there
+/// may not. That split is why the session is testable without a terminal.
+pub mod session {
+    use crate::bytecode::Chunk;
+    use crate::error::LispErr;
+    use crate::expand::Macros;
+    use crate::value::Value;
+    use crate::vm::{Outcome, Unwind, Vm};
+    use crate::{compile, expand, reader, vm};
+
+    /// How one input ended. Not `Outcome`: a session never suspends, because
+    /// nothing fuels it, and an input that fails to *read* has not run at all —
+    /// which is a different thing from one that ran and threw.
+    pub enum Ended {
+        Value(Value),
+        Threw(Unwind),
+    }
+
+    pub struct Session {
+        pub vm: Vm,
+        /// One chunk for the whole session, extended per input. Existing proto
+        /// indices never move, so a closure defined three inputs ago still
+        /// names a valid proto (ADR-044 parts 2 and 3).
+        chunk: Chunk,
+        macros: Macros,
+    }
+
+    impl Session {
+        pub fn new() -> Session {
+            let mut vm = Vm::new();
+            // Once for the session, not once per input. The gensym counter is
+            // reset here and never again, so no two inputs can mint the same
+            // fresh name.
+            vm.reset_gensym();
+            let macros = Macros::with_prelude(&mut vm);
+            Session {
+                vm,
+                chunk: Chunk { protos: Vec::new() },
+                macros,
+            }
+        }
+
+        /// Read, expand, compile into the session's chunk, and run what was
+        /// added. The `Err` side is a failure to *build* the input; a program
+        /// that ran and threw comes back as `Ok(Ended::Threw)`, because that is
+        /// a result and not a malformed input.
+        pub fn eval(&mut self, src: &str) -> Result<Ended, LispErr> {
+            let forms = reader::read_all(src, &mut self.vm.interner)?;
+            let forms = expand::expand_in(forms, &mut self.vm, &mut self.macros)?;
+            let top = compile::compile_into(&mut self.chunk, &forms, &mut self.vm.interner)?;
+            let ex = vm::start_at(&self.chunk, top);
+            let (outcome, _, _) = vm::run_fueled(&mut self.vm, &self.chunk, ex, u64::MAX);
+            Ok(match outcome {
+                Outcome::Returned(v) => Ended::Value(v),
+                Outcome::Threw(u) => Ended::Threw(u),
+                // Nothing fuels a session. ADR-043 part 4 makes suspension a
+                // library facility for the round-trip property, and a prompt
+                // that could suspend would need somewhere to put the
+                // `Execution` — which is ADR-044's open clause, not this.
+                Outcome::Suspended => unreachable!("a session runs un-fuelled"),
+            })
+        }
+
+        /// Everything the input emitted. Drained per input, so output arrives
+        /// interleaved with prompts rather than at the end of the session.
+        pub fn take_output(&mut self) -> String {
+            self.vm.take_output()
+        }
+    }
+
+    impl Default for Session {
+        fn default() -> Session {
+            Session::new()
+        }
+    }
+
+    /// Is this buffer a complete input, or did the user stop mid-form?
+    ///
+    /// A flag on the reader's error rather than a second parser or a delimiter
+    /// count (ADR-044 part 5). Counting brackets gets strings and comments
+    /// wrong, and the reader already knows the answer exactly — the only thing
+    /// missing was a way to ask that did not involve matching on prose.
+    /// Reads into a throwaway interner, never the session's. An abandoned line
+    /// would otherwise leave its symbols interned — harmless to run, but they
+    /// reach an `Image`, and a session's symbol table should hold what was
+    /// evaluated rather than what was typed.
+    pub fn wants_more(src: &str) -> bool {
+        match reader::read_all(src, &mut crate::value::Interner::new()) {
+            Err(e) => e.truncated,
+            Ok(_) => false,
         }
     }
 }

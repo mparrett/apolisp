@@ -4,17 +4,24 @@
 //! anything about the language — if a change to this file changes what a
 //! program means, it is in the wrong file.
 
+use apolisp::session::{self, Ended, Session};
 use apolisp::{bytecode, compile, expand, printer, reader, value, vm};
+use std::io::Write;
 use std::process::ExitCode;
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().collect();
     if args.len() < 2 {
-        eprintln!("usage: apolisp <read|spans|sizes|expand|compile|run> [file.xs]");
+        eprintln!("usage: apolisp <read|spans|sizes|repl|expand|compile|run> [file.xs]");
         return ExitCode::from(2);
     }
     if args[1] == "sizes" {
         return report_sizes();
+    }
+    // Milestone 9. The only command with no file: a session's input is the
+    // session, and there is nothing to read off disk (ADR-044 part 1).
+    if args[1] == "repl" {
+        return repl();
     }
     if args.len() < 3 {
         eprintln!("usage: apolisp <read|spans|expand|compile|run> <file.xs>");
@@ -168,6 +175,73 @@ fn main() -> ExitCode {
         _ => {
             eprintln!("apolisp: unknown command `{cmd}`");
             ExitCode::from(2)
+        }
+    }
+}
+
+/// The prompt. Everything about *what an input means* is in `session`; this
+/// function owns stdin, the two prompts, and when to stop (ADR-031).
+///
+/// A thrown value does not end the session. ADR-039 gives the VM one failure
+/// path that leaves the machine usable afterwards, and ADR-044 part 5 spends
+/// that guarantee here rather than re-earning it: a REPL that died on a typo is
+/// not a development interface.
+fn repl() -> ExitCode {
+    let mut s = Session::new();
+    let mut buffered = String::new();
+    loop {
+        // `> ` for a new form, `  ` for a continuation, so a half-typed form is
+        // visible as one. Flushed explicitly because a prompt has no newline
+        // and would otherwise sit in the buffer until after the answer.
+        print!("{}", if buffered.is_empty() { "> " } else { "  " });
+        if std::io::stdout().flush().is_err() {
+            return ExitCode::FAILURE;
+        }
+        let mut line = String::new();
+        match std::io::stdin().read_line(&mut line) {
+            // End of input. A form still open at EOF is abandoned rather than
+            // guessed at.
+            Ok(0) => {
+                println!();
+                return ExitCode::SUCCESS;
+            }
+            Ok(_) => {}
+            Err(e) => {
+                eprintln!("apolisp: {e}");
+                return ExitCode::FAILURE;
+            }
+        }
+        buffered.push_str(&line);
+        if buffered.trim().is_empty() {
+            buffered.clear();
+            continue;
+        }
+        // Keep typing only when the reader says the input stopped *mid-form*.
+        // A genuine syntax error falls through to `eval`, which reports it —
+        // waiting for more input on a malformed line would hang the prompt on a
+        // typo (ADR-044 part 5).
+        if session::wants_more(&buffered) {
+            continue;
+        }
+        let src = std::mem::take(&mut buffered);
+        match s.eval(&src) {
+            Ok(ended) => {
+                print!("{}", s.take_output());
+                match ended {
+                    Ended::Value(v) => println!("{}", printer::print(&v, &s.vm.interner)),
+                    // The same sections a `.out` transcript uses, minus the
+                    // exit status — there is no exit, which is the point.
+                    Ended::Threw(u) => {
+                        println!("--- threw\n{}", printer::print(&u.value, &s.vm.interner));
+                        for v in &u.suppressed {
+                            println!("--- suppressed\n{}", printer::print(v, &s.vm.interner));
+                        }
+                    }
+                }
+            }
+            // `<repl>` rather than a path: the position is real, and the file
+            // it points into is the line just typed.
+            Err(e) => println!("{}", e.render("<repl>", &src)),
         }
     }
 }

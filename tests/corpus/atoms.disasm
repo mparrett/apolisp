@@ -1,0 +1,29 @@
+proto 0  <top>  params 0  slots 14
+  constants
+    k0  nil
+    k1  true
+    k2  false
+    k3  0
+    k4  -17
+    k5  1.5
+    k6  -0.25
+    k7  "a string"
+    k8  "escapes: \" \\ \n \t"
+    k9  :keyword
+    k10  :ns/qualified
+  code
+    0000  CONST       r1 <- k0               2:1
+    0001  CONST       r2 <- k1               3:1
+    0002  CONST       r3 <- k2               4:1
+    0003  CONST       r4 <- k3               5:1
+    0004  CONST       r5 <- k4               6:1
+    0005  CONST       r6 <- k5               7:1
+    0006  CONST       r7 <- k6               8:1
+    0007  CONST       r8 <- k7               9:1
+    0008  CONST       r9 <- k8               10:1
+    0009  GETGLOBAL   r10 <- sym             11:1
+    0010  GETGLOBAL   r11 <- +               12:1
+    0011  GETGLOBAL   r12 <- some/qualified  13:1
+    0012  CONST       r13 <- k9              14:1
+    0013  CONST       r0 <- k10              15:1
+    0014  RETURN      r0                     2:1

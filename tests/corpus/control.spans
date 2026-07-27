@@ -1,0 +1,57 @@
+134..159 list (if (ready?) (go) (wait))
+  135..137 symbol if
+  138..146 list (ready?)
+    139..145 symbol ready?
+  147..151 list (go)
+    148..150 symbol go
+  152..158 list (wait)
+    153..157 symbol wait
+160..178 list (if (ready?) (go))
+  161..163 symbol if
+  164..172 list (ready?)
+    165..171 symbol ready?
+  173..177 list (go)
+    174..176 symbol go
+234..252 list (do (one) (two) 3)
+  235..237 symbol do
+  238..243 list (one)
+    239..242 symbol one
+  244..249 list (two)
+    245..248 symbol two
+  250..251 int 3
+562..636 list (try (throw {:kind :boom}) (catch e (report e)) (finally (cleanup)))
+  563..566 symbol try
+  569..590 list (throw {:kind :boom})
+    570..575 symbol throw
+    576..589 map {:kind :boom}
+      577..582 keyword :kind
+      583..588 keyword :boom
+  593..613 list (catch e (report e))
+    594..599 symbol catch
+    600..601 symbol e
+    602..612 list (report e)
+      603..609 symbol report
+      610..611 symbol e
+  616..635 list (finally (cleanup))
+    617..624 symbol finally
+    625..634 list (cleanup)
+      626..633 symbol cleanup
+638..671 list (try (risky) (finally (cleanup)))
+  639..642 symbol try
+  643..650 list (risky)
+    644..649 symbol risky
+  651..670 list (finally (cleanup))
+    652..659 symbol finally
+    660..669 list (cleanup)
+      661..668 symbol cleanup
+752..774 list (set-cell! (cell 0) 1)
+  753..762 symbol set-cell!
+  763..771 list (cell 0)
+    764..768 symbol cell
+    769..770 int 0
+  772..773 int 1
+896..919 list (set-global! answer 42)
+  897..908 symbol set-global!
+  909..915 symbol answer
+  916..918 int 42
+ok: span invariants hold

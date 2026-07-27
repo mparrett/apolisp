@@ -13,36 +13,13 @@ use apolisp::{printer, reader, value};
 use std::path::PathBuf;
 use std::process::Command;
 
+mod common;
+use common::{bin, check_goldens, corpus_files, repo_root};
+
 // Properties call the library directly (ADR-031), so `read(print(read(s)))` is
 // compared on values rather than on printed strings. Snapshots still run the
 // binary, because a golden file pins the artifact `just bless` regenerates and
 // two producers of the same text would drift.
-
-fn repo_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-}
-
-/// The binary cargo built for *this* test run. Reconstructing
-/// `target/debug/apolisp` by hand runs a stale artifact under a custom
-/// `CARGO_TARGET_DIR`, which is a green suite testing yesterday's code.
-fn bin() -> &'static str {
-    env!("CARGO_BIN_EXE_apolisp")
-}
-
-fn run_cmd(cmd: &str, path: &std::path::Path) -> Result<String, String> {
-    let out = Command::new(bin())
-        .arg(cmd)
-        .arg(path)
-        .output()
-        .expect("failed to run apolisp");
-    let stdout = String::from_utf8_lossy(&out.stdout).into_owned();
-    let stderr = String::from_utf8_lossy(&out.stderr).into_owned();
-    if out.status.success() {
-        Ok(stdout)
-    } else {
-        Err(stderr)
-    }
-}
 
 fn read(src: &str) -> Result<(Vec<LocatedForm>, Interner), String> {
     let mut interner = Interner::new();
@@ -59,21 +36,6 @@ fn print_all(forms: &[LocatedForm], interner: &Interner) -> String {
         out.push('\n');
     }
     out
-}
-
-fn corpus_files() -> Vec<PathBuf> {
-    let mut dir = repo_root();
-    dir.push("tests/corpus");
-    let mut files: Vec<PathBuf> = std::fs::read_dir(&dir)
-        .expect("tests/corpus missing")
-        .filter_map(|e| e.ok().map(|e| e.path()))
-        .filter(|p| p.extension().is_some_and(|e| e == "xs"))
-        .collect();
-    // Directory order is not deterministic across machines, and a test that
-    // reports failures in a different order each run is a test people stop
-    // reading (BUILD.md, determinism).
-    files.sort();
-    files
 }
 
 // --- Value identity for the round-trip property -----------------------------
@@ -312,40 +274,6 @@ fn every_syntactic_child_has_an_origin() {
 
 // --- Golden snapshots -------------------------------------------------------
 
-fn check_goldens(cmd: &str, ext: &str) {
-    let mut missing = Vec::new();
-    let mut diffs = Vec::new();
-
-    for path in corpus_files() {
-        let actual = run_cmd(cmd, &path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
-        let golden = path.with_extension(ext);
-        match std::fs::read_to_string(&golden) {
-            Err(_) => missing.push(golden),
-            Ok(expected) if expected != actual => diffs.push(format!(
-                "--- {}\nexpected:\n{expected}\nactual:\n{actual}",
-                golden.display()
-            )),
-            Ok(_) => {}
-        }
-    }
-
-    // A missing golden file is a failure with instructions, never a silent
-    // write. Creating it automatically would mean the first run of a broken
-    // reader pins the broken behaviour.
-    if !missing.is_empty() {
-        let names: Vec<String> = missing
-            .iter()
-            .map(|p| p.file_name().unwrap().to_string_lossy().into_owned())
-            .collect();
-        panic!(
-            "missing golden files: {}\nreview the output and write them by hand \
-             (`apolisp {cmd} <file>`), or run `just bless` once you have read the diff",
-            names.join(", ")
-        );
-    }
-    assert!(diffs.is_empty(), "{}", diffs.join("\n"));
-}
-
 /// Rung 3 (BUILD.md). One phase per file; milestone 1 owns `.forms`.
 #[test]
 fn forms_snapshots_match() {
@@ -529,10 +457,13 @@ fn a_number_that_does_not_fit_is_an_error_not_a_symbol() {
 ///
 /// The code is load-bearing, not cosmetic. `smoke.sh` runs the stages in
 /// pipeline order, which is not the order they are built in — expand is
-/// milestone 5, compile and run are 2 and 3 — so it distinguishes "not built
-/// yet" from "ran and failed" by this number alone. Without it the script
-/// either stops at the first gap, hiding milestones 2 and 3 behind milestone 5,
-/// or treats a genuine failure as pending.
+/// milestone 5, while compile and run are 2 and 3 — so it distinguishes "not
+/// built yet" from "ran and failed" by this number alone. Without it the script
+/// either stops at the first gap, hiding a landed milestone behind a pending
+/// one, or treats a genuine failure as pending.
+///
+/// `compile` left this list at milestone 2. `expand` and `run` leave it at 5
+/// and 3.
 #[test]
 fn unimplemented_stages_exit_with_the_pending_code() {
     // Keep in sync with EXIT_NOT_IMPLEMENTED in src/main.rs and NOT_IMPLEMENTED
@@ -541,7 +472,7 @@ fn unimplemented_stages_exit_with_the_pending_code() {
 
     let mut path = repo_root();
     path.push("tests/corpus/hello.xs");
-    for cmd in ["expand", "compile", "run"] {
+    for cmd in ["expand", "run"] {
         let out = Command::new(bin())
             .arg(cmd)
             .arg(&path)

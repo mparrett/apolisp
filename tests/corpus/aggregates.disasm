@@ -1,0 +1,66 @@
+proto 0  <top>  params 0  slots 52
+  constants
+    k0  ()
+    k1  1
+    k2  2
+    k3  3
+    k4  :a
+    k5  :b
+    k6  :nested
+    k7  :deep
+    k8  :x
+    k9  nil
+  code
+    0000  CONST       r1 <- k0               2:1
+    0001  GETGLOBAL   r3 <- vector           3:1
+    0002  CALL        r2 <- r3(0)            3:1
+    0003  GETGLOBAL   r5 <- hash-map         4:1
+    0004  CALL        r4 <- r5(0)            4:1
+    0005  CONST       r7 <- k1               5:2
+    0006  CONST       r8 <- k2               5:4
+    0007  CONST       r9 <- k3               5:6
+    0008  CALL        r6 <- r7(2)            5:1
+    0009  GETGLOBAL   r11 <- vector          6:1
+    0010  CONST       r12 <- k1              6:2
+    0011  GETGLOBAL   r14 <- vector          6:4
+    0012  CONST       r15 <- k2              6:5
+    0013  GETGLOBAL   r17 <- vector          6:7
+    0014  CONST       r18 <- k3              6:8
+    0015  CALL        r16 <- r17(1)          6:7
+    0016  CALL        r13 <- r14(2)          6:4
+    0017  CALL        r10 <- r11(2)          6:1
+    0018  GETGLOBAL   r20 <- hash-map        7:1
+    0019  CONST       r21 <- k4              7:2
+    0020  CONST       r22 <- k1              7:5
+    0021  CONST       r23 <- k5              7:7
+    0022  CONST       r24 <- k2              7:10
+    0023  CALL        r19 <- r20(4)          7:1
+    0024  GETGLOBAL   r26 <- hash-map        8:1
+    0025  CONST       r27 <- k6              8:2
+    0026  GETGLOBAL   r29 <- hash-map        8:10
+    0027  CONST       r30 <- k7              8:11
+    0028  GETGLOBAL   r32 <- vector          8:17
+    0029  CONST       r33 <- k1              8:18
+    0030  CONST       r34 <- k2              8:20
+    0031  GETGLOBAL   r36 <- hash-map        8:22
+    0032  CONST       r37 <- k8              8:23
+    0033  CONST       r38 <- k9              8:26
+    0034  CALL        r35 <- r36(2)          8:22
+    0035  CALL        r31 <- r32(3)          8:17
+    0036  CALL        r28 <- r29(2)          8:10
+    0037  CALL        r25 <- r26(2)          8:1
+    0038  GETGLOBAL   r40 <- defn            9:2
+    0039  GETGLOBAL   r41 <- square          9:7
+    0040  GETGLOBAL   r44 <- vector          9:14
+    0041  GETGLOBAL   r45 <- x               9:15
+    0042  CALL        r42 <- r44(1)          9:14
+    0043  GETGLOBAL   r46 <- *               9:19
+    0044  GETGLOBAL   r47 <- x               9:21
+    0045  GETGLOBAL   r48 <- x               9:23
+    0046  CALL        r43 <- r46(2)          9:18
+    0047  CALL        r39 <- r40(3)          9:1
+    0048  GETGLOBAL   r49 <- a               10:2
+    0049  GETGLOBAL   r50 <- b               10:5
+    0050  GETGLOBAL   r51 <- c               10:8
+    0051  TAILCALL    r49(2)                 10:1
+    0052  RETURN      r0                     2:1

@@ -1,0 +1,60 @@
+138..232 list (set-global! nested (fn [a] (let [b 2] (fn [c] (fn [d] (list a b c d))))))
+  139..150 symbol set-global!
+  151..157 symbol nested
+  160..231 list (fn [a] (let [b 2] (fn [c] (fn [d] (list a b c d)))))
+    161..163 symbol fn
+    164..167 vector [a]
+      165..166 symbol a
+    172..230 list (let [b 2] (fn [c] (fn [d] (list a b c d))))
+      173..176 symbol let
+      177..182 vector [b 2]
+        178..179 symbol b
+        180..181 int 2
+      189..229 list (fn [c] (fn [d] (list a b c d)))
+        190..192 symbol fn
+        193..196 vector [c]
+          194..195 symbol c
+        205..228 list (fn [d] (list a b c d))
+          206..208 symbol fn
+          209..212 vector [d]
+            210..211 symbol d
+          213..227 list (list a b c d)
+            214..218 symbol list
+            219..220 symbol a
+            221..222 symbol b
+            223..224 symbol c
+            225..226 symbol d
+365..479 list (set-global! count-down (fn count-down [n acc] (if (< n 1) acc (count-down (- n 1) (+ acc n)))))
+  366..377 symbol set-global!
+  378..388 symbol count-down
+  391..478 list (fn count-down [n acc] (if (< n 1) acc (count-down (- n 1) (+ acc n))))
+    392..394 symbol fn
+    395..405 symbol count-down
+    406..413 vector [n acc]
+      407..408 symbol n
+      409..412 symbol acc
+    418..477 list (if (< n 1) acc (count-down (- n 1) (+ acc n)))
+      419..421 symbol if
+      422..429 list (< n 1)
+        423..424 symbol <
+        425..426 symbol n
+        427..428 int 1
+      436..439 symbol acc
+      446..476 list (count-down (- n 1) (+ acc n))
+        447..457 symbol count-down
+        458..465 list (- n 1)
+          459..460 symbol -
+          461..462 symbol n
+          463..464 int 1
+        466..475 list (+ acc n)
+          467..468 symbol +
+          469..472 symbol acc
+          473..474 symbol n
+633..660 list (fn [head & others] others)
+  634..636 symbol fn
+  637..652 vector [head & others]
+    638..642 symbol head
+    643..644 symbol &
+    645..651 symbol others
+  653..659 symbol others
+ok: span invariants hold

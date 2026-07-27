@@ -1,0 +1,66 @@
+proto 0  <top>  params 0  slots 3
+  code
+    0000  CLOSURE     r1 <- proto 1          4:3
+    0001  SETGLOBAL   nested <- r1           3:1
+    0002  CLOSURE     r2 <- proto 4          12:3
+    0003  SETGLOBAL   count-down <- r2       11:1
+    0004  CLOSURE     r0 <- proto 5          19:1
+    0005  RETURN      r0                     3:1
+
+proto 1  <fn>  params 1  slots 3
+  constants
+    k0  2
+  code
+    0000  CONST       r2 <- k0               5:13
+    0001  CLOSURE     r1 <- proto 2          6:7
+    0002  RETURN      r1                     4:3
+
+proto 2  <fn>  params 1  slots 2
+  captures
+    c0  local r0
+    c1  local r2
+  code
+    0000  CLOSURE     r1 <- proto 3          7:9
+    0001  RETURN      r1                     6:7
+
+proto 3  <fn>  params 1  slots 7
+  captures
+    c0  capture c0
+    c1  capture c1
+    c2  local r0
+  code
+    0000  GETGLOBAL   r2 <- list             7:18
+    0001  GETCAP      r3 <- c0               7:23
+    0002  GETCAP      r4 <- c1               7:25
+    0003  GETCAP      r5 <- c2               7:27
+    0004  MOVE        r6 <- r0               7:29
+    0005  TAILCALL    r2(4)                  7:17
+    0006  RETURN      r1                     7:9
+
+proto 4  count-down  params 2  slots 16
+  constants
+    k0  1
+  code
+    0000  GETGLOBAL   r4 <- <                13:10
+    0001  MOVE        r5 <- r0               13:12
+    0002  CONST       r6 <- k0               13:14
+    0003  CALL        r3 <- r4(2)            13:9
+    0004  JUMPUNLESS  r3, 0007               13:5
+    0005  MOVE        r2 <- r1               14:7
+    0006  JUMP        0017                   13:5
+    0007  GETSELF     r7 <- self             15:8
+    0008  GETGLOBAL   r10 <- -               15:20
+    0009  MOVE        r11 <- r0              15:22
+    0010  CONST       r12 <- k0              15:24
+    0011  CALL        r8 <- r10(2)           15:19
+    0012  GETGLOBAL   r13 <- +               15:28
+    0013  MOVE        r14 <- r1              15:30
+    0014  MOVE        r15 <- r0              15:34
+    0015  CALL        r9 <- r13(2)           15:27
+    0016  TAILCALL    r7(2)                  15:7
+    0017  RETURN      r2                     12:3
+
+proto 5  <fn>  params 1 &rest  slots 3
+  code
+    0000  MOVE        r2 <- r1               19:21
+    0001  RETURN      r2                     19:1

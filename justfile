@@ -55,7 +55,7 @@ hooks:
 # the diff and says why. Generating is what *creates* the diff — so generate
 # deliberately, then justify every hunk before committing.
 bless:
-    for f in tests/corpus/*.xs; do cargo run --quiet -- read "$f" > "${f%.xs}.forms"; cargo run --quiet -- spans "$f" > "${f%.xs}.spans"; done
+    for f in tests/corpus/*.xs; do cargo run --quiet -- read "$f" > "${f%.xs}.forms"; cargo run --quiet -- spans "$f" > "${f%.xs}.spans"; cargo run --quiet -- compile "$f" > "${f%.xs}.disasm"; done
     @echo 'goldens regenerated — run `git diff` and justify every hunk before committing'
 
 # Constraint #1, on demand. The budget test prints the same numbers per layer.

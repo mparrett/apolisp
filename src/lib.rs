@@ -68,6 +68,16 @@ pub mod error {
             }
         }
 
+        /// For phases downstream of the reader, whose input may be generated
+        /// rather than read. A compiler error on macro output has no file
+        /// position, and inventing one is worse than saying so (ADR-026).
+        pub fn at_origin(origin: SpanOrigin, msg: impl Into<String>) -> LispErr {
+            LispErr {
+                msg: msg.into(),
+                origin,
+            }
+        }
+
         /// Render with 1-based line and column, resolved against the source
         /// the span came from.
         pub fn render(&self, path: &str, src: &str) -> String {
@@ -875,6 +885,1141 @@ pub mod printer {
             s
         } else {
             format!("{s}.0")
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+
+/// The instruction set, the compiled function, and the disassembler (ADR-034).
+///
+/// Instructions are a typed enum with `u32` operands rather than packed words.
+/// E-5 corrected ADR-006's claim that monotonic slots avoid a wider encoding —
+/// no reuse raises the maximum live slot index, so a packed format's operand
+/// fields are exactly what comes under pressure. Unpacked, there is no width
+/// left to run out of.
+pub mod bytecode {
+    use crate::error::{line_col, SpanOrigin};
+    use crate::printer;
+    use crate::value::{Interner, SymId, Value};
+
+    pub type Slot = u32;
+    pub type ConstIdx = u32;
+    pub type Pc = u32;
+    pub type ProtoIdx = u32;
+    pub type CaptureIdx = u32;
+
+    /// A call's callee sits at `base` and its arguments at `base+1 ..= base+argc`
+    /// — where left-to-right evaluation into monotonically allocated slots puts
+    /// them anyway (ADR-033). The callee's frame receives the arguments in its
+    /// own slots `0..argc`, so parameters are the first slots of a frame by
+    /// construction.
+    #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+    pub enum Instr {
+        Const {
+            dst: Slot,
+            k: ConstIdx,
+        },
+        Move {
+            dst: Slot,
+            src: Slot,
+        },
+        /// The operand is the interned name, not a `CellId`: forward references
+        /// then need no fixup, and the disassembly does not depend on the order
+        /// globals were defined in (ADR-034). The VM still owns the cell
+        /// (ADR-027).
+        GetGlobal {
+            dst: Slot,
+            name: SymId,
+        },
+        SetGlobal {
+            name: SymId,
+            src: Slot,
+        },
+        GetCapture {
+            dst: Slot,
+            idx: CaptureIdx,
+        },
+        /// ADR-002: self-recursion resolves through the running closure's own
+        /// identity, never through a capture.
+        GetSelf {
+            dst: Slot,
+        },
+        SetCell {
+            cell: Slot,
+            src: Slot,
+        },
+        Closure {
+            dst: Slot,
+            proto: ProtoIdx,
+        },
+        Call {
+            dst: Slot,
+            base: Slot,
+            argc: u32,
+        },
+        TailCall {
+            base: Slot,
+            argc: u32,
+        },
+        Return {
+            src: Slot,
+        },
+        Jump {
+            target: Pc,
+        },
+        /// Only `nil` and `false` are falsy (`TRAPS.md`).
+        JumpUnless {
+            cond: Slot,
+            target: Pc,
+        },
+        Throw {
+            src: Slot,
+        },
+        PushHandler {
+            catch: Pc,
+            err: Slot,
+        },
+        PushFinally {
+            target: Pc,
+        },
+        PopHandler,
+        EndFinally,
+    }
+
+    /// ADR-034 asserts this the way ADR-025 asserts `Value`'s: the number is
+    /// measured, not assumed. The point of not packing was to stop paying
+    /// attention to operand widths, and the assertion is what keeps that from
+    /// becoming an excuse for an instruction that carries a `String`.
+    pub const INSTR_SIZE_LIMIT: usize = 16;
+
+    pub fn instr_size() -> usize {
+        std::mem::size_of::<Instr>()
+    }
+
+    /// Where a capture's value comes from, read in the **enclosing** frame at
+    /// the moment `Closure` runs. Copied, not referenced — that is the whole of
+    /// ADR-002.
+    #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+    pub enum CaptureSrc {
+        Local(Slot),
+        Capture(CaptureIdx),
+        SelfFn,
+    }
+
+    /// One compiled function. A *prototype* rather than a function because it
+    /// holds no captured values: a closure is this plus the values captured at
+    /// the moment it was created.
+    #[derive(Debug)]
+    pub struct Proto {
+        pub name: Option<SymId>,
+        /// Named parameters, including the rest parameter when `variadic`.
+        pub params: u32,
+        pub variadic: bool,
+        pub slots: u32,
+        pub code: Vec<Instr>,
+        /// ADR-023 point 2: `lines[i]` is the origin of the instruction at `i`.
+        /// Kept parallel to `code` by construction — every instruction is
+        /// emitted through one function that pushes to both.
+        pub lines: Vec<SpanOrigin>,
+        pub consts: Vec<Value>,
+        pub captures: Vec<CaptureSrc>,
+    }
+
+    /// What compiling one file produces: `protos[0]` is the top level, and
+    /// every nested `fn` is an index into this vector, reserved in source order
+    /// so the disassembly is stable (ADR-034).
+    #[derive(Debug)]
+    pub struct Chunk {
+        pub protos: Vec<Proto>,
+    }
+
+    pub fn disassemble(chunk: &Chunk, interner: &Interner, src: &str) -> String {
+        let mut out = String::new();
+        for (i, p) in chunk.protos.iter().enumerate() {
+            if i > 0 {
+                out.push('\n');
+            }
+            disasm_proto(&mut out, i, p, interner, src);
+        }
+        out
+    }
+
+    fn disasm_proto(out: &mut String, idx: usize, p: &Proto, interner: &Interner, src: &str) {
+        let name = match (p.name, idx) {
+            (Some(s), _) => interner.name(s.0),
+            (None, 0) => "<top>",
+            (None, _) => "<fn>",
+        };
+        let params = if p.variadic {
+            format!("{} &rest", p.params - 1)
+        } else {
+            p.params.to_string()
+        };
+        out.push_str(&format!(
+            "proto {idx}  {name}  params {params}  slots {}\n",
+            p.slots
+        ));
+        if !p.consts.is_empty() {
+            out.push_str("  constants\n");
+            for (k, v) in p.consts.iter().enumerate() {
+                out.push_str(&format!("    k{k}  {}\n", printer::print(v, interner)));
+            }
+        }
+        if !p.captures.is_empty() {
+            out.push_str("  captures\n");
+            for (c, s) in p.captures.iter().enumerate() {
+                let from = match *s {
+                    CaptureSrc::Local(slot) => format!("local r{slot}"),
+                    CaptureSrc::Capture(i) => format!("capture c{i}"),
+                    CaptureSrc::SelfFn => "self".to_string(),
+                };
+                out.push_str(&format!("    c{c}  {from}\n"));
+            }
+        }
+        out.push_str("  code\n");
+        for (pc, ins) in p.code.iter().enumerate() {
+            let (mnemonic, operands) = render(ins, interner);
+            out.push_str(&format!(
+                "    {pc:04}  {mnemonic:<11} {operands:<22} {}\n",
+                position(p.lines[pc], src)
+            ));
+        }
+    }
+
+    /// The position half of ADR-023 point 2. `../reg-lisp`'s completeness test
+    /// found *every* function's return attributed to line 0 — a hole a corpus
+    /// does not surface, because the output still looks right — so the position
+    /// prints on every instruction rather than where it seems interesting.
+    fn position(o: SpanOrigin, src: &str) -> String {
+        match o {
+            SpanOrigin::Source(s) => {
+                let (line, col) = line_col(src, s.start as usize);
+                format!("{line}:{col}")
+            }
+            SpanOrigin::Generated(s) => {
+                let (line, col) = line_col(src, s.start as usize);
+                format!("generated {line}:{col}")
+            }
+            SpanOrigin::Unknown => "?".to_string(),
+        }
+    }
+
+    fn render(i: &Instr, interner: &Interner) -> (&'static str, String) {
+        match *i {
+            Instr::Const { dst, k } => ("CONST", format!("r{dst} <- k{k}")),
+            Instr::Move { dst, src } => ("MOVE", format!("r{dst} <- r{src}")),
+            Instr::GetGlobal { dst, name } => {
+                ("GETGLOBAL", format!("r{dst} <- {}", interner.name(name.0)))
+            }
+            Instr::SetGlobal { name, src } => {
+                ("SETGLOBAL", format!("{} <- r{src}", interner.name(name.0)))
+            }
+            Instr::GetCapture { dst, idx } => ("GETCAP", format!("r{dst} <- c{idx}")),
+            Instr::GetSelf { dst } => ("GETSELF", format!("r{dst} <- self")),
+            Instr::SetCell { cell, src } => ("SETCELL", format!("[r{cell}] <- r{src}")),
+            Instr::Closure { dst, proto } => ("CLOSURE", format!("r{dst} <- proto {proto}")),
+            Instr::Call { dst, base, argc } => ("CALL", format!("r{dst} <- r{base}({argc})")),
+            Instr::TailCall { base, argc } => ("TAILCALL", format!("r{base}({argc})")),
+            Instr::Return { src } => ("RETURN", format!("r{src}")),
+            Instr::Jump { target } => ("JUMP", format!("{target:04}")),
+            Instr::JumpUnless { cond, target } => ("JUMPUNLESS", format!("r{cond}, {target:04}")),
+            Instr::Throw { src } => ("THROW", format!("r{src}")),
+            Instr::PushHandler { catch, err } => {
+                ("PUSHHANDLER", format!("catch {catch:04}, err r{err}"))
+            }
+            Instr::PushFinally { target } => ("PUSHFINALLY", format!("{target:04}")),
+            Instr::PopHandler => ("POPHANDLER", String::new()),
+            Instr::EndFinally => ("ENDFINALLY", String::new()),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+
+/// The core AST and the slot compiler (ADR-006, ADR-007, ADR-034).
+///
+/// Two passes. The resolver turns forms into `Core`, deciding what every symbol
+/// *is* — a local, a capture, the running function itself, or a global — and
+/// nothing about layout. The lowering assigns slots monotonically and emits
+/// instructions. Splitting them is what keeps slot allocation in one place:
+/// bindings and temporaries come out of the same counter, which is the whole of
+/// "no liveness analysis, no reuse".
+pub mod compile {
+    use crate::bytecode::{
+        CaptureIdx, CaptureSrc, Chunk, ConstIdx, Instr, Pc, Proto, ProtoIdx, Slot,
+    };
+    use crate::error::{LispErr, SpanOrigin};
+    use crate::value::{kind_name, Interner, LocatedForm, Origins, SymId, Value};
+
+    pub type LocalId = u32;
+
+    // --- the core AST -------------------------------------------------------
+
+    /// The closed core (ADR-007, amended by ADR-027, spelled by ADR-034). Read
+    /// this enum and you have read the language.
+    ///
+    /// Thirteen forms, more variants: `literal` absorbs `quote`, and `local`
+    /// arrives as one of three resolutions — a slot in this frame, a capture, or
+    /// the running closure itself. Which one it is is the resolver's whole job.
+    #[derive(Debug)]
+    pub enum Core {
+        Literal(Value),
+        Local(LocalId),
+        Capture(CaptureIdx),
+        SelfFn,
+        Global(SymId),
+        If(Box<Expr>, Box<Expr>, Box<Expr>),
+        Do(Vec<Expr>),
+        Let(Vec<(LocalId, Expr)>, Vec<Expr>),
+        Fn(Box<FnDef>),
+        Call(Box<Expr>, Vec<Expr>),
+        SetCell(Box<Expr>, Box<Expr>),
+        SetGlobal(SymId, Box<Expr>),
+        Throw(Box<Expr>),
+        Try(Box<TryForm>),
+    }
+
+    /// A core node and where it came from. The origin travels on every node
+    /// because `lines[i]` needs one per *instruction* (ADR-023 point 2), and an
+    /// instruction is emitted from a node.
+    #[derive(Debug)]
+    pub struct Expr {
+        pub core: Core,
+        pub origin: SpanOrigin,
+    }
+
+    #[derive(Debug)]
+    pub struct FnDef {
+        pub name: Option<SymId>,
+        /// Named parameters, including the rest parameter when `variadic`.
+        pub params: u32,
+        pub variadic: bool,
+        /// How many `LocalId`s this function hands out. Parameters are 0..params.
+        pub locals: u32,
+        pub captures: Vec<CaptureSpec>,
+        pub body: Vec<Expr>,
+        pub origin: SpanOrigin,
+    }
+
+    /// A capture named in the terms the *resolver* has — local ids, not slots.
+    /// Slots do not exist until lowering, and the translation happens in the
+    /// enclosing function, which is where the value is read from.
+    #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+    pub enum CaptureSpec {
+        Local(LocalId),
+        Capture(CaptureIdx),
+        SelfFn,
+    }
+
+    #[derive(Debug)]
+    pub struct TryForm {
+        pub body: Vec<Expr>,
+        pub catch: Option<(LocalId, Vec<Expr>)>,
+        pub finally: Option<Vec<Expr>>,
+    }
+
+    // --- walking forms ------------------------------------------------------
+
+    /// A value and the origins travelling beside it (ADR-026). This pair is the
+    /// unit the resolver walks; splitting them is exactly how spans get lost.
+    #[derive(Clone, Copy)]
+    struct Form<'a> {
+        v: &'a Value,
+        o: &'a Origins,
+    }
+
+    impl<'a> Form<'a> {
+        /// Syntactic children, in source order, paired with their origins. A map
+        /// contributes key then value, which is the order ADR-033 fixes for
+        /// evaluation too.
+        fn items(&self) -> Vec<Form<'a>> {
+            let zip = |vs: Vec<&'a Value>| -> Vec<Form<'a>> {
+                vs.into_iter()
+                    .zip(&self.o.children)
+                    .map(|(v, o)| Form { v, o })
+                    .collect()
+            };
+            match self.v {
+                Value::List(l) => zip(l.0.iter().collect()),
+                Value::Vec(x) => zip(x.0.iter().collect()),
+                Value::Map(m) => zip(m.0.iter().flat_map(|(k, v)| [k, v]).collect()),
+                _ => Vec::new(),
+            }
+        }
+
+        fn sym(&self) -> Option<SymId> {
+            match self.v {
+                Value::Sym(s) => Some(*s),
+                _ => None,
+            }
+        }
+
+        /// The head symbol of a non-empty list, which is what makes a form a
+        /// special form or a call.
+        fn head(&self) -> Option<SymId> {
+            match self.v {
+                Value::List(l) => match l.0.first() {
+                    Some(Value::Sym(s)) => Some(*s),
+                    _ => None,
+                },
+                _ => None,
+            }
+        }
+
+        fn err(&self, msg: impl Into<String>) -> LispErr {
+            LispErr::at_origin(self.o.origin, msg)
+        }
+    }
+
+    // --- the resolver -------------------------------------------------------
+
+    /// The core-form names, interned once. A head symbol is compared by id
+    /// after this, which is the only comparison symbols are supposed to need.
+    struct Specials {
+        if_: SymId,
+        do_: SymId,
+        let_: SymId,
+        fn_: SymId,
+        quote: SymId,
+        set_cell: SymId,
+        set_global: SymId,
+        throw: SymId,
+        try_: SymId,
+        catch: SymId,
+        finally: SymId,
+        rest: SymId,
+        vector: SymId,
+        hash_map: SymId,
+    }
+
+    impl Specials {
+        fn new(i: &mut Interner) -> Specials {
+            let mut s = |n: &str| SymId(i.intern(n));
+            Specials {
+                if_: s("if"),
+                do_: s("do"),
+                let_: s("let"),
+                fn_: s("fn"),
+                quote: s("quote"),
+                set_cell: s("set-cell!"),
+                set_global: s("set-global!"),
+                throw: s("throw"),
+                try_: s("try"),
+                catch: s("catch"),
+                finally: s("finally"),
+                rest: s("&"),
+                vector: s("vector"),
+                hash_map: s("hash-map"),
+            }
+        }
+    }
+
+    struct FnScope {
+        name: Option<SymId>,
+        locals: u32,
+        scopes: Vec<Vec<(SymId, LocalId)>>,
+        captures: Vec<CaptureSpec>,
+    }
+
+    impl FnScope {
+        fn new(name: Option<SymId>) -> FnScope {
+            FnScope {
+                name,
+                locals: 0,
+                scopes: vec![Vec::new()],
+                captures: Vec::new(),
+            }
+        }
+    }
+
+    struct Resolver<'a> {
+        interner: &'a mut Interner,
+        sp: Specials,
+        fns: Vec<FnScope>,
+    }
+
+    /// Forms to core AST. Every symbol comes out resolved and every core form
+    /// comes out shape-checked; nothing about slots has happened yet.
+    pub fn resolve(forms: &[LocatedForm], interner: &mut Interner) -> Result<FnDef, LispErr> {
+        let sp = Specials::new(interner);
+        let mut r = Resolver {
+            interner,
+            sp,
+            fns: vec![FnScope::new(None)],
+        };
+        let mut body = Vec::new();
+        for f in forms {
+            body.push(r.expr(Form {
+                v: &f.root,
+                o: &f.origins,
+            })?);
+        }
+        let scope = r.fns.pop().expect("top-level scope");
+        Ok(FnDef {
+            name: None,
+            params: 0,
+            variadic: false,
+            locals: scope.locals,
+            captures: scope.captures,
+            body,
+            origin: forms
+                .first()
+                .map(|f| f.origins.origin)
+                .unwrap_or(SpanOrigin::Unknown),
+        })
+    }
+
+    impl Resolver<'_> {
+        fn expr(&mut self, f: Form) -> Result<Expr, LispErr> {
+            let origin = f.o.origin;
+            let core = match f.v {
+                // `()` evaluates to itself, as in Clojure. Every other list is a
+                // special form or a call.
+                Value::List(l) if l.0.is_empty() => Core::Literal(f.v.clone()),
+                Value::List(_) => self.list(f)?,
+                // Collection literals lower to calls (ADR-035), which is what
+                // keeps the core closed at 13 forms while ADR-033's
+                // left-to-right element order still falls out of ordinary
+                // argument evaluation. Resolved as globals directly rather than
+                // through scope: `[x]` is a vector literal even where a local
+                // named `vector` is in scope.
+                Value::Vec(_) => self.literal_call(f, self.sp.vector, origin)?,
+                Value::Map(_) => self.literal_call(f, self.sp.hash_map, origin)?,
+                Value::Sym(s) => self.symbol(*s),
+                // ADR-023's cost paragraph: the compiler's input is not closed,
+                // because a macro can put anything into code position. This is
+                // the decent error it asks for.
+                Value::Fn(_) | Value::Cell(_) | Value::Handle(_) | Value::Buffer(_) => {
+                    return Err(f.err(format!("cannot compile a {}", kind_name(f.v))))
+                }
+                _ => Core::Literal(f.v.clone()),
+            };
+            Ok(Expr { core, origin })
+        }
+
+        fn literal_call(
+            &mut self,
+            f: Form,
+            ctor: SymId,
+            origin: SpanOrigin,
+        ) -> Result<Core, LispErr> {
+            let callee = Expr {
+                core: Core::Global(ctor),
+                origin,
+            };
+            Ok(Core::Call(Box::new(callee), self.exprs(&f.items())?))
+        }
+
+        fn exprs(&mut self, items: &[Form]) -> Result<Vec<Expr>, LispErr> {
+            items.iter().map(|f| self.expr(*f)).collect()
+        }
+
+        fn symbol(&mut self, s: SymId) -> Core {
+            let top = self.fns.len() - 1;
+            self.lookup(top, s).unwrap_or(Core::Global(s))
+        }
+
+        /// A symbol resolves against the innermost function first, then outward,
+        /// adding a capture at every level it crosses. A name that reaches no
+        /// binding is a global, and stays unresolved until run time — which is
+        /// what makes forward references free (ADR-034).
+        fn lookup(&mut self, level: usize, name: SymId) -> Option<Core> {
+            for scope in self.fns[level].scopes.iter().rev() {
+                if let Some((_, id)) = scope.iter().rev().find(|(n, _)| *n == name) {
+                    return Some(Core::Local(*id));
+                }
+            }
+            if self.fns[level].name == Some(name) {
+                return Some(Core::SelfFn);
+            }
+            if level == 0 {
+                return None;
+            }
+            let spec = match self.lookup(level - 1, name)? {
+                Core::Local(id) => CaptureSpec::Local(id),
+                Core::Capture(i) => CaptureSpec::Capture(i),
+                Core::SelfFn => CaptureSpec::SelfFn,
+                _ => return None,
+            };
+            Some(Core::Capture(self.add_capture(level, spec)))
+        }
+
+        fn add_capture(&mut self, level: usize, spec: CaptureSpec) -> CaptureIdx {
+            let caps = &mut self.fns[level].captures;
+            if let Some(i) = caps.iter().position(|c| *c == spec) {
+                return i as CaptureIdx;
+            }
+            caps.push(spec);
+            (caps.len() - 1) as CaptureIdx
+        }
+
+        fn declare(&mut self, name: SymId) -> LocalId {
+            let f = self.fns.last_mut().expect("a function scope");
+            let id = f.locals;
+            f.locals += 1;
+            f.scopes.last_mut().expect("a block scope").push((name, id));
+            id
+        }
+
+        fn push_scope(&mut self) {
+            self.fns
+                .last_mut()
+                .expect("a function scope")
+                .scopes
+                .push(Vec::new());
+        }
+
+        fn pop_scope(&mut self) {
+            self.fns
+                .last_mut()
+                .expect("a function scope")
+                .scopes
+                .pop()
+                .expect("a block scope");
+        }
+
+        /// A list with a symbol head is a special form if the head names one.
+        /// Checked before scope, so a core form cannot be shadowed by a local —
+        /// the core is closed (ADR-007) and a language whose `if` depends on
+        /// what is in scope has no closed core.
+        fn list(&mut self, f: Form) -> Result<Core, LispErr> {
+            let items = f.items();
+            if let Some(h) = f.head() {
+                let sp = &self.sp;
+                if h == sp.if_ {
+                    return self.if_form(f, &items);
+                } else if h == sp.do_ {
+                    return Ok(Core::Do(self.exprs(&items[1..])?));
+                } else if h == sp.let_ {
+                    return self.let_form(f, &items);
+                } else if h == sp.fn_ {
+                    return self.fn_form(f, &items);
+                } else if h == sp.quote {
+                    if items.len() != 2 {
+                        return Err(f.err("`quote` takes exactly one form"));
+                    }
+                    return Ok(Core::Literal(items[1].v.clone()));
+                } else if h == sp.set_cell {
+                    if items.len() != 3 {
+                        return Err(f.err("`set-cell!` takes a cell and a value"));
+                    }
+                    let cell = self.expr(items[1])?;
+                    let val = self.expr(items[2])?;
+                    return Ok(Core::SetCell(Box::new(cell), Box::new(val)));
+                } else if h == sp.set_global {
+                    return self.set_global_form(f, &items);
+                } else if h == sp.throw {
+                    if items.len() != 2 {
+                        return Err(f.err("`throw` takes exactly one value"));
+                    }
+                    return Ok(Core::Throw(Box::new(self.expr(items[1])?)));
+                } else if h == sp.try_ {
+                    return self.try_form(&items);
+                } else if h == sp.catch || h == sp.finally {
+                    let name = self.interner.name(h.0).to_string();
+                    return Err(f.err(format!("`{name}` is only valid inside `try`")));
+                }
+            }
+            let callee = self.expr(items[0])?;
+            Ok(Core::Call(Box::new(callee), self.exprs(&items[1..])?))
+        }
+
+        fn if_form(&mut self, f: Form, items: &[Form]) -> Result<Core, LispErr> {
+            if items.len() < 3 || items.len() > 4 {
+                return Err(f.err("`if` takes a test, a then, and an optional else"));
+            }
+            let test = self.expr(items[1])?;
+            let then = self.expr(items[2])?;
+            let other = match items.get(3) {
+                Some(e) => self.expr(*e)?,
+                // A missing else is `nil`, and it takes the `if`'s own position:
+                // there is no source text to point at, and `Unknown` here would
+                // lose the one thing a backtrace could say.
+                None => Expr {
+                    core: Core::Literal(Value::Nil),
+                    origin: f.o.origin,
+                },
+            };
+            Ok(Core::If(Box::new(test), Box::new(then), Box::new(other)))
+        }
+
+        fn let_form(&mut self, f: Form, items: &[Form]) -> Result<Core, LispErr> {
+            if items.len() < 2 {
+                return Err(f.err("`let` takes a binding vector and a body"));
+            }
+            if !matches!(items[1].v, Value::Vec(_)) {
+                return Err(items[1].err(format!(
+                    "`let` takes a binding vector, not a {}",
+                    kind_name(items[1].v)
+                )));
+            }
+            let pairs = items[1].items();
+            if !pairs.len().is_multiple_of(2) {
+                return Err(items[1].err("binding vector has a name with no value"));
+            }
+            self.push_scope();
+            let mut binds = Vec::new();
+            for pair in pairs.chunks(2) {
+                let name = pair[0].sym().ok_or_else(|| {
+                    pair[0].err(format!(
+                        "`let` binds symbols, not a {}",
+                        kind_name(pair[0].v)
+                    ))
+                })?;
+                // Sequential, left to right (ADR-033): the initializer is
+                // resolved before its own name is in scope, so `(let [x x] ...)`
+                // takes the outer `x`.
+                let init = self.expr(pair[1])?;
+                binds.push((self.declare(name), init));
+            }
+            let body = self.exprs(&items[2..])?;
+            self.pop_scope();
+            Ok(Core::Let(binds, body))
+        }
+
+        fn fn_form(&mut self, f: Form, items: &[Form]) -> Result<Core, LispErr> {
+            let mut at = 1;
+            let name = match items.get(at).and_then(|i| i.sym()) {
+                Some(s) => {
+                    at += 1;
+                    Some(s)
+                }
+                None => None,
+            };
+            let params = match items.get(at) {
+                Some(p) if matches!(p.v, Value::Vec(_)) => *p,
+                Some(p) => {
+                    return Err(p.err(format!(
+                        "`fn` takes a parameter vector, not a {}",
+                        kind_name(p.v)
+                    )))
+                }
+                None => return Err(f.err("`fn` takes a parameter vector and a body")),
+            };
+            self.fns.push(FnScope::new(name));
+            // Popped whether or not the body resolved, so an error does not
+            // leave the resolver holding a scope that no longer exists.
+            let built = self.fn_inner(params, &items[at + 1..]);
+            let scope = self.fns.pop().expect("the function scope just pushed");
+            let (count, variadic, body) = built?;
+            Ok(Core::Fn(Box::new(FnDef {
+                name,
+                params: count,
+                variadic,
+                locals: scope.locals,
+                captures: scope.captures,
+                body,
+                origin: f.o.origin,
+            })))
+        }
+
+        fn fn_inner(
+            &mut self,
+            params: Form,
+            body: &[Form],
+        ) -> Result<(u32, bool, Vec<Expr>), LispErr> {
+            let (count, variadic) = self.params(params)?;
+            Ok((count, variadic, self.exprs(body)?))
+        }
+
+        /// `[a b & rest]`. One parameter list, optionally ending in `&` and one
+        /// rest parameter (ADR-033 rule 3). Parameters are declared first, so
+        /// they hold local ids `0..params` and therefore slots `0..params` —
+        /// which is where a call leaves the arguments (ADR-034).
+        fn params(&mut self, f: Form) -> Result<(u32, bool), LispErr> {
+            let items = f.items();
+            let mut count = 0;
+            let mut i = 0;
+            while i < items.len() {
+                let name = items[i].sym().ok_or_else(|| {
+                    items[i].err(format!(
+                        "parameters are symbols, not a {}",
+                        kind_name(items[i].v)
+                    ))
+                })?;
+                if name == self.sp.rest {
+                    let rest = items.get(i + 1).and_then(|p| p.sym());
+                    match rest {
+                        Some(r) if r != self.sp.rest && i + 2 == items.len() => {
+                            self.declare(r);
+                            return Ok((count + 1, true));
+                        }
+                        _ => {
+                            return Err(
+                                items[i].err("`&` must be followed by exactly one rest parameter")
+                            )
+                        }
+                    }
+                }
+                self.declare(name);
+                count += 1;
+                i += 1;
+            }
+            Ok((count, false))
+        }
+
+        fn set_global_form(&mut self, f: Form, items: &[Form]) -> Result<Core, LispErr> {
+            if items.len() != 3 {
+                return Err(f.err("`set-global!` takes a name and a value"));
+            }
+            let name = items[1].sym().ok_or_else(|| {
+                items[1].err(format!(
+                    "`set-global!` binds a symbol, not a {}",
+                    kind_name(items[1].v)
+                ))
+            })?;
+            Ok(Core::SetGlobal(name, Box::new(self.expr(items[2])?)))
+        }
+
+        fn try_form(&mut self, items: &[Form]) -> Result<Core, LispErr> {
+            let mut body = Vec::new();
+            let mut catch = None;
+            let mut finally = None;
+            for it in &items[1..] {
+                let head = it.head();
+                if head == Some(self.sp.catch) {
+                    if catch.is_some() {
+                        return Err(it.err("`try` takes at most one `catch` (Q23)"));
+                    }
+                    if finally.is_some() {
+                        return Err(it.err("`finally` must be the last clause"));
+                    }
+                    let ci = it.items();
+                    let bound = ci
+                        .get(1)
+                        .and_then(|c| c.sym())
+                        .ok_or_else(|| it.err("`catch` binds the thrown value to one symbol"))?;
+                    self.push_scope();
+                    let id = self.declare(bound);
+                    let handler = self.exprs(&ci[2..]);
+                    self.pop_scope();
+                    catch = Some((id, handler?));
+                } else if head == Some(self.sp.finally) {
+                    if finally.is_some() {
+                        return Err(it.err("`try` takes at most one `finally`"));
+                    }
+                    finally = Some(self.exprs(&it.items()[1..])?);
+                } else if catch.is_some() || finally.is_some() {
+                    return Err(
+                        it.err("everything after a `catch` or `finally` clause must be one too")
+                    );
+                } else {
+                    body.push(self.expr(*it)?);
+                }
+            }
+            Ok(Core::Try(Box::new(TryForm {
+                body,
+                catch,
+                finally,
+            })))
+        }
+    }
+
+    // --- lowering -----------------------------------------------------------
+
+    pub fn compile(forms: &[LocatedForm], interner: &mut Interner) -> Result<Chunk, LispErr> {
+        Ok(lower(&resolve(forms, interner)?))
+    }
+
+    /// Core AST to a `Chunk`. Slots come out of one monotonic counter per
+    /// function, shared by bindings and temporaries and never reused (ADR-006).
+    /// E-5 is what makes that affordable here: with unpacked operands a high
+    /// slot index costs nothing at all.
+    pub fn lower(top: &FnDef) -> Chunk {
+        let mut lo = Lower { protos: Vec::new() };
+        lo.proto(top, Vec::new());
+        Chunk {
+            protos: lo
+                .protos
+                .into_iter()
+                .map(|p| p.expect("every reserved proto is filled in"))
+                .collect(),
+        }
+    }
+
+    struct Lower {
+        /// An index is reserved before its body is lowered, so a proto's number
+        /// is its source order rather than the order compilation finished.
+        protos: Vec<Option<Proto>>,
+    }
+
+    impl Lower {
+        fn proto(&mut self, def: &FnDef, captures: Vec<CaptureSrc>) -> ProtoIdx {
+            let idx = self.protos.len();
+            self.protos.push(None);
+            let mut f = FnLower::new(def);
+            let dst = f.alloc(1);
+            f.body(self, &def.body, dst, true, def.origin);
+            // Unreachable after a tail call, and emitted anyway. One dead
+            // instruction is cheaper than a special case in the single place a
+            // function's exit is guaranteed to exist.
+            f.emit(Instr::Return { src: dst }, def.origin);
+            self.protos[idx] = Some(Proto {
+                name: def.name,
+                params: def.params,
+                variadic: def.variadic,
+                slots: f.next,
+                code: f.code,
+                lines: f.lines,
+                consts: f.consts,
+                captures,
+            });
+            idx as ProtoIdx
+        }
+    }
+
+    struct FnLower {
+        code: Vec<Instr>,
+        lines: Vec<SpanOrigin>,
+        consts: Vec<Value>,
+        /// `LocalId` to slot, filled in at the binding, read at every use.
+        slots: Vec<Slot>,
+        next: Slot,
+        /// Handler regions open in this function. A call inside one is never a
+        /// tail call — ADR-028 rule 2 says the frame is still needed, and that
+        /// reason covers `catch` exactly as it covers `finally`: the handler
+        /// record names this frame, and a reused frame is a different one.
+        regions: u32,
+    }
+
+    impl FnLower {
+        fn new(def: &FnDef) -> FnLower {
+            let mut slots = vec![0; def.locals as usize];
+            // Parameters were declared first, so they hold local ids
+            // `0..params` — and a call leaves the arguments in exactly those
+            // slots (ADR-034).
+            for i in 0..def.params {
+                slots[i as usize] = i;
+            }
+            FnLower {
+                code: Vec::new(),
+                lines: Vec::new(),
+                consts: Vec::new(),
+                slots,
+                next: def.params,
+                regions: 0,
+            }
+        }
+
+        /// The only place an instruction is created, which is what keeps `lines`
+        /// parallel to `code` structurally rather than by discipline (ADR-023
+        /// point 2). `../reg-lisp` lost that parallel in a mutant its whole
+        /// suite failed to notice.
+        fn emit(&mut self, i: Instr, o: SpanOrigin) -> Pc {
+            self.code.push(i);
+            self.lines.push(o);
+            (self.code.len() - 1) as Pc
+        }
+
+        fn here(&self) -> Pc {
+            self.code.len() as Pc
+        }
+
+        fn alloc(&mut self, n: u32) -> Slot {
+            let s = self.next;
+            self.next += n;
+            s
+        }
+
+        fn patch(&mut self, at: Pc, target: Pc) {
+            match &mut self.code[at as usize] {
+                Instr::Jump { target: t }
+                | Instr::JumpUnless { target: t, .. }
+                | Instr::PushFinally { target: t }
+                | Instr::PushHandler { catch: t, .. } => *t = target,
+                other => unreachable!("cannot patch {other:?}"),
+            }
+        }
+
+        /// Constants are deduplicated by language `=`, deliberately: it never
+        /// merges `1` with `1.0` (Q13) or a list with a vector (Q20), and it
+        /// never merges `##NaN` with itself, which costs a duplicate entry and
+        /// is the correct answer under IEEE rules.
+        fn konst(&mut self, v: &Value, dst: Slot, o: SpanOrigin) {
+            let k = match self.consts.iter().position(|c| c == v) {
+                Some(k) => k,
+                None => {
+                    self.consts.push(v.clone());
+                    self.consts.len() - 1
+                }
+            };
+            self.emit(
+                Instr::Const {
+                    dst,
+                    k: k as ConstIdx,
+                },
+                o,
+            );
+        }
+
+        /// An implicit `do`: every form but the last runs for effect, the last
+        /// supplies the value. An empty body is `nil`.
+        fn body(&mut self, lo: &mut Lower, exprs: &[Expr], dst: Slot, tail: bool, o: SpanOrigin) {
+            match exprs.split_last() {
+                None => self.konst(&Value::Nil, dst, o),
+                Some((last, rest)) => {
+                    for e in rest {
+                        let scratch = self.alloc(1);
+                        self.expr(lo, e, scratch, false);
+                    }
+                    self.expr(lo, last, dst, tail);
+                }
+            }
+        }
+
+        fn expr(&mut self, lo: &mut Lower, e: &Expr, dst: Slot, tail: bool) {
+            let o = e.origin;
+            match &e.core {
+                Core::Literal(v) => self.konst(v, dst, o),
+                Core::Local(id) => {
+                    let src = self.slots[*id as usize];
+                    if src != dst {
+                        self.emit(Instr::Move { dst, src }, o);
+                    }
+                }
+                Core::Capture(i) => {
+                    self.emit(Instr::GetCapture { dst, idx: *i }, o);
+                }
+                Core::SelfFn => {
+                    self.emit(Instr::GetSelf { dst }, o);
+                }
+                Core::Global(s) => {
+                    self.emit(Instr::GetGlobal { dst, name: *s }, o);
+                }
+                Core::If(test, then, other) => {
+                    let cond = self.alloc(1);
+                    self.expr(lo, test, cond, false);
+                    let jump_else = self.emit(Instr::JumpUnless { cond, target: 0 }, o);
+                    self.expr(lo, then, dst, tail);
+                    let jump_end = self.emit(Instr::Jump { target: 0 }, o);
+                    let els = self.here();
+                    self.patch(jump_else, els);
+                    self.expr(lo, other, dst, tail);
+                    let end = self.here();
+                    self.patch(jump_end, end);
+                }
+                Core::Do(es) => self.body(lo, es, dst, tail, o),
+                Core::Let(binds, es) => {
+                    for (id, init) in binds {
+                        let s = self.alloc(1);
+                        self.expr(lo, init, s, false);
+                        self.slots[*id as usize] = s;
+                    }
+                    self.body(lo, es, dst, tail, o);
+                }
+                Core::Fn(def) => {
+                    // Capture sources are named in the enclosing frame, so they
+                    // are translated to slots here rather than inside the nested
+                    // function (ADR-002: copied at creation, never referenced).
+                    let captures = def
+                        .captures
+                        .iter()
+                        .map(|c| match *c {
+                            CaptureSpec::Local(id) => CaptureSrc::Local(self.slots[id as usize]),
+                            CaptureSpec::Capture(i) => CaptureSrc::Capture(i),
+                            CaptureSpec::SelfFn => CaptureSrc::SelfFn,
+                        })
+                        .collect();
+                    let proto = lo.proto(def, captures);
+                    self.emit(Instr::Closure { dst, proto }, o);
+                }
+                Core::Call(callee, args) => {
+                    let argc = args.len() as u32;
+                    // The whole window is reserved before anything is lowered
+                    // into it, so a nested call inside an argument allocates
+                    // above it rather than through it.
+                    let base = self.alloc(1 + argc);
+                    self.expr(lo, callee, base, false);
+                    for (i, a) in args.iter().enumerate() {
+                        self.expr(lo, a, base + 1 + i as u32, false);
+                    }
+                    if tail && self.regions == 0 {
+                        self.emit(Instr::TailCall { base, argc }, o);
+                    } else {
+                        self.emit(Instr::Call { dst, base, argc }, o);
+                    }
+                }
+                Core::SetCell(cell, val) => {
+                    let c = self.alloc(1);
+                    self.expr(lo, cell, c, false);
+                    // Left to right (ADR-033), and the form's value is the value
+                    // written — so it is lowered straight into `dst`.
+                    self.expr(lo, val, dst, false);
+                    self.emit(Instr::SetCell { cell: c, src: dst }, o);
+                }
+                Core::SetGlobal(name, val) => {
+                    self.expr(lo, val, dst, false);
+                    self.emit(
+                        Instr::SetGlobal {
+                            name: *name,
+                            src: dst,
+                        },
+                        o,
+                    );
+                }
+                Core::Throw(v) => {
+                    let src = self.alloc(1);
+                    self.expr(lo, v, src, false);
+                    self.emit(Instr::Throw { src }, o);
+                }
+                Core::Try(t) => self.try_form(lo, t, dst, tail, o),
+            }
+        }
+
+        /// Two nested handler regions, with `finally` emitted twice — once on
+        /// the normal path, once as the path the VM enters while unwinding
+        /// (ADR-034). Nesting the catch region *inside* the finally region is
+        /// what makes a throw from the catch body still run the cleanup.
+        ///
+        /// The protocol milestone 4 has to honour: the VM pops a handler record
+        /// when it dispatches to that record's target, and this code pops it
+        /// with `POPHANDLER` on the path where nothing was thrown. Exactly one
+        /// of those happens per record, which is ADR-028 invariant 1 read off
+        /// the emitted code rather than argued about a state machine.
+        fn try_form(&mut self, lo: &mut Lower, t: &TryForm, dst: Slot, tail: bool, o: SpanOrigin) {
+            let fin = t.finally.as_ref().map(|_| {
+                self.regions += 1;
+                self.emit(Instr::PushFinally { target: 0 }, o)
+            });
+            let cat = t.catch.as_ref().map(|(id, _)| {
+                let err = self.alloc(1);
+                self.slots[*id as usize] = err;
+                self.regions += 1;
+                self.emit(Instr::PushHandler { catch: 0, err }, o)
+            });
+
+            let protected = tail && self.regions == 0;
+            self.body(lo, &t.body, dst, protected, o);
+
+            if let (Some(push), Some((_, handler))) = (cat, t.catch.as_ref()) {
+                self.emit(Instr::PopHandler, o);
+                self.regions -= 1;
+                let over = self.emit(Instr::Jump { target: 0 }, o);
+                let entry = self.here();
+                self.patch(push, entry);
+                let handler_tail = tail && self.regions == 0;
+                self.body(lo, handler, dst, handler_tail, o);
+                let done = self.here();
+                self.patch(over, done);
+            }
+
+            if let (Some(push), Some(cleanup)) = (fin, t.finally.as_ref()) {
+                self.emit(Instr::PopHandler, o);
+                self.regions -= 1;
+                // The cleanup's value is discarded on both paths, so it is never
+                // in tail position and wants a slot only to be written to.
+                let normal = self.alloc(1);
+                self.body(lo, cleanup, normal, false, o);
+                let over = self.emit(Instr::Jump { target: 0 }, o);
+                let entry = self.here();
+                self.patch(push, entry);
+                let unwinding = self.alloc(1);
+                self.body(lo, cleanup, unwinding, false, o);
+                self.emit(Instr::EndFinally, o);
+                let end = self.here();
+                self.patch(over, end);
+            }
         }
     }
 }

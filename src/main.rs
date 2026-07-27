@@ -4,7 +4,7 @@
 //! anything about the language — if a change to this file changes what a
 //! program means, it is in the wrong file.
 
-use apolisp::{printer, reader, value};
+use apolisp::{bytecode, compile, printer, reader, value};
 use std::process::ExitCode;
 
 /// A stage whose milestone has not landed, as distinct from a stage that ran
@@ -87,9 +87,33 @@ fn main() -> ExitCode {
                 }
             }
         }
+        // Milestone 2. Compilation is not yet a function of source alone — it
+        // acquires a VM dependency at milestone 5, when macros make it
+        // unavoidable (ADR-004) — so for now reading and compiling is the whole
+        // pipeline.
+        "compile" => {
+            let mut interner = value::Interner::new();
+            let forms = match reader::read_all(&src, &mut interner) {
+                Ok(forms) => forms,
+                Err(e) => {
+                    eprintln!("{}", e.render(path, &src));
+                    return ExitCode::FAILURE;
+                }
+            };
+            match compile::compile(&forms, &mut interner) {
+                Ok(chunk) => {
+                    print!("{}", bytecode::disassemble(&chunk, &interner, &src));
+                    ExitCode::SUCCESS
+                }
+                Err(e) => {
+                    eprintln!("{}", e.render(path, &src));
+                    ExitCode::FAILURE
+                }
+            }
+        }
         // Stages whose milestone has not landed. They fail rather than no-op:
         // a smoke test that silently skips a stage stops being an oracle.
-        "expand" | "compile" | "run" => {
+        "expand" | "run" => {
             eprintln!("apolisp: `{cmd}` is not implemented yet (see BUILD.md)");
             ExitCode::from(EXIT_NOT_IMPLEMENTED)
         }
@@ -106,10 +130,19 @@ fn main() -> ExitCode {
 fn report_sizes() -> ExitCode {
     let limit = value::VALUE_SIZE_LIMIT;
     let n = value::value_size();
+    let instr = bytecode::instr_size();
+    let instr_limit = bytecode::INSTR_SIZE_LIMIT;
     println!("Value: {n} bytes (limit {limit}, ADR-025)");
     println!("Origins: {} bytes", value::origins_size());
+    println!("Instr: {instr} bytes (limit {instr_limit}, ADR-034)");
     if n > limit {
         println!("VIOLATION: Value exceeds {limit} bytes");
+        return ExitCode::FAILURE;
+    }
+    // Not packing the encoding was the decision; the assertion is what keeps
+    // that from drifting into an instruction that carries a `String`.
+    if instr > instr_limit {
+        println!("VIOLATION: Instr exceeds {instr_limit} bytes");
         return ExitCode::FAILURE;
     }
     ExitCode::SUCCESS

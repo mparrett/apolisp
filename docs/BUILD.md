@@ -40,7 +40,7 @@ Each milestone is a runnable artifact.
 | 3 | VM: frames, calls, closures, `if`/`let`/`fn`, tail calls | **Done** (`8ff2c9f`) — smoke runs `run`; 100k tail calls peak at the same frame *and* slot count as 10 |
 | 4 | Errors, `try`/`throw`/`finally`, handler stack | **Done** (`aa7a20b`) — `control.xs` and `errors.xs` transcripts; cleanup counted on all four paths |
 | 5 | Macro expansion + quasiquote + gensym | **Done** (`6c4785f`) — `defmacro` is a prelude macro; expansion is deterministic per unit |
-| 6 | Collections, strings, bytes | In-language test suite begins |
+| 6 | Collections, strings, bytes | **Done** (`de916cc`) — `tests/lang/` runs through the binary, and caught two bugs on its first run |
 | 7 | Host handle table + blocking file/stdio | `with-open` works; handles are generational |
 | 8 | Fuel suspension + `Image` + resume | Round-trip property passes; live handles are refused |
 | 9 | REPL | Becomes the primary development interface |
@@ -120,6 +120,19 @@ what keeps the system discussable once the code is real.
 **Rung 4 — behavior is specified.** A test suite written **in the language
 itself** wherever possible, so it survives implementation churn and doubles as a
 dogfooding pass. Keep it independent of the internals it tests.
+
+Landed at milestone 6: `tests/lang/*.xs`, with `tests/lang.rs` as a runner that
+knows only how to start the binary. The harness is *concatenated* ahead of each
+suite rather than imported, because there is no `require` and one namespace
+(ADR-027, Q12) — the paste is the clearest statement of what a module system
+would buy. A failing assertion throws, so the failure arrives as a transcript
+naming the form.
+
+It earned its place immediately: two bugs on the first run, one of them a
+miscompilation that had been live since milestone 2 (`-0.0` and `0.0` sharing a
+constant-pool entry, so `(/ 1.0 0.0)` could produce `##-Inf`). The milestone-6
+mutation pass then found that this rung is the *only* thing that catches any of
+the semantics milestone 6 added — see `notes/milestone-6-mutants.md`.
 
 ## Property tests
 

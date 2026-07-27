@@ -83,6 +83,14 @@ with one origin per syntactic child of every aggregate. Naming `Generated` and
 where `lines[i]` is the span of instruction *i*. What lets a runtime error or
 backtrace report a position at all.
 
+**copy-on-write** — How every collection operation builds: take the buffer by
+`Rc::make_mut`, which mutates when the value is not shared and clones when it
+is (ADR-041). Correct as written; see erratum E-13 for what it does *not* yet
+buy.
+
+**rung 4** — The in-language test suite, `tests/lang/` (BUILD.md). Written in
+apolisp and run through the binary, so it survives implementation churn.
+
 **auto-gensym** — `x#` inside a template: one fresh symbol per *template*, so
 two occurrences of `x#` in one template are the same name and two templates
 never collide. Lowered by the expander, not the reader (ADR-040). Per template

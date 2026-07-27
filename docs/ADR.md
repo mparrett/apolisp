@@ -1756,6 +1756,10 @@ answerable: the machinery it was waiting on exists.
 
 ### ADR-041 — Collections, equality, and the numeric tower
 
+*Decision stands; the performance claim in part 1's rationale is corrected by
+erratum E-13 — `Rc::make_mut` does not yet mutate in place, and measurement is
+how that was found.*
+
 *(New, 2026-07-27. Resolves Q6, Q13, and Q26, and the collection half of Q20.
 Names the representation ADR-011 left open. Narrows ADR-032. Adds one `:kind`
 to ADR-039's vocabulary.)*
@@ -1982,6 +1986,27 @@ Nearly free today, since `ListObj` and `VecObj` are both `Vec<Value>` and
 arguments already occupy contiguous slots. Declined because it would quietly
 constrain Q20's still-open cross-type sequential equality, which currently
 answers `false` for list-versus-vector.
+
+**E-13 — ADR-041, the transient win that is not there yet.** The *Why* clause
+says `Rc::make_mut` "removes exactly that case — a fresh accumulator has one
+reference, so the loop mutates a buffer it already owns". Measured, it never
+does. At a native call the collection is live in the caller's argument window
+*and* in the clone the primitive takes, so the strong count is at least two and
+`make_mut` copies every time; in a `conj` loop the accumulator is additionally
+still bound to a live local. Instrumenting `conj` over a five-element build
+printed `copied=true` on every iteration, and replacing `make_mut` with an
+unconditional clone survived the entire suite — the two are indistinguishable
+today.
+
+The decision stands: flat `Vec`, copy-on-write, no transients is still the right
+shape, and `make_mut` is still the correct way to write it. What is wrong is the
+claim that it already pays. The O(n²) Q6 named is still there, and removing it
+needs the compiler to kill a slot on its last use (ADR-006's optional reuse
+pass, extended) or a call protocol where a primitive consumes its arguments.
+Both are pre-registered experiments under ADR-021, and neither is a collections
+question. The one win that *is* real: a multi-pair `assoc` or multi-item `conj`
+copies once rather than once per pair, because the `&mut` is taken outside the
+loop.
 
 **E-12 — ADR-034, what `finally` duplicates.** The cost clause says "`finally`
 duplicates 2^depth under nesting" and means the code array. The proto table

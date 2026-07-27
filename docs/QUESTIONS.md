@@ -162,8 +162,8 @@ order-dependent `.forms` snapshots — the failure mode ADR-008 exists to preven
 
 ## No milestone — decide when evidence arrives
 
-**Q18 — Mutation checks as an oracle rung.** *(Evidence arrived four times —
-milestones 1, 2, 4, and 5.)*
+**Q18 — Mutation checks as an oracle rung.** *(Evidence arrived five times —
+milestones 1, 2, 4, 5, and 6.)*
 Run against milestone 1's own span tests, two of three mutants survived: every
 origin could be `Unknown`, or every span could start at byte 0, with the suite
 staying green. Only arity was actually checked. Fixed by adding `.spans`
@@ -191,6 +191,13 @@ worse. **A macro receiving *expanded* arguments instead of the forms as written
 passed all 75 tests**, because every macro in the suite used its arguments as
 code, where expanding early and expanding late agree. See
 `docs/notes/milestone-5-mutants.md`.
+
+Milestone 6 ran eight. Seven died; the eighth could not have done anything
+else — it mutated a *performance* claim (`Rc::make_mut` versus an unconditional
+clone), and the two are behaviourally identical, so no test can separate them.
+The interesting result came from instrumentation instead, and refuted ADR-041's
+own rationale (erratum E-13). Worth naming as a limit of the rung: **a mutation
+check answers behavioural claims only.**
 
 **So the finding is broader than "tests can be dead."** A mutation check also
 finds duplicated enforcement, which nothing else in this loop looks for, and

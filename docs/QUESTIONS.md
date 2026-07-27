@@ -167,8 +167,8 @@ order-dependent `.forms` snapshots — the failure mode ADR-008 exists to preven
 
 ## No milestone — decide when evidence arrives
 
-**Q18 — Mutation checks as an oracle rung.** *(Evidence arrived twice —
-milestones 1 and 2.)*
+**Q18 — Mutation checks as an oracle rung.** *(Evidence arrived three times —
+milestones 1, 2, and 4.)*
 Run against milestone 1's own span tests, two of three mutants survived: every
 origin could be `Unknown`, or every span could start at byte 0, with the suite
 staying green. Only arity was actually checked. Fixed by adding `.spans`
@@ -181,11 +181,20 @@ found something different in kind. ADR-028 rule 2 was enforced *twice*, by the
 and no test could say which was doing the work. The fix was to delete the
 redundancy, not to add a test. See `docs/notes/milestone-2-mutants.md`.
 
+Milestone 4 ran five against the handler stack and one survived, predicted to:
+unwinding that drops frames but keeps their slots is a real leak that **no test
+can observe** — bounded, so no high-water mark moves, and nil-filled, so no
+value is wrong. The test written for it was dead too. Fixed by making the
+release of a frame one shared mechanism rather than two that agree, so the
+mutation stops being expressible. See `docs/notes/milestone-4-mutants.md`.
+
 **So the finding is broader than "tests can be dead."** A mutation check also
 finds duplicated enforcement, which nothing else in this loop looks for, and
 which a test written to pin the rule will happily pass while the mechanism it
-was written for is dead. Two milestones, two findings, nothing else caught
-either. The remaining question is only what shape the rung takes — `../reg-lisp`
+was written for is dead. It finds a third thing too: a defect that is real and
+*unobservable*, where the honest response is to remove the way to write it
+rather than to add a test that cannot fail. Three milestones, three kinds of
+finding, nothing else caught any of them. The remaining question is only what shape the rung takes — `../reg-lisp`
 uses a `verify.sh mutate` over a hand-listed set of load-bearing lines, and that
 still looks right here: worth doing for a handful of lines per milestone, not
 worth a general framework.

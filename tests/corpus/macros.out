@@ -4,6 +4,10 @@
 42
 [:a :b] {:tag :k :value 1} [:all 1 2]
 (when a b)
+(when a b)
+:begin
+:middle
+:end
 --- value
 nil
 --- exit

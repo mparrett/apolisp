@@ -213,6 +213,23 @@ fn a_quote_is_data_and_is_not_expanded() {
     );
 }
 
+/// A macro receives *forms*: unevaluated, and unexpanded.
+///
+/// This is the rule everyone knows and nothing was checking. Expanding a
+/// macro's arguments before invoking it left the entire suite green, because
+/// every macro in it used its arguments as code — where expanding early and
+/// expanding late produce the same answer. It takes a macro that keeps an
+/// argument as *data* to tell the two apart.
+#[test]
+fn a_macro_receives_unexpanded_forms() {
+    assert_eq!(
+        expand_ok(
+            "(defmacro inner [] :expanded)\n             (defmacro outer [x] `(quote ~x))\n             (outer (inner))"
+        ),
+        "(quote inner)\n(quote outer)\n(quote (inner))"
+    );
+}
+
 /// ADR-036 gives the expander the forms *it* produces. The reader's bound
 /// cannot see them: nothing was read.
 #[test]

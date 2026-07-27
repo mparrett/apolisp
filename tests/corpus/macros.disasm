@@ -1,88 +1,107 @@
-proto 0  <top>  params 0  slots 50
+proto 0  <top>  params 0  slots 64
   constants
     k0  42
     k1  when
-    k2  twice
-    k3  unless
-    k4  pair
-    k5  tagged
-    k6  all
-    k7  (when a b)
-    k8  0
-    k9  :positive
-    k10  nil
-    k11  false
-    k12  true
-    k13  :not-negative
-    k14  21
-    k15  :a
-    k16  :b
-    k17  :tag
-    k18  :k
-    k19  :value
-    k20  1
-    k21  :all
-    k22  2
+    k2  trace
+    k3  twice
+    k4  unless
+    k5  pair
+    k6  tagged
+    k7  all
+    k8  (when a b)
+    k9  as-data
+    k10  0
+    k11  :positive
+    k12  nil
+    k13  false
+    k14  true
+    k15  :not-negative
+    k16  21
+    k17  :a
+    k18  :b
+    k19  :tag
+    k20  :k
+    k21  :value
+    k22  1
+    k23  :all
+    k24  2
+    k25  :begin
+    k26  :middle
+    k27  :end
   code
     0000  CONST       r1 <- k0               generated 9:1
     0001  SETGLOBAL   answer <- r1           generated 9:1
-    0002  CONST       r2 <- k1               generated 13:1
+    0002  CONST       r2 <- k1               generated 12:1
     0003  CONST       r3 <- k2               generated 19:1
-    0004  CONST       r4 <- k3               generated 24:1
-    0005  CONST       r5 <- k4               generated 29:1
-    0006  CONST       r6 <- k5               generated 30:1
-    0007  CONST       r7 <- k6               generated 31:1
-    0008  CONST       r8 <- k7               35:18
-    0009  SETGLOBAL   quoted-call <- r8      generated 35:1
-    0010  GETGLOBAL   r10 <- println         37:2
-    0011  GETGLOBAL   r13 <- <               37:17
-    0012  CONST       r14 <- k8              37:19
-    0013  GETGLOBAL   r15 <- answer          37:21
-    0014  CALL        r12 <- r13(2)          37:16
-    0015  JUMPUNLESS  r12, 0018              generated 37:10
-    0016  CONST       r11 <- k9              generated 37:10
-    0017  JUMP        0019                   generated 37:10
-    0018  CONST       r11 <- k10             generated 37:10
-    0019  CALL        r9 <- r10(1)           37:1
-    0020  GETGLOBAL   r17 <- println         38:2
-    0021  GETGLOBAL   r21 <- <               38:19
-    0022  GETGLOBAL   r22 <- answer          38:21
-    0023  CONST       r23 <- k8              38:28
-    0024  CALL        r20 <- r21(2)          38:18
-    0025  JUMPUNLESS  r20, 0028              generated 38:10
-    0026  CONST       r19 <- k11             generated 38:10
-    0027  JUMP        0029                   generated 38:10
-    0028  CONST       r19 <- k12             generated 38:10
-    0029  JUMPUNLESS  r19, 0032              generated 38:10
-    0030  CONST       r18 <- k13             generated 38:10
-    0031  JUMP        0033                   generated 38:10
-    0032  CONST       r18 <- k10             generated 38:10
-    0033  CALL        r16 <- r17(1)          38:1
-    0034  GETGLOBAL   r25 <- println         39:2
-    0035  CONST       r27 <- k14             generated 39:10
-    0036  GETGLOBAL   r28 <- +               generated 39:10
-    0037  MOVE        r29 <- r27             generated 39:10
-    0038  MOVE        r30 <- r27             generated 39:10
-    0039  CALL        r26 <- r28(2)          generated 39:10
-    0040  CALL        r24 <- r25(1)          39:1
-    0041  GETGLOBAL   r32 <- println         40:2
-    0042  GETGLOBAL   r36 <- vector          generated 40:10
-    0043  CONST       r37 <- k15             generated 40:10
-    0044  CONST       r38 <- k16             generated 40:10
-    0045  CALL        r33 <- r36(2)          generated 40:10
-    0046  GETGLOBAL   r39 <- hash-map        generated 40:23
-    0047  CONST       r40 <- k17             generated 40:23
-    0048  CONST       r41 <- k18             generated 40:23
-    0049  CONST       r42 <- k19             generated 40:23
-    0050  CONST       r43 <- k20             generated 40:23
-    0051  CALL        r34 <- r39(4)          generated 40:23
-    0052  GETGLOBAL   r44 <- vector          generated 40:37
-    0053  CONST       r45 <- k21             generated 40:37
-    0054  CONST       r46 <- k20             generated 40:37
-    0055  CONST       r47 <- k22             generated 40:37
-    0056  CALL        r35 <- r44(3)          generated 40:37
-    0057  CALL        r31 <- r32(3)          40:1
-    0058  GETGLOBAL   r48 <- println         41:2
-    0059  GETGLOBAL   r49 <- quoted-call     41:10
-    0060  TAILCALL    r48(1)                 41:1
-    0061  RETURN      r0                     41:1
+    0004  CONST       r4 <- k3               generated 25:1
+    0005  CONST       r5 <- k4               generated 30:1
+    0006  CONST       r6 <- k5               generated 35:1
+    0007  CONST       r7 <- k6               generated 36:1
+    0008  CONST       r8 <- k7               generated 37:1
+    0009  CONST       r9 <- k8               41:18
+    0010  SETGLOBAL   quoted-call <- r9      generated 41:1
+    0011  CONST       r10 <- k9              generated 47:1
+    0012  GETGLOBAL   r12 <- println         49:2
+    0013  GETGLOBAL   r15 <- <               49:17
+    0014  CONST       r16 <- k10             49:19
+    0015  GETGLOBAL   r17 <- answer          49:21
+    0016  CALL        r14 <- r15(2)          49:16
+    0017  JUMPUNLESS  r14, 0020              generated 49:10
+    0018  CONST       r13 <- k11             generated 49:10
+    0019  JUMP        0021                   generated 49:10
+    0020  CONST       r13 <- k12             generated 49:10
+    0021  CALL        r11 <- r12(1)          49:1
+    0022  GETGLOBAL   r19 <- println         50:2
+    0023  GETGLOBAL   r23 <- <               50:19
+    0024  GETGLOBAL   r24 <- answer          50:21
+    0025  CONST       r25 <- k10             50:28
+    0026  CALL        r22 <- r23(2)          50:18
+    0027  JUMPUNLESS  r22, 0030              generated 50:10
+    0028  CONST       r21 <- k13             generated 50:10
+    0029  JUMP        0031                   generated 50:10
+    0030  CONST       r21 <- k14             generated 50:10
+    0031  JUMPUNLESS  r21, 0034              generated 50:10
+    0032  CONST       r20 <- k15             generated 50:10
+    0033  JUMP        0035                   generated 50:10
+    0034  CONST       r20 <- k12             generated 50:10
+    0035  CALL        r18 <- r19(1)          50:1
+    0036  GETGLOBAL   r27 <- println         51:2
+    0037  CONST       r29 <- k16             generated 51:10
+    0038  GETGLOBAL   r30 <- +               generated 51:10
+    0039  MOVE        r31 <- r29             generated 51:10
+    0040  MOVE        r32 <- r29             generated 51:10
+    0041  CALL        r28 <- r30(2)          generated 51:10
+    0042  CALL        r26 <- r27(1)          51:1
+    0043  GETGLOBAL   r34 <- println         52:2
+    0044  GETGLOBAL   r38 <- vector          generated 52:10
+    0045  CONST       r39 <- k17             generated 52:10
+    0046  CONST       r40 <- k18             generated 52:10
+    0047  CALL        r35 <- r38(2)          generated 52:10
+    0048  GETGLOBAL   r41 <- hash-map        generated 52:23
+    0049  CONST       r42 <- k19             generated 52:23
+    0050  CONST       r43 <- k20             generated 52:23
+    0051  CONST       r44 <- k21             generated 52:23
+    0052  CONST       r45 <- k22             generated 52:23
+    0053  CALL        r36 <- r41(4)          generated 52:23
+    0054  GETGLOBAL   r46 <- vector          generated 52:37
+    0055  CONST       r47 <- k23             generated 52:37
+    0056  CONST       r48 <- k22             generated 52:37
+    0057  CONST       r49 <- k24             generated 52:37
+    0058  CALL        r37 <- r46(3)          generated 52:37
+    0059  CALL        r33 <- r34(3)          52:1
+    0060  GETGLOBAL   r51 <- println         53:2
+    0061  GETGLOBAL   r52 <- quoted-call     53:10
+    0062  CALL        r50 <- r51(1)          53:1
+    0063  GETGLOBAL   r54 <- println         54:2
+    0064  CONST       r55 <- k8              generated 54:10
+    0065  CALL        r53 <- r54(1)          54:1
+    0066  GETGLOBAL   r57 <- println         generated 55:1
+    0067  CONST       r58 <- k25             generated 55:1
+    0068  CALL        r56 <- r57(1)          generated 55:1
+    0069  GETGLOBAL   r60 <- println         55:9
+    0070  CONST       r61 <- k26             55:17
+    0071  CALL        r59 <- r60(1)          55:8
+    0072  GETGLOBAL   r62 <- println         generated 55:1
+    0073  CONST       r63 <- k27             generated 55:1
+    0074  TAILCALL    r62(1)                 generated 55:1
+    0075  RETURN      r0                     generated 55:1

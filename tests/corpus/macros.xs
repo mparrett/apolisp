@@ -8,10 +8,16 @@
 ; forms the core actually has (ADR-027).
 (def answer 42)
 
-; A template with an unquote, a splice, and a tail the splice does not swallow.
-; A wrong `concat` grouping reorders these and the value still looks plausible.
+; A template with an unquote and a splice.
 (defmacro when [test & body]
   `(if ~test (do ~@body) nil))
+
+; Items on *both* sides of a splice, which `when` above does not have: its
+; splice is last, so a `concat` that dropped everything after a splice would
+; expand it correctly and this one wrongly. The mutation pass found that gap by
+; surviving — the first version of this file claimed to cover it in a comment.
+(defmacro trace [& body]
+  `(do (println :begin) ~@body (println :end)))
 
 ; Auto-gensym. Both occurrences are one name, and it cannot collide with the
 ; `v` the caller passes in — which is the whole point, and is what a template
@@ -34,8 +40,16 @@
 ; and an expander that walked into it would rewrite it.
 (def quoted-call '(when a b))
 
+; A macro receives *forms*, not values and not expansions. `when` is a macro by
+; now, so an expander that expanded arguments before invoking would hand
+; `as-data` something already rewritten — and the only way to see that is a
+; macro that keeps its argument as data instead of using it as code.
+(defmacro as-data [x] `(quote ~x))
+
 (println (when (< 0 answer) :positive))
 (println (unless (< answer 0) :not-negative))
 (println (twice 21))
 (println (pair :a :b) (tagged :k 1) (all 1 2))
 (println quoted-call)
+(println (as-data (when a b)))
+(trace (println :middle))

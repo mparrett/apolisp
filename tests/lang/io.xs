@@ -63,7 +63,16 @@
 (is= :io-error (get read-failure :type))
 (is= :closed (get read-failure :kind))
 (is= :read (get read-failure :operation))
-(is (= nil (get read-failure :path)))
+
+; `contains?` and not `(= nil (get ...))`. The obvious spelling cannot tell an
+; absent key from one present and nil, so it passes against the very shape this
+; assertion exists to forbid — a mutation that emits `:path nil` survived the
+; whole suite until this line said `contains?` instead
+; (`docs/notes/milestone-7-mutants.md`).
+(is (not (contains? read-failure :path)))
+(is (contains? open-failure :path))
+(is= 4 (count read-failure))
+(is= 5 (count open-failure))
 
 ; A misuse is a `:vm-error`, not an `:io-error`. Passing a string where a
 ; handle belongs is the same class of mistake as `(+ 1 "x")`, and nothing about
@@ -94,6 +103,20 @@
 (is (io/open? fresh))
 (is (throws? (io/close stale)))
 (io/close fresh)
+
+; Reading *through* a stale handle is the same aliasing bug on the path a
+; program is far more likely to walk, and the suite could not see it: dropping
+; the generation check from the read path alone survived everything above
+; (`docs/notes/milestone-7-mutants.md`). `gone` and `reused` share a slot, so
+; without the check this reads a file it never opened.
+(with-open [f (io/open path-b :write)] (io/write f "belongs-to-b"))
+(def gone (io/open path-a :read))
+(io/close gone)
+(def reused (io/open path-b :read))
+(is= :closed (get (try (io/read-all gone) (catch e e)) :kind))
+(is= :closed (get (try (io/write gone "x") (catch e e)) :kind))
+(is= "belongs-to-b" (bytes-str (io/read-all reused)))
+(io/close reused)
 
 ; --- with-open runs its cleanup on every path -------------------------------
 ;

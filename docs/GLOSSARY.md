@@ -175,6 +175,22 @@ same-build, fresh-VM resume with live handles refused (ADR-029).
 live: VM-owned, inside the `Execution` image, and discharged before a tail call
 reuses a frame (ADR-028).
 
+**fault** — A failure the VM raises rather than a program throwing it: an arity
+mismatch, an overflow, an unbound global, a call to a non-function. Since
+ADR-039 a fault *is* a throw — it unwinds identically and a `catch` binds it —
+and what distinguishes it is only its value's shape,
+`{:type :vm-error :kind K :message "..."}`.
+
+**unwind** — A failure in flight, and the act of delivering it: dropping frames
+down to the innermost handler record and entering that record. It carries three
+things, because only the first is a language value — the thrown value, the
+origin of the instruction that raised it, and the errors it displaced.
+
+**suppressed** — An error that a later one displaced. A cleanup that throws
+while unwinding wins, and the error it interrupted is retained on it (ADR-028
+invariant 3). In v1 the chain reaches the transcript and nothing else: a `catch`
+binds the winning value alone (ADR-039 clause 4).
+
 ## Host boundary
 
 **host** — Rust on the far side of the handle table. Everything the language

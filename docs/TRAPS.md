@@ -50,6 +50,21 @@ Every adapter declares its reacquisition semantics or refuses.
 hand-written. A Rust `?` early-return that skips frame cleanup leaks frames. Rust
 panics must never cross the VM loop.
 
+**A bare `catch` swallows typos.** Since ADR-039 a VM fault is a throw, so
+`(try (fetch-uesr id) (catch e :default))` catches the *unbound global* and
+returns `:default` — the program runs, the misspelling never surfaces, and the
+only trace is a `:kind :unbound` inside a value nobody looked at. Clojure's
+`(catch Exception e ...)` has the same hazard and the same answer: catch around
+the smallest expression that can fail, and look at `:kind` before deciding the
+handler applies. There is no filter clause in v1 to make the language check this
+for you.
+
+**A caught error loses its position and its suppressed chain.** Both travel
+beside the value, not inside it (ADR-039 clause 4), so a handler that re-throws
+what it caught throws a value whose origin is now the `throw` in the handler.
+The original position is gone, and `.out` will say the wrong line with complete
+confidence. Re-throwing is not free the way it looks.
+
 **Variadic rest is an empty list, not `nil`.** Clojure binds a rest parameter to
 `nil` when nothing extra was supplied; ADR-033 binds it to an empty list. This is
 the deviation most likely to be typed from muscle memory: an empty list is

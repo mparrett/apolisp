@@ -38,7 +38,7 @@ Each milestone is a runnable artifact.
 | 1 | Reader + printer + forms with span origins | **Done** (`ffcefa7`) — round-trip + span-invariants properties pass |
 | 2 | Core AST + slot compiler + disassembler | **Done** (`38d109c`) — `.disasm` goldens for six corpus programs |
 | 3 | VM: frames, calls, closures, `if`/`let`/`fn`, tail calls | **Done** (`8ff2c9f`) — smoke runs `run`; 100k tail calls peak at the same frame *and* slot count as 10 |
-| 4 | Errors, `try`/`throw`/`finally`, handler stack | Failure transcripts in the corpus; cleanup runs exactly once |
+| 4 | Errors, `try`/`throw`/`finally`, handler stack | **Done** (`aa7a20b`) — `control.xs` and `errors.xs` transcripts; cleanup counted on all four paths |
 | 5 | Macro expansion + quasiquote + gensym | `defmacro` in-language; deterministic output |
 | 6 | Collections, strings, bytes | In-language test suite begins |
 | 7 | Host handle table + blocking file/stdio | `with-open` works; handles are generational |
@@ -86,17 +86,22 @@ check proved the structural invariant alone was dead without it — see
 `notes/milestone-1-pilot.md`.
 
 `.out` is a canonical transcript, not just stdout: exit status, the final value
-*or* the thrown value, stdout, and any diagnostics. Milestone 4 puts failures in
-the corpus, and a failure with no defined record is a failure that cannot be
-pinned.
+*or* the thrown value, the position it was raised at, and any errors it
+displaced. A failure with no defined record is a failure that cannot be pinned,
+which is why milestone 4 could not start before ADR-039 fixed what a thrown
+value is.
 
-Only the programs that *run* carry one, and which those are is asserted as a
-list rather than inferred from which files happen to exist — so adding a corpus
-program forces the choice instead of silently skipping it. `just bless` updates
-a `.out` where one exists and never creates one, because creating the first one
-for a program is the decision. The rest of the corpus faults on globals nothing
-defines yet, and a fault transcript cannot be pinned before Q23 says what a
-thrown value is.
+Only the programs that *run to a defined end* carry one, and which those are is
+asserted as a list rather than inferred from which files happen to exist — so
+adding a corpus program forces the choice instead of silently skipping it. Since
+ADR-039 that list includes programs that fail: a fault is a value, so `control.xs`
+pins one and `errors.xs` pins a cleanup running on every path. `just bless`
+updates a `.out` where one exists and never creates one, because creating the
+first one for a program is the decision.
+
+The driver prints the path it was given, so the corpus harness runs it from the
+repository root with a relative path. An absolute one would put the checkout
+directory in a golden file.
 
 A snapshot per phase localizes a regression to one phase before anyone reads
 a diff. This is the highest-leverage thing in the project and should exist by the

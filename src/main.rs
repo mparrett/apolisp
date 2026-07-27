@@ -57,7 +57,7 @@ fn main() -> ExitCode {
                 Ok(forms) => {
                     let mut problems = Vec::new();
                     for f in &forms {
-                        value::check_origins(&f.root, &f.origins, src.len(), &mut problems);
+                        value::check_origins(&f.root, &f.origins, &src, &mut problems);
                     }
                     for f in &forms {
                         println!("{}", value::print_origins(&f.root, &f.origins, &interner, 0));
@@ -347,15 +347,28 @@ pub mod value {
 
     /// Walk a value against its origins and collect every way they disagree.
     ///
-    /// Two invariants (ADR-026): a `Source` span lies inside the file it came
-    /// from, and child-origin arity matches child count. The arity check is the
-    /// one that catches a whole *category* of node silently having no origin,
-    /// which is the failure `../reg-lisp` hit and its suite missed.
-    pub fn check_origins(v: &Value, o: &Origins, src_len: usize, out: &mut Vec<String>) {
+    /// Three invariants (ADR-026): a `Source` span lies inside the file it came
+    /// from, both of its ends fall on character boundaries, and child-origin
+    /// arity matches child count. The arity check is the one that catches a
+    /// whole *category* of node silently having no origin, which is the failure
+    /// `../reg-lisp` hit and its suite missed.
+    ///
+    /// The boundary check earns its place because the alternative to reporting
+    /// a misaligned span is panicking inside error rendering — a reader bug
+    /// then presents as a crash on the input it was meant to reject.
+    pub fn check_origins(v: &Value, o: &Origins, src: &str, out: &mut Vec<String>) {
         if let SpanOrigin::Source(s) = o.origin {
-            if s.start > s.end || s.end as usize > src_len {
+            let (start, end) = (s.start as usize, s.end as usize);
+            if s.start > s.end || end > src.len() {
                 out.push(format!(
-                    "span {}..{} outside source of {src_len} bytes",
+                    "span {}..{} outside source of {} bytes",
+                    s.start,
+                    s.end,
+                    src.len()
+                ));
+            } else if !src.is_char_boundary(start) || !src.is_char_boundary(end) {
+                out.push(format!(
+                    "span {}..{} does not lie on character boundaries",
                     s.start, s.end
                 ));
             }
@@ -370,7 +383,7 @@ pub mod value {
             return; // Arity is already wrong; recursing would report noise.
         }
         for (child, co) in children(v).iter().zip(&o.children) {
-            check_origins(child, co, src_len, out);
+            check_origins(child, co, src, out);
         }
     }
 
@@ -478,15 +491,6 @@ pub mod reader {
 
         fn peek(&self) -> Option<u8> {
             self.src.as_bytes().get(self.pos).copied()
-        }
-
-        fn bump(&mut self) -> Option<u8> {
-            let b = self.peek()?;
-            // Advance by one character, not one byte, so positions stay inside
-            // character boundaries in non-ASCII source.
-            let rest = &self.src[self.pos..];
-            self.pos += rest.chars().next().map(|c| c.len_utf8()).unwrap_or(1);
-            Some(b)
         }
 
         fn skip_ws(&mut self) {
@@ -679,20 +683,31 @@ pub mod reader {
                         ));
                     }
                     b'\\' => {
+                        // The backslash offset is captured before advancing.
+                        // The escaped character may be multi-byte, so the span
+                        // cannot be recovered afterwards by subtracting a byte
+                        // count — that lands inside a character and panics the
+                        // renderer on input the reader is supposed to reject.
+                        let esc_start = self.pos;
                         self.pos += 1;
-                        let esc = self
-                            .bump()
-                            .ok_or_else(|| self.err_here("unfinished escape sequence"))?;
+                        let esc = match self.src[self.pos..].chars().next() {
+                            None => return Err(self.err_here("unfinished escape sequence")),
+                            Some(c) => c,
+                        };
+                        self.pos += esc.len_utf8();
                         match esc {
-                            b'n' => s.push('\n'),
-                            b't' => s.push('\t'),
-                            b'r' => s.push('\r'),
-                            b'\\' => s.push('\\'),
-                            b'"' => s.push('"'),
+                            'n' => s.push('\n'),
+                            't' => s.push('\t'),
+                            'r' => s.push('\r'),
+                            '\\' => s.push('\\'),
+                            '"' => s.push('"'),
+                            // Reported as a character, not as the first byte of
+                            // one: `\€` names the escape the source actually
+                            // wrote rather than a mojibake prefix of it.
                             other => {
                                 return Err(LispErr::at(
-                                    Span::new(self.pos - 2, self.pos),
-                                    format!("unknown escape `\\{}`", other as char),
+                                    Span::new(esc_start, self.pos),
+                                    format!("unknown escape `\\{other}`"),
                                 ))
                             }
                         }

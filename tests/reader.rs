@@ -28,8 +28,12 @@ fn bin() -> PathBuf {
 }
 
 fn read_cmd(path: &Path) -> Result<String, String> {
+    run_cmd("read", path)
+}
+
+fn run_cmd(cmd: &str, path: &Path) -> Result<String, String> {
     let out = Command::new(bin())
-        .arg("read")
+        .arg(cmd)
         .arg(path)
         .output()
         .expect("failed to run apolisp; `cargo build` first");
@@ -49,13 +53,22 @@ fn read_cmd(path: &Path) -> Result<String, String> {
 /// parallel threads of one process, so a pid-only name has every test writing
 /// the same path and reading back someone else's source.
 fn read_str(src: &str) -> Result<String, String> {
+    cmd_str("read", src)
+}
+
+/// The same, for the `spans` debug view.
+fn spans_str(src: &str) -> Result<String, String> {
+    cmd_str("spans", src)
+}
+
+fn cmd_str(cmd: &str, src: &str) -> Result<String, String> {
     use std::sync::atomic::{AtomicUsize, Ordering};
     static SEQ: AtomicUsize = AtomicUsize::new(0);
     let n = SEQ.fetch_add(1, Ordering::Relaxed);
     let mut path = std::env::temp_dir();
     path.push(format!("apolisp-prop-{}-{n}.xs", std::process::id()));
     std::fs::write(&path, src).unwrap();
-    let r = read_cmd(&path);
+    let r = run_cmd(cmd, &path);
     let _ = std::fs::remove_file(&path);
     r
 }
@@ -349,6 +362,46 @@ fn unclosed_delimiter_points_at_the_opener() {
     let src = "(a\nb\nc\nd\n";
     let err = read_str(src).expect_err("should not read");
     assert!(err.contains(":1:1:"), "expected the opener at 1:1, got {err:?}");
+}
+
+/// Non-ASCII source must reach a `LispErr`, not a panic.
+///
+/// The escape span was built by subtracting a byte count from the position
+/// after the escaped character, which lands inside any multi-byte one and
+/// panics `line_col` while rendering. A reader bug presenting as a crash on
+/// the very input it rejects is the worst available failure mode, so the class
+/// is pinned here and by the character-boundary span invariant.
+#[test]
+fn a_multibyte_escape_is_an_error_not_a_panic() {
+    for src in ["\"\\€\"", "\"\\é\"", "\"a\\🙂b\""] {
+        let err = read_str(src).expect_err(&format!("{src:?} should not read"));
+        assert!(
+            err.contains("unknown escape"),
+            "{src:?}: expected an unknown-escape error, got {err:?}"
+        );
+        assert!(
+            err.contains(":1:"),
+            "{src:?}: error has no line:col — {err:?}"
+        );
+    }
+    // The message names the character the source wrote, not the first byte of
+    // its encoding.
+    let err = read_str("\"\\€\"").unwrap_err();
+    assert!(err.contains("`\\€`"), "escape misreported: {err:?}");
+}
+
+/// Multi-byte characters in the forms that do read, so the spans covering them
+/// are exercised by the boundary invariant rather than only by the escape path.
+#[test]
+fn non_ascii_forms_read_with_well_formed_spans() {
+    for src in ["\"héllo\"", "(δ 1)", ":χ", "{:α \"ω\"}", "[é 🙂]"] {
+        read_str(src).unwrap_or_else(|e| panic!("{src:?} should read: {e}"));
+        let spans = spans_str(src).unwrap_or_else(|e| panic!("{src:?} spans: {e}"));
+        assert!(
+            spans.contains("ok: span invariants hold"),
+            "{src:?}: {spans}"
+        );
+    }
 }
 
 #[test]

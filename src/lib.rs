@@ -146,8 +146,22 @@ pub mod value {
     /// nondeterminism there kills the oracle (BUILD.md).
     #[derive(Debug)]
     pub struct MapObj(pub Vec<(Value, Value)>);
+
+    /// An index into the VM's native function table (ADR-038).
+    #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+    pub struct NativeId(pub u32);
+
+    /// ADR-038. A native function is a kind of closure, so it is called through
+    /// the ordinary `Call` and `Value` needs no new variant — ADR-025 stands.
+    ///
+    /// `proto` is a plain `u32` rather than `bytecode::ProtoIdx` because
+    /// `bytecode` depends on this module and not the other way round. Captures
+    /// are copied in at creation and never referenced (ADR-002).
     #[derive(Debug)]
-    pub struct Closure;
+    pub enum Closure {
+        Fn { proto: u32, captures: Rc<[Value]> },
+        Native(NativeId),
+    }
 
     /// ADR-025. `PartialEq` is implemented by hand below, never derived —
     /// derived equality follows Rust variant and payload equality, which is the
@@ -820,6 +834,21 @@ pub mod printer {
         let mut out = String::new();
         write(&mut out, v, interner);
         out
+    }
+
+    /// What `println` emits: a string is its own characters, not a readable
+    /// literal. Clojure draws the same line between `pr` and `print`, and the
+    /// round-trip property is about `print` — this one deliberately does not
+    /// read back.
+    ///
+    /// Only the top level is affected. A string *inside* a collection still
+    /// prints readably, because the alternative renders `["a b" "c"]`
+    /// indistinguishable from `["a" "b" "c"]`.
+    pub fn display(v: &Value, interner: &Interner) -> String {
+        match v {
+            Value::Str(s) => s.0.clone(),
+            _ => print(v, interner),
+        }
     }
 
     fn write(out: &mut String, v: &Value, interner: &Interner) {
@@ -2065,5 +2094,648 @@ pub mod compile {
                 self.patch(over, end);
             }
         }
+    }
+}
+
+// ---------------------------------------------------------------------------
+
+/// The VM: frames, calls, closures, and tail calls (ADR-004, ADR-038).
+///
+/// The dispatch loop is flat and the Rust stack is empty at every instruction
+/// boundary (ADR-004). That is the decision the whole snapshot story rests on,
+/// and it is also why nothing here recurses — a native function is called and
+/// returns, but it never re-enters the loop.
+///
+/// `Vm` and `Execution` are separate for the reason ADR-029 gives: an `Image` is
+/// one of each, so anything not in either is out of scope by construction.
+/// Milestone 3 builds both; the handler stack and fuel are milestones 4 and 8.
+pub mod vm {
+    use crate::bytecode::{CaptureSrc, Chunk, Instr};
+    use crate::error::{LispErr, SpanOrigin};
+    use crate::printer;
+    use crate::value::{
+        CellId, Closure, Interner, ListObj, MapObj, NativeId, SymId, Value, VecObj,
+    };
+    use std::rc::Rc;
+
+    /// How a run ended. A `LispErr` is a **host fault** — an arity mismatch, an
+    /// overflow, an unbound global — and `Threw` carries a language value from
+    /// `throw`. ADR-038 keeps them distinct on purpose: making faults into
+    /// language values would answer Q23 by accident.
+    #[derive(Debug)]
+    pub enum Outcome {
+        Returned(Value),
+        Threw(Value),
+    }
+
+    type NativeFn = fn(&mut Vm, &[Value]) -> Result<Value, String>;
+
+    struct Native {
+        name: SymId,
+        /// Minimum argument count; `variadic` allows more.
+        min: u32,
+        variadic: bool,
+        f: NativeFn,
+    }
+
+    /// ADR-025: cells are retained for the lifetime of the VM in v1, and the
+    /// live count is instrumented rather than reclaimed.
+    struct CellEntry {
+        generation: u32,
+        value: Value,
+    }
+
+    pub struct Vm {
+        pub interner: Interner,
+        /// Indexed by `SymId`, not a map: globals reach output through the
+        /// disassembler and eventually through an `Image`, and a `Vec` is
+        /// deterministic by construction where a `HashMap` needs a sort
+        /// (BUILD.md, determinism).
+        globals: Vec<Option<CellId>>,
+        cells: Vec<CellEntry>,
+        natives: Vec<Native>,
+        /// The buffered in-memory host BUILD.md's serialization property needs:
+        /// emitted effects are part of the comparison rather than escaping it.
+        out: String,
+    }
+
+    impl Vm {
+        pub fn new() -> Vm {
+            let mut vm = Vm {
+                interner: Interner::new(),
+                globals: Vec::new(),
+                cells: Vec::new(),
+                natives: Vec::new(),
+                out: String::new(),
+            };
+            vm.install_primitives();
+            vm
+        }
+
+        pub fn take_output(&mut self) -> String {
+            std::mem::take(&mut self.out)
+        }
+
+        pub fn live_cells(&self) -> usize {
+            self.cells.len()
+        }
+
+        fn new_cell(&mut self, value: Value) -> CellId {
+            self.cells.push(CellEntry {
+                generation: 0,
+                value,
+            });
+            CellId((self.cells.len() - 1) as u32, 0)
+        }
+
+        fn cell(&self, id: CellId) -> Option<&Value> {
+            let e = self.cells.get(id.0 as usize)?;
+            (e.generation == id.1).then_some(&e.value)
+        }
+
+        fn set_cell(&mut self, id: CellId, value: Value) -> bool {
+            match self.cells.get_mut(id.0 as usize) {
+                Some(e) if e.generation == id.1 => {
+                    e.value = value;
+                    true
+                }
+                _ => false,
+            }
+        }
+
+        pub fn global(&self, name: SymId) -> Option<&Value> {
+            let id = (*self.globals.get(name.0 as usize)?)?;
+            self.cell(id)
+        }
+
+        /// ADR-027's create-or-rebind. The name's cell is created once and kept,
+        /// so a closure that already read the global keeps seeing rebinds.
+        pub fn set_global(&mut self, name: SymId, value: Value) {
+            let i = name.0 as usize;
+            if self.globals.len() <= i {
+                self.globals.resize(i + 1, None);
+            }
+            match self.globals[i] {
+                Some(id) => {
+                    self.set_cell(id, value);
+                }
+                None => {
+                    let id = self.new_cell(value);
+                    self.globals[i] = Some(id);
+                }
+            }
+        }
+
+        fn native(&mut self, name: &str, min: u32, variadic: bool, f: NativeFn) {
+            let sym = SymId(self.interner.intern(name));
+            self.natives.push(Native {
+                name: sym,
+                min,
+                variadic,
+                f,
+            });
+            let id = NativeId((self.natives.len() - 1) as u32);
+            self.set_global(sym, Value::Fn(Rc::new(Closure::Native(id))));
+        }
+    }
+
+    impl Default for Vm {
+        fn default() -> Vm {
+            Vm::new()
+        }
+    }
+
+    /// One function activation. Slots live in a single flat `Vec` on the
+    /// `Execution`, base-relative, which is the shape an `Image` wants
+    /// (ADR-029) and what makes a tail call a truncation rather than a copy.
+    struct Frame {
+        proto: u32,
+        pc: usize,
+        /// Index in `Execution::slots` of this frame's slot 0.
+        base: usize,
+        /// Absolute slot index, in the *caller's* frame, for the return value.
+        /// Always below `base`, so returning can truncate first and write after.
+        dst: usize,
+        /// The slot stack's length before this frame existed. Returning
+        /// restores it. Truncating to `base` instead would discard the part of
+        /// the *caller's* frame that sits above the call window, which is most
+        /// of it — the window is allocated early and the caller keeps using
+        /// slots above it after the call returns.
+        ret_len: usize,
+        closure: Rc<Closure>,
+    }
+
+    pub struct Execution {
+        frames: Vec<Frame>,
+        slots: Vec<Value>,
+    }
+
+    impl Execution {
+        /// The deepest the frame stack reached, and the largest the slot stack
+        /// grew. A tail loop keeps both flat, which is milestone 3's exit
+        /// condition and not otherwise observable from outside.
+        pub fn depth(&self) -> usize {
+            self.frames.len()
+        }
+
+        pub fn slot_count(&self) -> usize {
+            self.slots.len()
+        }
+    }
+
+    pub fn run(vm: &mut Vm, chunk: &Chunk) -> Result<Outcome, LispErr> {
+        let (outcome, _) = run_traced(vm, chunk)?;
+        Ok(outcome)
+    }
+
+    /// `run`, plus the high-water marks. Separate because the marks exist for
+    /// the constant-space property and have no place in the driver.
+    pub fn run_traced(vm: &mut Vm, chunk: &Chunk) -> Result<(Outcome, (usize, usize)), LispErr> {
+        let top = Rc::new(Closure::Fn {
+            proto: 0,
+            captures: Rc::from(Vec::new()),
+        });
+        let mut ex = Execution {
+            frames: Vec::new(),
+            slots: Vec::new(),
+        };
+        let slots = chunk.protos[0].slots as usize;
+        ex.slots.resize(slots, Value::Nil);
+        ex.frames.push(Frame {
+            proto: 0,
+            pc: 0,
+            base: 0,
+            dst: 0,
+            ret_len: 0,
+            closure: top,
+        });
+
+        let mut peak = (1usize, ex.slots.len());
+        loop {
+            let fi = ex.frames.len() - 1;
+            let (pidx, base, pc) = {
+                let f = &ex.frames[fi];
+                (f.proto, f.base, f.pc)
+            };
+            let proto = &chunk.protos[pidx as usize];
+            let ins = proto.code[pc];
+            let at = proto.lines[pc];
+            ex.frames[fi].pc = pc + 1;
+
+            match ins {
+                Instr::Const { dst, k } => {
+                    ex.slots[base + dst as usize] = proto.consts[k as usize].clone();
+                }
+                Instr::Move { dst, src } => {
+                    ex.slots[base + dst as usize] = ex.slots[base + src as usize].clone();
+                }
+                Instr::GetGlobal { dst, name } => {
+                    let v = vm.global(name).cloned().ok_or_else(|| {
+                        fault(at, format!("`{}` is not bound", vm.interner.name(name.0)))
+                    })?;
+                    ex.slots[base + dst as usize] = v;
+                }
+                Instr::SetGlobal { name, src } => {
+                    let v = ex.slots[base + src as usize].clone();
+                    vm.set_global(name, v);
+                }
+                Instr::GetCapture { dst, idx } => {
+                    let v = match &*ex.frames[fi].closure {
+                        Closure::Fn { captures, .. } => captures[idx as usize].clone(),
+                        Closure::Native(_) => {
+                            return Err(fault(at, "a native function has no captures"))
+                        }
+                    };
+                    ex.slots[base + dst as usize] = v;
+                }
+                Instr::GetSelf { dst } => {
+                    let me = ex.frames[fi].closure.clone();
+                    ex.slots[base + dst as usize] = Value::Fn(me);
+                }
+                Instr::SetCell { cell, src } => {
+                    let target = ex.slots[base + cell as usize].clone();
+                    let v = ex.slots[base + src as usize].clone();
+                    match target {
+                        Value::Cell(id) if vm.set_cell(id, v) => {}
+                        Value::Cell(_) => return Err(fault(at, "cell is no longer live")),
+                        other => {
+                            return Err(fault(
+                                at,
+                                format!(
+                                    "`set-cell!` needs a cell, not a {}",
+                                    crate::value::kind_name(&other)
+                                ),
+                            ))
+                        }
+                    }
+                }
+                Instr::Closure { dst, proto: p } => {
+                    // ADR-002: captures are copied out of this frame now, not
+                    // referenced. The descriptors are read here because they
+                    // name slots in the *enclosing* frame.
+                    let target = &chunk.protos[p as usize];
+                    let mut captured = Vec::with_capacity(target.captures.len());
+                    for c in &target.captures {
+                        captured.push(match *c {
+                            CaptureSrc::Local(s) => ex.slots[base + s as usize].clone(),
+                            CaptureSrc::Capture(i) => match &*ex.frames[fi].closure {
+                                Closure::Fn { captures, .. } => captures[i as usize].clone(),
+                                Closure::Native(_) => {
+                                    return Err(fault(at, "a native function has no captures"))
+                                }
+                            },
+                            CaptureSrc::SelfFn => Value::Fn(ex.frames[fi].closure.clone()),
+                        });
+                    }
+                    ex.slots[base + dst as usize] = Value::Fn(Rc::new(Closure::Fn {
+                        proto: p,
+                        captures: Rc::from(captured),
+                    }));
+                }
+                Instr::Jump { target } => {
+                    ex.frames[fi].pc = target as usize;
+                }
+                Instr::JumpUnless { cond, target } => {
+                    // Only nil and false are falsy (`TRAPS.md`). 0 and "" are
+                    // truthy, and so is an empty collection.
+                    let truthy = !matches!(
+                        ex.slots[base + cond as usize],
+                        Value::Nil | Value::Bool(false)
+                    );
+                    if !truthy {
+                        ex.frames[fi].pc = target as usize;
+                    }
+                }
+                Instr::Call {
+                    dst,
+                    base: cb,
+                    argc,
+                } => {
+                    let callee = base + cb as usize;
+                    if let Some(v) =
+                        call(vm, &mut ex, chunk, callee, argc, base + dst as usize, at)?
+                    {
+                        // A native returns immediately; there is no frame to
+                        // push and nothing to resume.
+                        ex.slots[base + dst as usize] = v;
+                    }
+                }
+                Instr::TailCall { base: cb, argc } => {
+                    let callee = base + cb as usize;
+                    if let Some(v) = tail_call(vm, &mut ex, chunk, callee, argc, at)? {
+                        if let Some(done) = ret(&mut ex, v) {
+                            return Ok((Outcome::Returned(done), peak));
+                        }
+                    }
+                }
+                Instr::Return { src } => {
+                    let v = ex.slots[base + src as usize].clone();
+                    if let Some(done) = ret(&mut ex, v) {
+                        return Ok((Outcome::Returned(done), peak));
+                    }
+                }
+                Instr::Throw { src } => {
+                    // No handler stack until milestone 4 (ADR-028), so a throw
+                    // ends the run carrying its value.
+                    return Ok((Outcome::Threw(ex.slots[base + src as usize].clone()), peak));
+                }
+                Instr::PushHandler { .. }
+                | Instr::PushFinally { .. }
+                | Instr::PopHandler
+                | Instr::EndFinally => {
+                    return Err(fault(at, "`try` runs at milestone 4 (BUILD.md)"));
+                }
+            }
+            peak.0 = peak.0.max(ex.frames.len());
+            peak.1 = peak.1.max(ex.slots.len());
+        }
+    }
+
+    fn fault(origin: SpanOrigin, msg: impl Into<String>) -> LispErr {
+        LispErr::at_origin(origin, msg)
+    }
+
+    /// Pop the finished frame and deliver its value. `None` means execution
+    /// continues; `Some` means the outermost frame returned.
+    fn ret(ex: &mut Execution, value: Value) -> Option<Value> {
+        let f = ex.frames.pop().expect("a frame to return from");
+        ex.slots.truncate(f.ret_len);
+        if ex.frames.is_empty() {
+            return Some(value);
+        }
+        ex.slots[f.dst] = value;
+        None
+    }
+
+    /// Push a frame for a bytecode callee, or run a native and hand back its
+    /// value. `Ok(None)` means a frame was pushed.
+    fn call(
+        vm: &mut Vm,
+        ex: &mut Execution,
+        chunk: &Chunk,
+        callee: usize,
+        argc: u32,
+        dst: usize,
+        at: SpanOrigin,
+    ) -> Result<Option<Value>, LispErr> {
+        match callee_at(ex, callee, at)? {
+            Callee::Native(id) => native_call(vm, ex, id, callee, argc, at).map(Some),
+            Callee::Bytecode(proto, c) => {
+                // The arguments already sit at `callee+1..`, which is exactly
+                // where the callee's slots 0.. must be — so a call copies
+                // nothing (ADR-034).
+                let base = callee + 1;
+                let ret_len = ex.slots.len();
+                enter(vm, ex, chunk, proto, argc, base, at)?;
+                ex.frames.push(Frame {
+                    proto,
+                    pc: 0,
+                    base,
+                    dst,
+                    ret_len,
+                    closure: c,
+                });
+                Ok(None)
+            }
+        }
+    }
+
+    /// ADR-028: reuse the caller's frame. The arguments move down to `base`,
+    /// which is what keeps a tail loop in constant space.
+    fn tail_call(
+        vm: &mut Vm,
+        ex: &mut Execution,
+        chunk: &Chunk,
+        callee: usize,
+        argc: u32,
+        at: SpanOrigin,
+    ) -> Result<Option<Value>, LispErr> {
+        match callee_at(ex, callee, at)? {
+            Callee::Native(id) => native_call(vm, ex, id, callee, argc, at).map(Some),
+            Callee::Bytecode(proto, c) => {
+                let fi = ex.frames.len() - 1;
+                let base = ex.frames[fi].base;
+                // Copying ascending is safe: `base <= callee`, so the
+                // destination of each argument is always below its source.
+                for i in 0..argc as usize {
+                    ex.slots[base + i] = ex.slots[callee + 1 + i].clone();
+                }
+                enter(vm, ex, chunk, proto, argc, base, at)?;
+                ex.frames[fi].proto = proto;
+                ex.frames[fi].pc = 0;
+                ex.frames[fi].closure = c;
+                Ok(None)
+            }
+        }
+    }
+
+    /// What is in the callee slot, resolved once so `call` and `tail_call`
+    /// share one answer and one error message.
+    enum Callee {
+        Native(NativeId),
+        Bytecode(u32, Rc<Closure>),
+    }
+
+    fn callee_at(ex: &Execution, callee: usize, at: SpanOrigin) -> Result<Callee, LispErr> {
+        match &ex.slots[callee] {
+            Value::Fn(c) => Ok(match &**c {
+                Closure::Native(id) => Callee::Native(*id),
+                Closure::Fn { proto, .. } => Callee::Bytecode(*proto, c.clone()),
+            }),
+            other => Err(fault(
+                at,
+                format!("cannot call a {}", crate::value::kind_name(other)),
+            )),
+        }
+    }
+
+    /// The callee prologue: check arity once, at call time (ADR-033 rule 2),
+    /// size the frame, and pack a rest parameter (ADR-038).
+    fn enter(
+        vm: &Vm,
+        ex: &mut Execution,
+        chunk: &Chunk,
+        proto: u32,
+        argc: u32,
+        base: usize,
+        at: SpanOrigin,
+    ) -> Result<(), LispErr> {
+        let p = &chunk.protos[proto as usize];
+        let name = match p.name {
+            Some(s) => vm.interner.name(s.0).to_string(),
+            None => "fn".to_string(),
+        };
+        let fixed = if p.variadic { p.params - 1 } else { p.params };
+        if argc < fixed || (!p.variadic && argc > fixed) {
+            let wanted = if p.variadic {
+                format!("at least {fixed}")
+            } else {
+                fixed.to_string()
+            };
+            return Err(fault(
+                at,
+                format!("`{name}` takes {wanted} argument(s), given {argc}"),
+            ));
+        }
+        // ADR-038: whatever the call actually needs, since ADR-034 sets no
+        // maximum arity and the compiler therefore cannot have reserved it.
+        let want = (p.slots as usize).max(argc as usize);
+        if ex.slots.len() < base + want {
+            ex.slots.resize(base + want, Value::Nil);
+        }
+        // Everything above the arguments starts as nil. The compiler writes
+        // every slot before it reads one, so this is not needed for
+        // correctness — it is needed so a frame's contents are a function of
+        // the call and not of whatever ran here last, which is what an `Image`
+        // has to serialize (ADR-029).
+        for s in ex
+            .slots
+            .iter_mut()
+            .skip(base + argc as usize)
+            .take(want.saturating_sub(argc as usize))
+        {
+            *s = Value::Nil;
+        }
+        if p.variadic {
+            // Packed in place: slots `fixed..argc` are dead the instant they are
+            // collected, because the prologue runs before the first
+            // instruction. The rest is an empty *list*, never nil (ADR-033,
+            // E-11).
+            let rest: Vec<Value> = ex.slots[base + fixed as usize..base + argc as usize].to_vec();
+            for s in ex
+                .slots
+                .iter_mut()
+                .skip(base + fixed as usize)
+                .take(want - fixed as usize)
+            {
+                *s = Value::Nil;
+            }
+            ex.slots[base + fixed as usize] = Value::List(Rc::new(ListObj(rest)));
+        }
+        Ok(())
+    }
+
+    fn native_call(
+        vm: &mut Vm,
+        ex: &Execution,
+        id: NativeId,
+        callee: usize,
+        argc: u32,
+        at: SpanOrigin,
+    ) -> Result<Value, LispErr> {
+        let n = &vm.natives[id.0 as usize];
+        let (min, variadic, f, name) = (n.min, n.variadic, n.f, n.name);
+        if argc < min || (!variadic && argc > min) {
+            let wanted = if variadic {
+                format!("at least {min}")
+            } else {
+                min.to_string()
+            };
+            return Err(fault(
+                at,
+                format!(
+                    "`{}` takes {wanted} argument(s), given {argc}",
+                    vm.interner.name(name.0)
+                ),
+            ));
+        }
+        // `ex` and `vm` are distinct, so the arguments are borrowed in place
+        // rather than copied into a temporary for every native call.
+        let args = &ex.slots[callee + 1..callee + 1 + argc as usize];
+        f(vm, args).map_err(|msg| fault(at, msg))
+    }
+
+    // --- primitives ---------------------------------------------------------
+
+    /// ADR-038: primitives are ordinary globals, so `+` is a value you can pass
+    /// to `map` and `set-global!` can rebind it — including out from under the
+    /// program, which is the wart that entry accepts.
+    impl Vm {
+        fn install_primitives(&mut self) {
+            self.native("+", 0, true, |_, a| int_fold(a, 0, i64::checked_add, "+"));
+            self.native("*", 0, true, |_, a| int_fold(a, 1, i64::checked_mul, "*"));
+            self.native("-", 1, true, |_, a| {
+                let first = int_arg(&a[0], "-")?;
+                if a.len() == 1 {
+                    return first
+                        .checked_neg()
+                        .map(Value::Int)
+                        .ok_or_else(|| overflow("-"));
+                }
+                let mut acc = first;
+                for v in &a[1..] {
+                    acc = acc
+                        .checked_sub(int_arg(v, "-")?)
+                        .ok_or_else(|| overflow("-"))?;
+                }
+                Ok(Value::Int(acc))
+            });
+            self.native("<", 2, false, |_, a| {
+                Ok(Value::Bool(int_arg(&a[0], "<")? < int_arg(&a[1], "<")?))
+            });
+            self.native(">", 2, false, |_, a| {
+                Ok(Value::Bool(int_arg(&a[0], ">")? > int_arg(&a[1], ">")?))
+            });
+            self.native("println", 0, true, |vm, a| {
+                let line: Vec<String> = a
+                    .iter()
+                    .map(|v| printer::display(v, &vm.interner))
+                    .collect();
+                vm.out.push_str(&line.join(" "));
+                vm.out.push('\n');
+                Ok(Value::Nil)
+            });
+            self.native("list", 0, true, |_, a| {
+                Ok(Value::List(Rc::new(ListObj(a.to_vec()))))
+            });
+            // ADR-035 lowers `[a b]` to a call, so these two are what makes a
+            // collection literal mean anything. The representation itself is
+            // still Q6's, and `hash-map` keeps duplicate keys because Q20 has
+            // not said what to do with them.
+            self.native("vector", 0, true, |_, a| {
+                Ok(Value::Vec(Rc::new(VecObj(a.to_vec()))))
+            });
+            self.native("hash-map", 0, true, |_, a| {
+                if !a.len().is_multiple_of(2) {
+                    return Err("`hash-map` needs a value for every key".to_string());
+                }
+                Ok(Value::Map(Rc::new(MapObj(
+                    a.chunks(2).map(|p| (p[0].clone(), p[1].clone())).collect(),
+                ))))
+            });
+        }
+    }
+
+    fn overflow(op: &str) -> String {
+        format!("`{op}` overflowed a 64-bit integer (ADR-037)")
+    }
+
+    /// Q26: mixing integers and floats, and float arithmetic at all, is
+    /// undecided. Faulting is the option that does not answer it by accident —
+    /// silently coercing would fix the numeric tower here, in a match arm.
+    fn int_arg(v: &Value, op: &str) -> Result<i64, String> {
+        match v {
+            Value::Int(i) => Ok(*i),
+            Value::Float(_) => Err(format!(
+                "`{op}` on a float: the numeric tower is undecided (Q26)"
+            )),
+            other => Err(format!(
+                "`{op}` needs an integer, not a {}",
+                crate::value::kind_name(other)
+            )),
+        }
+    }
+
+    fn int_fold(
+        args: &[Value],
+        init: i64,
+        op: fn(i64, i64) -> Option<i64>,
+        name: &str,
+    ) -> Result<Value, String> {
+        let mut acc = init;
+        for v in args {
+            acc = op(acc, int_arg(v, name)?).ok_or_else(|| overflow(name))?;
+        }
+        Ok(Value::Int(acc))
     }
 }

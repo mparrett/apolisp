@@ -1,0 +1,138 @@
+242..353 list (set-global! factorial (fn factorial [n acc] (if (< n 2) acc (factorial (- n 1) (* acc n)))))
+  243..254 symbol set-global!
+  255..264 symbol factorial
+  267..352 list (fn factorial [n acc] (if (< n 2) acc (factorial (- n 1) (* acc n))))
+    268..270 symbol fn
+    271..280 symbol factorial
+    281..288 vector [n acc]
+      282..283 symbol n
+      284..287 symbol acc
+    293..351 list (if (< n 2) acc (factorial (- n 1) (* acc n)))
+      294..296 symbol if
+      297..304 list (< n 2)
+        298..299 symbol <
+        300..301 symbol n
+        302..303 int 2
+      311..314 symbol acc
+      321..350 list (factorial (- n 1) (* acc n))
+        322..331 symbol factorial
+        332..339 list (- n 1)
+          333..334 symbol -
+          335..336 symbol n
+          337..338 int 1
+        340..349 list (* acc n)
+          341..342 symbol *
+          343..346 symbol acc
+          347..348 symbol n
+354..380 list (println (factorial 20 1))
+  355..362 symbol println
+  363..379 list (factorial 20 1)
+    364..373 symbol factorial
+    374..376 int 20
+    377..378 int 1
+518..626 list (set-global! count-to (fn count-to [i limit] (if (< i limit) (count-to (+ i 1) limit) i)))
+  519..530 symbol set-global!
+  531..539 symbol count-to
+  542..625 list (fn count-to [i limit] (if (< i limit) (count-to (+ i 1) limit) i))
+    543..545 symbol fn
+    546..554 symbol count-to
+    555..564 vector [i limit]
+      556..557 symbol i
+      558..563 symbol limit
+    569..624 list (if (< i limit) (count-to (+ i 1) limit) i)
+      570..572 symbol if
+      573..584 list (< i limit)
+        574..575 symbol <
+        576..577 symbol i
+        578..583 symbol limit
+      591..615 list (count-to (+ i 1) limit)
+        592..600 symbol count-to
+        601..608 list (+ i 1)
+          602..603 symbol +
+          604..605 symbol i
+          606..607 int 1
+        609..614 symbol limit
+      622..623 symbol i
+627..656 list (println (count-to 0 100000))
+  628..635 symbol println
+  636..655 list (count-to 0 100000)
+    637..645 symbol count-to
+    646..647 int 0
+    648..654 int 100000
+805..897 list (set-global! sum-to (fn sum-to [n] (if (< n 1) 0 (+ n (sum-to (- n 1))))))
+  806..817 symbol set-global!
+  818..824 symbol sum-to
+  827..896 list (fn sum-to [n] (if (< n 1) 0 (+ n (sum-to (- n 1)))))
+    828..830 symbol fn
+    831..837 symbol sum-to
+    838..841 vector [n]
+      839..840 symbol n
+    846..895 list (if (< n 1) 0 (+ n (sum-to (- n 1))))
+      847..849 symbol if
+      850..857 list (< n 1)
+        851..852 symbol <
+        853..854 symbol n
+        855..856 int 1
+      864..865 int 0
+      872..894 list (+ n (sum-to (- n 1)))
+        873..874 symbol +
+        875..876 symbol n
+        877..893 list (sum-to (- n 1))
+          878..884 symbol sum-to
+          885..892 list (- n 1)
+            886..887 symbol -
+            888..889 symbol n
+            890..891 int 1
+898..920 list (println (sum-to 100))
+  899..906 symbol println
+  907..919 list (sum-to 100)
+    908..914 symbol sum-to
+    915..918 int 100
+1036..1083 list (set-global! adder (fn [by] (fn [x] (+ x by))))
+  1037..1048 symbol set-global!
+  1049..1054 symbol adder
+  1055..1082 list (fn [by] (fn [x] (+ x by)))
+    1056..1058 symbol fn
+    1059..1063 vector [by]
+      1060..1062 symbol by
+    1064..1081 list (fn [x] (+ x by))
+      1065..1067 symbol fn
+      1068..1071 vector [x]
+        1069..1070 symbol x
+      1072..1080 list (+ x by)
+        1073..1074 symbol +
+        1075..1076 symbol x
+        1077..1079 symbol by
+1084..1108 list (println ((adder 40) 2))
+  1085..1092 symbol println
+  1093..1107 list ((adder 40) 2)
+    1094..1104 list (adder 40)
+      1095..1100 symbol adder
+      1101..1103 int 40
+    1105..1106 int 2
+1259..1318 list (set-global! tally (fn [head & others] (list head others)))
+  1260..1271 symbol set-global!
+  1272..1277 symbol tally
+  1278..1317 list (fn [head & others] (list head others))
+    1279..1281 symbol fn
+    1282..1297 vector [head & others]
+      1283..1287 symbol head
+      1288..1289 symbol &
+      1290..1296 symbol others
+    1298..1316 list (list head others)
+      1299..1303 symbol list
+      1304..1308 symbol head
+      1309..1315 symbol others
+1319..1342 list (println (tally 1 2 3))
+  1320..1327 symbol println
+  1328..1341 list (tally 1 2 3)
+    1329..1334 symbol tally
+    1335..1336 int 1
+    1337..1338 int 2
+    1339..1340 int 3
+1343..1362 list (println (tally 1))
+  1344..1351 symbol println
+  1352..1361 list (tally 1)
+    1353..1358 symbol tally
+    1359..1360 int 1
+ok: span invariants hold

@@ -55,10 +55,17 @@ pub fn corpus_files() -> Vec<PathBuf> {
 /// diff and decide whether the behaviour change was intended. That decision is
 /// the oracle, and automating it away removes the only thing keeping it honest.
 pub fn check_goldens(cmd: &str, ext: &str) {
+    check_goldens_over(cmd, ext, corpus_files());
+}
+
+/// The same, over a chosen subset. Milestone 3 needs it: only some corpus
+/// programs run, and which ones is a decision to state rather than a set to
+/// infer from whichever golden files happen to exist.
+pub fn check_goldens_over(cmd: &str, ext: &str, files: Vec<std::path::PathBuf>) {
     let mut missing = Vec::new();
     let mut diffs = Vec::new();
 
-    for path in corpus_files() {
+    for path in files {
         let actual = run_cmd(cmd, &path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
         let golden = path.with_extension(ext);
         match std::fs::read_to_string(&golden) {

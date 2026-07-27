@@ -56,6 +56,10 @@ hooks:
 # deliberately, then justify every hunk before committing.
 bless:
     for f in tests/corpus/*.xs; do cargo run --quiet -- read "$f" > "${f%.xs}.forms"; cargo run --quiet -- spans "$f" > "${f%.xs}.spans"; cargo run --quiet -- compile "$f" > "${f%.xs}.disasm"; done
+    # `.out` is updated where one exists and never created. Which programs run
+    # is a decision the test asserts, not a set to infer — and a fault
+    # transcript needs Q23 answered before it can be pinned at all.
+    for f in tests/corpus/*.xs; do if [ -f "${f%.xs}.out" ]; then cargo run --quiet -- run "$f" > "${f%.xs}.out"; fi; done
     @echo 'goldens regenerated — run `git diff` and justify every hunk before committing'
 
 # Constraint #1, on demand. The budget test prints the same numbers per layer.

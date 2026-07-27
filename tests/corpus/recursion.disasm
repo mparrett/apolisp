@@ -1,0 +1,148 @@
+proto 0  <top>  params 0  slots 41
+  constants
+    k0  20
+    k1  1
+    k2  0
+    k3  100000
+    k4  100
+    k5  40
+    k6  2
+    k7  3
+  code
+    0000  CLOSURE     r1 <- proto 1          7:3
+    0001  SETGLOBAL   factorial <- r1        6:1
+    0002  GETGLOBAL   r3 <- println          11:2
+    0003  GETGLOBAL   r5 <- factorial        11:11
+    0004  CONST       r6 <- k0               11:21
+    0005  CONST       r7 <- k1               11:24
+    0006  CALL        r4 <- r5(2)            11:10
+    0007  CALL        r2 <- r3(1)            11:1
+    0008  CLOSURE     r8 <- proto 2          16:3
+    0009  SETGLOBAL   count-to <- r8         15:1
+    0010  GETGLOBAL   r10 <- println         20:2
+    0011  GETGLOBAL   r12 <- count-to        20:11
+    0012  CONST       r13 <- k2              20:20
+    0013  CONST       r14 <- k3              20:22
+    0014  CALL        r11 <- r12(2)          20:10
+    0015  CALL        r9 <- r10(1)           20:1
+    0016  CLOSURE     r15 <- proto 3         25:3
+    0017  SETGLOBAL   sum-to <- r15          24:1
+    0018  GETGLOBAL   r17 <- println         29:2
+    0019  GETGLOBAL   r19 <- sum-to          29:11
+    0020  CONST       r20 <- k4              29:18
+    0021  CALL        r18 <- r19(1)          29:10
+    0022  CALL        r16 <- r17(1)          29:1
+    0023  CLOSURE     r21 <- proto 4         33:20
+    0024  SETGLOBAL   adder <- r21           33:1
+    0025  GETGLOBAL   r23 <- println         34:2
+    0026  GETGLOBAL   r27 <- adder           34:12
+    0027  CONST       r28 <- k5              34:18
+    0028  CALL        r25 <- r27(1)          34:11
+    0029  CONST       r26 <- k6              34:22
+    0030  CALL        r24 <- r25(1)          34:10
+    0031  CALL        r22 <- r23(1)          34:1
+    0032  CLOSURE     r29 <- proto 6         38:20
+    0033  SETGLOBAL   tally <- r29           38:1
+    0034  GETGLOBAL   r31 <- println         39:2
+    0035  GETGLOBAL   r33 <- tally           39:11
+    0036  CONST       r34 <- k1              39:17
+    0037  CONST       r35 <- k6              39:19
+    0038  CONST       r36 <- k7              39:21
+    0039  CALL        r32 <- r33(3)          39:10
+    0040  CALL        r30 <- r31(1)          39:1
+    0041  GETGLOBAL   r37 <- println         40:2
+    0042  GETGLOBAL   r39 <- tally           40:11
+    0043  CONST       r40 <- k1              40:17
+    0044  CALL        r38 <- r39(1)          40:10
+    0045  TAILCALL    r37(1)                 40:1
+    0046  RETURN      r0                     40:1
+
+proto 1  factorial  params 2  slots 16
+  constants
+    k0  2
+    k1  1
+  code
+    0000  GETGLOBAL   r4 <- <                8:10
+    0001  MOVE        r5 <- r0               8:12
+    0002  CONST       r6 <- k0               8:14
+    0003  CALL        r3 <- r4(2)            8:9
+    0004  JUMPUNLESS  r3, 0007               8:5
+    0005  MOVE        r2 <- r1               9:7
+    0006  JUMP        0017                   8:5
+    0007  GETSELF     r7 <- self             10:8
+    0008  GETGLOBAL   r10 <- -               10:19
+    0009  MOVE        r11 <- r0              10:21
+    0010  CONST       r12 <- k1              10:23
+    0011  CALL        r8 <- r10(2)           10:18
+    0012  GETGLOBAL   r13 <- *               10:27
+    0013  MOVE        r14 <- r1              10:29
+    0014  MOVE        r15 <- r0              10:33
+    0015  CALL        r9 <- r13(2)           10:26
+    0016  TAILCALL    r7(2)                  10:7
+    0017  RETURN      r2                     8:5
+
+proto 2  count-to  params 2  slots 13
+  constants
+    k0  1
+  code
+    0000  GETGLOBAL   r4 <- <                17:10
+    0001  MOVE        r5 <- r0               17:12
+    0002  MOVE        r6 <- r1               17:14
+    0003  CALL        r3 <- r4(2)            17:9
+    0004  JUMPUNLESS  r3, 0013               17:5
+    0005  GETSELF     r7 <- self             18:8
+    0006  GETGLOBAL   r10 <- +               18:18
+    0007  MOVE        r11 <- r0              18:20
+    0008  CONST       r12 <- k0              18:22
+    0009  CALL        r8 <- r10(2)           18:17
+    0010  MOVE        r9 <- r1               18:25
+    0011  TAILCALL    r7(2)                  18:7
+    0012  JUMP        0014                   17:5
+    0013  MOVE        r2 <- r0               19:7
+    0014  RETURN      r2                     17:5
+
+proto 3  sum-to  params 1  slots 14
+  constants
+    k0  1
+    k1  0
+  code
+    0000  GETGLOBAL   r3 <- <                26:10
+    0001  MOVE        r4 <- r0               26:12
+    0002  CONST       r5 <- k0               26:14
+    0003  CALL        r2 <- r3(2)            26:9
+    0004  JUMPUNLESS  r2, 0007               26:5
+    0005  CONST       r1 <- k1               27:7
+    0006  JUMP        0016                   26:5
+    0007  GETGLOBAL   r6 <- +                28:8
+    0008  MOVE        r7 <- r0               28:10
+    0009  GETSELF     r9 <- self             28:13
+    0010  GETGLOBAL   r11 <- -               28:21
+    0011  MOVE        r12 <- r0              28:23
+    0012  CONST       r13 <- k0              28:25
+    0013  CALL        r10 <- r11(2)          28:20
+    0014  CALL        r8 <- r9(1)            28:12
+    0015  TAILCALL    r6(2)                  28:7
+    0016  RETURN      r1                     26:5
+
+proto 4  <fn>  params 1  slots 2
+  code
+    0000  CLOSURE     r1 <- proto 5          33:29
+    0001  RETURN      r1                     33:29
+
+proto 5  <fn>  params 1  slots 5
+  captures
+    c0  local r0
+  code
+    0000  GETGLOBAL   r2 <- +                33:38
+    0001  MOVE        r3 <- r0               33:40
+    0002  GETCAP      r4 <- c0               33:42
+    0003  TAILCALL    r2(2)                  33:37
+    0004  RETURN      r1                     33:37
+
+proto 6  <fn>  params 1 &rest  slots 6
+  code
+    0000  GETGLOBAL   r3 <- list             38:41
+    0001  MOVE        r4 <- r0               38:46
+    0002  MOVE        r5 <- r1               38:51
+    0003  TAILCALL    r3(2)                  38:40
+    0004  RETURN      r2                     38:40

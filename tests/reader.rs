@@ -462,8 +462,8 @@ fn a_number_that_does_not_fit_is_an_error_not_a_symbol() {
 /// either stops at the first gap, hiding a landed milestone behind a pending
 /// one, or treats a genuine failure as pending.
 ///
-/// `compile` left this list at milestone 2. `expand` and `run` leave it at 5
-/// and 3.
+/// `compile` left this list at milestone 2 and `run` at milestone 3. `expand`
+/// is the last one, and leaves at milestone 5.
 #[test]
 fn unimplemented_stages_exit_with_the_pending_code() {
     // Keep in sync with EXIT_NOT_IMPLEMENTED in src/main.rs and NOT_IMPLEMENTED
@@ -472,20 +472,19 @@ fn unimplemented_stages_exit_with_the_pending_code() {
 
     let mut path = repo_root();
     path.push("tests/corpus/hello.xs");
-    for cmd in ["expand", "run"] {
-        let out = Command::new(bin())
-            .arg(cmd)
-            .arg(&path)
-            .output()
-            .expect("failed to run apolisp");
-        let stderr = String::from_utf8_lossy(&out.stderr);
-        assert!(stderr.contains("not implemented"), "`{cmd}`: {stderr:?}");
-        assert_eq!(
-            out.status.code(),
-            Some(EXIT_NOT_IMPLEMENTED),
-            "`{cmd}` must exit {EXIT_NOT_IMPLEMENTED} so smoke.sh can tell pending from broken"
-        );
-    }
+    let cmd = "expand";
+    let out = Command::new(bin())
+        .arg(cmd)
+        .arg(&path)
+        .output()
+        .expect("failed to run apolisp");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(stderr.contains("not implemented"), "`{cmd}`: {stderr:?}");
+    assert_eq!(
+        out.status.code(),
+        Some(EXIT_NOT_IMPLEMENTED),
+        "`{cmd}` must exit {EXIT_NOT_IMPLEMENTED} so smoke.sh can tell pending from broken"
+    );
 
     // A stage that exists and fails must not look pending.
     let bad = repo_root().join("tests/corpus/does-not-exist.xs");

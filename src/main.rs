@@ -4,7 +4,7 @@
 //! anything about the language — if a change to this file changes what a
 //! program means, it is in the wrong file.
 
-use apolisp::{bytecode, compile, printer, reader, value};
+use apolisp::{bytecode, compile, printer, reader, value, vm};
 use std::process::ExitCode;
 
 /// A stage whose milestone has not landed, as distinct from a stage that ran
@@ -111,9 +111,51 @@ fn main() -> ExitCode {
                 }
             }
         }
+        // Milestone 3. The `.out` transcript is canonical rather than raw
+        // stdout (BUILD.md): a failure with no defined record is a failure that
+        // cannot be pinned, and milestone 4 adds the thrown-value half.
+        "run" => {
+            let mut vm = vm::Vm::new();
+            let forms = match reader::read_all(&src, &mut vm.interner) {
+                Ok(forms) => forms,
+                Err(e) => {
+                    eprintln!("{}", e.render(path, &src));
+                    return ExitCode::FAILURE;
+                }
+            };
+            let chunk = match compile::compile(&forms, &mut vm.interner) {
+                Ok(chunk) => chunk,
+                Err(e) => {
+                    eprintln!("{}", e.render(path, &src));
+                    return ExitCode::FAILURE;
+                }
+            };
+            let outcome = vm::run(&mut vm, &chunk);
+            let stdout = vm.take_output();
+            print!("--- stdout\n{stdout}");
+            match outcome {
+                Ok(vm::Outcome::Returned(v)) => {
+                    println!("--- value\n{}", printer::print(&v, &vm.interner));
+                    println!("--- exit\n0");
+                    ExitCode::SUCCESS
+                }
+                Ok(vm::Outcome::Threw(v)) => {
+                    println!("--- threw\n{}", printer::print(&v, &vm.interner));
+                    println!("--- exit\n1");
+                    ExitCode::FAILURE
+                }
+                // A host fault is not a language value until Q23 (ADR-038), so
+                // it is reported as a diagnostic and never as a thrown value.
+                Err(e) => {
+                    println!("--- fault\n{}", e.render(path, &src));
+                    println!("--- exit\n1");
+                    ExitCode::FAILURE
+                }
+            }
+        }
         // Stages whose milestone has not landed. They fail rather than no-op:
         // a smoke test that silently skips a stage stops being an oracle.
-        "expand" | "run" => {
+        "expand" => {
             eprintln!("apolisp: `{cmd}` is not implemented yet (see BUILD.md)");
             ExitCode::from(EXIT_NOT_IMPLEMENTED)
         }

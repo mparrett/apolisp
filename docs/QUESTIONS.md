@@ -122,6 +122,18 @@ That is the same shape of evidence that produced ADR-046 through ADR-048 — eac
 piece scoped by a program that had already wanted it — so another round of
 candidate 2 is available whenever it is wanted, and now has its list.
 
+**Candidate 1 again, 2026-07-28, at the third ETHOS workload**
+(`notes/the-pager-program.md`). A pager, and the ratio moved the rest of the
+way: 46 lines of code, **four** of them host shim, nothing hand-rolled. The
+standard library carried a whole program for the first time. What it found is
+therefore not on the language surface at all — `io/stdout` is buffered until the
+program ends, so the first version painted five frames into a terminal that had
+already stopped caring, and the only way to paint one live is to open
+`/dev/tty` as a file, which is the `fs` feature and which escapes ADR-029's
+round-trip property. That is **Q33**, and it is the first finding from this
+practice that is a question about the *host boundary* rather than a missing
+function.
+
 The candidates, and what each is really a bet on:
 
 1. **Write programs, fix what they break.** The bet is that the test suite has
@@ -177,6 +189,52 @@ open-ended: one opcode, and a frame that can grow.
 
 **Decide when a program wants it**, and not before. If one does, the thing to
 measure first is whether it wants dynamic arity or just a fold.
+
+**Q33 — How does a program paint a terminal?** *(Filed 2026-07-28 from
+`notes/the-pager-program.md`, which is the program that wanted it.)*
+
+`io/stdout` is buffered until the program ends, so an interactive program
+written against it paints into a terminal that has stopped caring. The workaround
+is `(io/open "/dev/tty" :write)`, which takes the `Host::File` path and writes
+live. It works — the pager is a correct full-screen application on it — and it
+costs two things: the `fs` feature, and the round-trip property.
+
+**The second cost is the real one, and it is why this is a question rather than a
+missing native.** ADR-029 makes emitted effects part of the serialization
+comparison *rather than something that escapes it*, and that is the only reason
+constraint #2 is a property instead of an aspiration. `/dev/tty` escapes it. So
+the choice is not "should there be a `term/write`" — it is what the terminal
+workload is allowed to cost the oracle.
+
+Four shapes, and they are not equally cheap:
+
+1. **Leave it.** `/dev/tty` is the documented answer, terminal programs are
+   outside the round-trip property by construction, and `TRAPS.md` carries the
+   warning. Costs nothing, and concedes that one of the three ETHOS workloads
+   cannot be snapshotted or replayed.
+2. **An unbuffered stdout mode**, chosen by the driver rather than by the
+   program — the buffered host stays exactly as it is for the property, and
+   `apolisp run` gains a way to say "this program is interactive". The `.out`
+   transcript is the thing to think about first: `main.rs` argues a golden that
+   depends on a step limit is not a golden, and a golden that depends on flush
+   timing has the same problem.
+3. **`term/write` in the adapter**, alongside `term/size` and `term/read-key`.
+   Symmetric with the input half, does not need `fs`, and keeps the terminal
+   entirely inside the thing that is already excluded from the budget. It also
+   puts a second live output path next to `vm.emit`, which is the part to argue
+   about.
+4. **Make the buffer a real stream with a flush point.** Largest, reaches
+   ADR-016 and the handle table, and `io/close`'s comment already explains why
+   there is no `io/flush`.
+
+Not gating anything: the pager works today. What it gates is whether a *second*
+terminal program is written the same way by copying the workaround, at which
+point the workaround is the design and nobody decided it.
+
+Adjacent, and worth settling in the same breath: **a program has no argv and no
+environment.** `main.rs` takes a command and a path. The pager pages its own
+source because that is the only file it can name, and every terminal program
+takes an argument.
 
 ## No milestone — decide when evidence arrives
 

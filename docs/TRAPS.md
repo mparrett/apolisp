@@ -69,6 +69,26 @@ hand, and a first attempt works right up until a payload crosses a packet
 boundary. Found by writing one (`notes/first-programs.md`), where it passed by
 luck.
 
+**`io/stdout` does not reach the terminal until the program ends.** Writes to it
+go through `vm.emit` into `vm.out`, and `main.rs` prints that buffer after the
+run. Two `println`s separated by 24 seconds of work arrive at the same instant.
+For a batch program this is invisible; for anything interactive it is fatal, and
+it fails silently — a pager driven under a pty consumed five keystrokes against
+a blank screen and then painted all five frames at once, after quitting
+(`notes/the-pager-program.md`). Input is live and output is buffered, which is
+the asymmetry to hold on to: `term/read-key` really does block on the real tty.
+
+The buffer is not a defect — it is ADR-029's oracle, and emitted effects being
+captured rather than escaping is what makes constraint #2 a property. But it
+means the only way to paint a terminal today is `(io/open "/dev/tty" :write)`,
+which takes the `Host::File` path and writes live. That is the **`fs` feature**,
+so a build with `term` and without `fs` can read keys and cannot paint. Q33.
+
+Two consequences that look like separate bugs. Line endings written for raw mode
+come out wrong, because the flush happens after the `finally` has restored the
+mode and the tty applies `ONLCR` to them. And a program using the `/dev/tty`
+workaround holds a live handle, so ADR-043 part 5 refuses it a snapshot.
+
 **A `recur` from a `catch` is allowed here, and is not in Clojure.** This VM
 pops a handler record when it dispatches to it, so a catch body runs with no
 open region and the ordinary tail-call rule permits re-entering the loop —

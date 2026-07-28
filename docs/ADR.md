@@ -2791,6 +2791,80 @@ none of them a string question.
 
 ---
 
+### ADR-050 — `compare`, and ordering that stops where it runs out
+
+*(New, 2026-07-28. Adds `take`, `drop`, `sort`, `sort-by`, `sort-with`,
+`compare`. Prompted by `notes/the-report-program.md`. Defers `apply` to Q32.)*
+
+**Decision.** Four parts.
+
+**1. `compare` orders within numbers and within strings, and refuses
+everything else by name.** It answers `-1`, `0`, `1`.
+
+It exists because `<` and friends are **numbers only**, so before this there was
+no way to order two strings at all — and a `sort` that cannot order a list of
+names is not a sort anybody wanted. That is the gap, and it was invisible until
+a program tried to print a report.
+
+**It is deliberately not a total order over every value.** Ordering a keyword
+against a vector is a decision with no obvious answer and nothing has needed
+one, so the pair is refused rather than given a ruling. The refusal has two
+messages, because they are two different mistakes: a keyword against a keyword
+is "this type has no order", and a number against a string is "these two do not
+share one". One message for both reads like a bug in the checker.
+
+Strings order by their UTF-8 bytes, which for UTF-8 *is* code-point order — so
+this is not a byte-order quirk, it is the answer scalar-by-scalar comparison
+would give. **It is not a collation.** `"Z"` sorts before `"a"` and no locale is
+consulted, which is a limit to know rather than a bug to file.
+
+Numbers reuse the comparison `<` already makes, across `Int` and `Float`, so
+`compare` and `<` cannot disagree and `##NaN` is refused here exactly as it is
+there.
+
+**2. `take` and `drop` clamp rather than raising.** Asking for more than there
+is, or for a negative count, is how a caller says "all of it" and "none of it" —
+and every use site would otherwise write the same two guards.
+
+**3. `sort`, `sort-by`, `sort-with` — three names, because there is one arity
+per name.** Clojure spells these as overloads of `sort` and `sort-by`; without
+multi-arity the honest translation is three names rather than a variadic
+signature that inspects its arguments.
+
+**It is a merge sort, and that is the decision, not the detail.** The version
+everyone writes first — take the smallest, remove it with `filter`, repeat —
+removes *every* element equal to the smallest rather than one of them, so it
+silently drops ties. That is in `TRAPS.md` because it is wrong on the first
+input with a duplicate and looks right on every input without one.
+
+The merge takes from the left when neither element is less, which makes it
+**stable**: equal elements keep their input order, so sorting by one key and
+then another composes the way people expect.
+
+`sort-by` calls its key function once per *comparison*, not once per element. An
+expensive key wants pairing up first — a thing to know rather than a thing to
+hide.
+
+**4. `apply` is not here.** It is the one item on the list no program asked
+for — it came from a capability probe rather than from writing something — and
+it is much deeper than it looks. Filed as **Q32** with the measurement.
+
+**Cost.** Core goes from 6,639 to 6,741 of 7,500. The report program that
+prompted this arc goes 54 lines → 41 → **21, with no hand-written library at
+all**; it is now only the program.
+
+**Rejected.** *A total order over all values*, which would need a ruling on
+keyword-versus-vector that nothing needs and everything would then be stuck
+with. *Making `<` work on strings* — Clojure keeps `<` numeric and puts general
+ordering in `compare` for the same reason, and a mixed-type `<` would need the
+total order above anyway. *A native `sort`*, which would have to call a language
+comparator, and ADR-041 part 6 forbids exactly that.
+
+**Open.** `apply` (Q32). Collation, if a program ever wants human-order names
+rather than code-point order.
+
+---
+
 ## Errata
 
 Factual corrections to entries whose **decision still stands**. A wrong reason is

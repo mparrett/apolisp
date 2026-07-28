@@ -114,9 +114,9 @@ The string half of that list is done: **ADR-049** removed `str-len` for
 `pad-left` and `pad-right` in the prelude — which took the report program from
 54 lines to 41 and its hand-written library from 30 to 19.
 
-**What remains is not a string question**: `sort`, `take`/`drop`, and `apply`.
-All 19 of the report program's remaining library lines are `sort`, so that is
-the next one a program has already asked for.
+`sort`, `take` and `drop` followed in **ADR-050**, which took the report program
+to 21 lines with no hand-written library at all. `apply` did not, and why is
+**Q32**.
 
 That is the same shape of evidence that produced ADR-046 through ADR-048 — each
 piece scoped by a program that had already wanted it — so another round of
@@ -145,6 +145,38 @@ The candidates, and what each is really a bet on:
 These are not exclusive; the ordering is the decision. Not resolvable by
 argument from inside the repository — it depends on what the project is *for*,
 which is the one thing no document here records.
+
+**Q32 — Does `apply` earn a dynamic call?** *(Filed 2026-07-28 by ADR-050.)*
+`(apply f xs)` calls `f` with the elements of `xs` as its arguments, and this
+machine cannot express that.
+
+Two things are in the way, and the second is the real one. `Instr::Call` carries
+`argc` **in the instruction**, so an argument count is fixed at compile time.
+And a `Proto` carries `slots`, also fixed at lowering, which is what
+`Execution::slots` is sized from — so a runtime-length argument list has **no
+reserved slots to be splatted into**. Supporting one means a frame that grows
+after it is created, which reaches ADR-006's monotonic slots, ADR-034's `Proto`,
+and the `Image` that serializes frames. That last is constraint #2's machinery,
+which is the part of this system least worth disturbing for a convenience.
+
+A primitive cannot route around it: ADR-041 part 6 forbids a native calling a
+language closure, for the same reason it forbids a native `map`.
+
+**Against building it.** Nothing has asked. It appeared in a capability probe —
+a list of names checked for boundness — and not in any program. Every use it is
+usually reached for is already spelled: `(apply str xs)` is `(join "" xs)`,
+`(apply + xs)` is `(reduce + 0 xs)`, `(apply max xs)` is a `reduce`. Against
+that, every other piece of the standard library built this week was scoped by a
+program that had already wanted it, and that rule is the one keeping this from
+growing a surface nobody needed.
+
+**For building it.** Genuinely dynamic arity — calling a function value with a
+computed argument list — has no spelling at all, and a language that cannot do
+it forecloses whatever would have wanted it. The cost is knowable rather than
+open-ended: one opcode, and a frame that can grow.
+
+**Decide when a program wants it**, and not before. If one does, the thing to
+measure first is whether it wants dynamic arity or just a fold.
 
 ## No milestone — decide when evidence arrives
 

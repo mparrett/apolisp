@@ -141,3 +141,55 @@
   (fn pad-left [width s]
     (let [n (- width (str-scalar-len s))]
       (if (< n 1) s (str (join "" (repeat n " ")) s)))))
+
+; --- Slicing and ordering (ADR-050) ------------------------------------------
+
+; Both clamp rather than raising: asking for more than there is, or for a
+; negative count, is how a caller says "as much as you have" and "none".
+(def take
+  (fn take [n xs]
+    (loop [i 0 out []]
+      (if (or (>= i n) (>= i (count xs))) out (recur (+ i 1) (conj out (nth xs i)))))))
+
+(def drop
+  (fn drop [n xs]
+    (loop [i (if (< n 0) 0 n) out []]
+      (if (>= i (count xs)) out (recur (+ i 1) (conj out (nth xs i)))))))
+
+; Merge sort, and it is a merge sort on purpose. The version everyone writes
+; first — take the smallest, remove it with `filter`, repeat — removes *every*
+; element equal to the smallest rather than one of them, so it silently drops
+; ties (`TRAPS.md`).
+;
+; `less?` decides strictly. When neither element is less than the other the
+; merge takes from the left, which is what makes this stable: equal elements
+; come out in the order they went in, so sorting by one key and then another
+; composes the way people expect.
+(def merge-sorted
+  (fn merge-sorted [less? a b]
+    (loop [a a b b out []]
+      (if (empty? a)
+        (loop [b b out out] (if (empty? b) out (recur (rest b) (conj out (first b)))))
+        (if (empty? b)
+          (loop [a a out out] (if (empty? a) out (recur (rest a) (conj out (first a)))))
+          (if (less? (first b) (first a))
+            (recur a (rest b) (conj out (first b)))
+            (recur (rest a) b (conj out (first a)))))))))
+
+(def sort-with
+  (fn sort-with [less? xs]
+    (if (< (count xs) 2)
+      (vec xs)
+      (let [half (quot (count xs) 2)]
+        (merge-sorted less?
+                      (sort-with less? (take half xs))
+                      (sort-with less? (drop half xs)))))))
+
+(def sort (fn sort [xs] (sort-with (fn [a b] (< (compare a b) 0)) xs)))
+
+; `f` is called on every comparison rather than once per element. Sorting by an
+; expensive key means computing it into a pair first — which is a thing to know,
+; not a thing to hide.
+(def sort-by
+  (fn sort-by [f xs]
+    (sort-with (fn [a b] (< (compare (f a) (f b)) 0)) xs)))

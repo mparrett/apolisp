@@ -4539,6 +4539,56 @@ pub mod prim {
             Ok(Value::Bool(compare(&a[0], &a[1], "==")?.is_eq()))
         });
 
+        // ADR-050. Ordering across a *type*, so that `sort` has something to
+        // sort by. `<` and friends are numbers-only, which left no way at all
+        // to order two strings — and a `sort` that cannot order names is not a
+        // sort anybody wanted.
+        //
+        // Not a total order over every value. Ordering a keyword against a
+        // vector is a decision with no obvious answer and nothing has needed
+        // it, so the pair is refused by name rather than given one.
+        vm.native("compare", 2, false, |_, a| {
+            let ord = match (&a[0], &a[1]) {
+                // Strings order by their UTF-8 bytes, which for UTF-8 is also
+                // code-point order — so this is not a byte-order quirk, it is
+                // the same answer scalar-by-scalar comparison would give. It is
+                // not a *collation*: `"Z"` sorts before `"a"`, and locale-aware
+                // ordering is a decision this does not make.
+                (Value::Str(x), Value::Str(y)) => x.0.cmp(&y.0),
+                // Numbers, including across Int and Float, reusing the
+                // comparison `<` already makes — so `compare` and `<` cannot
+                // disagree, and `##NaN` is refused here exactly as it is there.
+                (x, y) if is_num(x) && is_num(y) => compare(x, y, "compare")?,
+                (x, y) => {
+                    // Two different messages, because they are two different
+                    // mistakes. A keyword against a keyword is "this type has
+                    // no order"; a number against a string is "these two do not
+                    // share one". Saying "not a keyword with a keyword" for the
+                    // first reads like a bug in the checker.
+                    let (kx, ky) = (kind_name(x), kind_name(y));
+                    return Err(fault(
+                        Kind::Type,
+                        if kx == ky {
+                            format!(
+                                "`compare` has no ordering for {kx}s; it orders numbers \
+                                 and strings (ADR-050)"
+                            )
+                        } else {
+                            format!(
+                                "`compare` orders numbers with numbers and strings with \
+                                 strings, not a {kx} with a {ky}"
+                            )
+                        },
+                    ));
+                }
+            };
+            Ok(Value::Int(match ord {
+                std::cmp::Ordering::Less => -1,
+                std::cmp::Ordering::Equal => 0,
+                std::cmp::Ordering::Greater => 1,
+            }))
+        });
+
         // --- equality and truth ----------------------------------------------
         vm.native("=", 1, true, |_, a| {
             Ok(Value::Bool(a.windows(2).all(|p| equal(&p[0], &p[1]))))
@@ -5143,6 +5193,14 @@ pub mod prim {
     enum Num {
         Int(i64),
         Float(f64),
+    }
+
+    /// Is this one of the two numeric variants? `compare` needs to ask before
+    /// committing to the numeric path, because falling into it and failing
+    /// would report "needs a number" for a pair of keywords rather than saying
+    /// what it can actually order.
+    fn is_num(v: &Value) -> bool {
+        matches!(v, Value::Int(_) | Value::Float(_))
     }
 
     fn num(v: &Value, op: &str) -> Result<Num, Fault> {

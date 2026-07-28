@@ -173,3 +173,48 @@
 
 ; They compose, which is the whole reason to have them.
 (is= 36 (reduce + 0 (map (fn [x] (* x 2)) (filter (fn [x] (> x 2)) (range 7)))))
+
+; --- take / drop / sort (ADR-050) --------------------------------------------
+(is= [1 2] (take 2 [1 2 3 4]))
+(is= [3 4] (drop 2 [1 2 3 4]))
+; Both clamp rather than raising. Asking for more than there is, or for a
+; negative count, is how a caller says "all of it" and "none of it".
+(is= [] (take 0 [1 2]))
+(is= [1 2] (take 9 [1 2]))
+(is= [] (take -1 [1 2]))
+(is= [1 2] (drop 0 [1 2]))
+(is= [] (drop 9 [1 2]))
+(is= [1 2] (drop -1 [1 2]))
+; take and drop partition, which is what merge sort rests on.
+(is= [1 2 3] (concat (take 1 [1 2 3]) (drop 1 [1 2 3])))
+
+(is= [1 1 2 3] (sort [3 1 2 1]))
+(is= [] (sort []))
+(is= [1] (sort [1]))
+; Strings order by code point, so uppercase sorts before lowercase. That is an
+; order, not a collation — no locale is consulted.
+(is= ["Apple" "apple" "fig" "pear"] (sort ["pear" "Apple" "apple" "fig"]))
+(is= ["a" "bb" "ccc"] (sort-by str-scalar-len ["ccc" "a" "bb"]))
+(is= [3 2 1] (sort-with (fn [a b] (> a b)) [1 3 2]))
+; Sorting a list answers with a vector, like everything else here.
+(is= ["a" "b"] (sort (keys (hash-map "b" 1 "a" 2))))
+
+; Stable: equal keys come out in the order they went in, which is what makes
+; sorting by one key and then another compose.
+(is= [[0 :a] [0 :b] [1 :x] [1 :y]] (sort-by first [[1 :x] [0 :a] [1 :y] [0 :b]]))
+; And the tie that a filter-based selection sort would have dropped entirely.
+(is= 4 (count (sort [2 1 2 1])))
+
+(is= -1 (compare 1 2))
+(is= 1 (compare 2 1))
+(is= 0 (compare 1 1))
+; Ordering crosses Int and Float exactly as `<` does, so the two cannot disagree.
+(is= 0 (compare 1 1.0))
+(is= -1 (compare 1 1.5))
+(is= -1 (compare "a" "b"))
+(is= 0 (compare "a" "a"))
+; Not a total order over every value: an unorderable pair is refused by name.
+(is (throws? (compare 1 "a")))
+(is (throws? (compare :a :b)))
+(is (throws? (compare [1] [2])))
+(is (throws? (compare ##NaN 1)))

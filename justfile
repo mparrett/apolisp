@@ -62,6 +62,16 @@ subtract:
     cargo clippy --no-default-features --features fs --all-targets -- -D warnings
     cargo test --no-default-features --features fs
 
+# BUILD.md's ladder: `merge → soak → tag`. Two of the three legs run anywhere;
+# the leak check needs valgrind and says so rather than passing quietly.
+soak:
+    ./soak.sh
+
+# All three legs, in the container that has valgrind.
+soak-linux:
+    docker build --target soak --tag apolisp-soak .
+    docker run --rm apolisp-soak
+
 # BUILD.md's follow-up: the same gate, on Linux. Deliberately *not* a
 # dependency of `verify` — it needs a running daemon, and a gate with an
 # external prerequisite is a gate people learn to skip. This is a pre-tag and

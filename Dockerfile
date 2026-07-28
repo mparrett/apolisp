@@ -19,7 +19,7 @@
 # this gate's answer depend on the day it ran, and determinism is a
 # prerequisite here (BUILD.md) rather than a preference. Bumping it is a
 # reviewed diff.
-FROM rust:1.97.1-slim
+FROM rust:1.97.1-slim AS gate
 
 # `just` is the one command anyone runs, so the container runs the real recipes
 # rather than a hand-copied list that drifts from the justfile the first time
@@ -49,3 +49,17 @@ COPY . .
 # "this rung was never in the gate" — which is the one question this image
 # exists to answer unambiguously.
 CMD ["just", "verify"]
+
+# --- soak -------------------------------------------------------------------
+#
+# BUILD.md's ladder ends `merge → soak → tag`, and the soak's leak leg needs a
+# tool the gate has no use for. A separate stage (`--target soak`) so the gate
+# image stays exactly what its CMD claims — an image carrying a profiler is an
+# image someone eventually profiles in, and then the gate is not the gate.
+FROM gate AS soak
+
+RUN apt-get update \
+ && apt-get install --yes --no-install-recommends valgrind \
+ && rm -rf /var/lib/apt/lists/*
+
+CMD ["sh", "soak.sh"]

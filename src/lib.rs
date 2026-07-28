@@ -1421,6 +1421,11 @@ pub mod compile {
         SetGlobal(SymId, Box<Expr>),
         Throw(Box<Expr>),
         Try(Box<TryForm>),
+        /// A re-entry into the enclosing `loop` (ADR-047). Lowered as a tail
+        /// call to the loop's own function, which is what the loop is — so this
+        /// is not a new kind of control flow, only one the compiler refuses to
+        /// emit anywhere the existing tail-call rules would not.
+        Recur(Vec<Expr>),
     }
 
     /// A core node and where it came from. The origin travels on every node
@@ -1534,6 +1539,8 @@ pub mod compile {
         rest: SymId,
         vector: SymId,
         hash_map: SymId,
+        loop_: SymId,
+        recur: SymId,
     }
 
     impl Specials {
@@ -1554,6 +1561,8 @@ pub mod compile {
                 rest: s("&"),
                 vector: s("vector"),
                 hash_map: s("hash-map"),
+                loop_: s("loop"),
+                recur: s("recur"),
             }
         }
     }
@@ -1563,6 +1572,11 @@ pub mod compile {
         locals: u32,
         scopes: Vec<Vec<(SymId, LocalId)>>,
         captures: Vec<CaptureSpec>,
+        /// `Some(n)` when this function *is* a `loop` of arity `n` (ADR-047).
+        /// Only the innermost scope is consulted, which is what stops a `recur`
+        /// inside a nested `fn` from targeting the loop outside it — that
+        /// function's frame is not the loop's frame.
+        loop_arity: Option<u32>,
     }
 
     impl FnScope {
@@ -1572,6 +1586,7 @@ pub mod compile {
                 locals: 0,
                 scopes: vec![Vec::new()],
                 captures: Vec::new(),
+                loop_arity: None,
             }
         }
     }
@@ -1736,6 +1751,10 @@ pub mod compile {
                     return Ok(Core::Do(self.exprs(&items[1..])?));
                 } else if h == sp.let_ {
                     return self.let_form(f, &items);
+                } else if h == sp.loop_ {
+                    return self.loop_form(f, &items);
+                } else if h == sp.recur {
+                    return self.recur_form(f, &items);
                 } else if h == sp.fn_ {
                     return self.fn_form(f, &items);
                 } else if h == sp.quote {
@@ -1819,6 +1838,113 @@ pub mod compile {
             let body = self.exprs(&items[2..])?;
             self.pop_scope();
             Ok(Core::Let(binds, body))
+        }
+
+        /// `(loop [a init-a b init-b] body…)`. ADR-047.
+        ///
+        /// A `let` for the bindings, whose body immediately calls an anonymous
+        /// function taking those names. `recur` is then a tail call to that
+        /// function, so **"tail position for `recur`" is the flag the compiler
+        /// already threads for every other tail call** rather than a second
+        /// opinion about what tail position means. That single definition is the
+        /// whole reason this is a core form and not the eight-line prelude macro
+        /// (`notes/loop-recur-attempt.md`).
+        ///
+        /// The outer `let` is not ceremony: it keeps Clojure's sequential
+        /// bindings, so `(loop [a 1 b a] …)` sees `a`. Passing the initializers
+        /// straight in as arguments would evaluate them all in the outer scope
+        /// and change that silently.
+        fn loop_form(&mut self, f: Form, items: &[Form]) -> Result<Core, LispErr> {
+            if items.len() < 2 {
+                return Err(f.err("`loop` takes a binding vector and a body"));
+            }
+            if !matches!(items[1].v, Value::Vec(_)) {
+                return Err(items[1].err(format!(
+                    "`loop` takes a binding vector, not a {}",
+                    kind_name(items[1].v)
+                )));
+            }
+            let pairs = items[1].items();
+            if !pairs.len().is_multiple_of(2) {
+                return Err(items[1].err("binding vector has a name with no value"));
+            }
+            let arity = (pairs.len() / 2) as u32;
+            let o = f.o.origin;
+
+            self.push_scope();
+            let mut binds = Vec::new();
+            let mut names = Vec::new();
+            for pair in pairs.chunks(2) {
+                let name = pair[0].sym().ok_or_else(|| {
+                    pair[0].err(format!(
+                        "`loop` binds symbols, not a {}",
+                        kind_name(pair[0].v)
+                    ))
+                })?;
+                let init = self.expr(pair[1])?;
+                binds.push((self.declare(name), init));
+                names.push(name);
+            }
+
+            // The function `recur` re-enters. Its parameters are the loop names
+            // declared again, in its own scope, so the body sees the parameters
+            // and not the outer bindings they were initialised from.
+            let mut scope = FnScope::new(None);
+            scope.loop_arity = Some(arity);
+            self.fns.push(scope);
+            for n in &names {
+                self.declare(*n);
+            }
+            let built = self.exprs(&items[2..]);
+            let scope = self.fns.pop().expect("the loop scope just pushed");
+            let body = built?;
+            self.pop_scope();
+
+            let args = binds
+                .iter()
+                .map(|(id, _)| Expr {
+                    core: Core::Local(*id),
+                    origin: o,
+                })
+                .collect();
+            let callee = Expr {
+                core: Core::Fn(Box::new(FnDef {
+                    name: None,
+                    params: arity,
+                    variadic: false,
+                    locals: scope.locals,
+                    captures: scope.captures,
+                    body,
+                    origin: o,
+                })),
+                origin: o,
+            };
+            Ok(Core::Let(
+                binds,
+                vec![Expr {
+                    core: Core::Call(Box::new(callee), args),
+                    origin: o,
+                }],
+            ))
+        }
+
+        /// `(recur e…)`. Valid only as the innermost function's own re-entry,
+        /// which is exactly "inside a `loop`, not across a `fn`". Arity is
+        /// checked here rather than at the call, because the loop's arity is
+        /// known and a mismatch has a better message than the callee's.
+        fn recur_form(&mut self, f: Form, items: &[Form]) -> Result<Core, LispErr> {
+            let Some(arity) = self.fns.last().and_then(|s| s.loop_arity) else {
+                return Err(
+                    f.err("`recur` is only valid inside `loop`, and never across a `fn` boundary")
+                );
+            };
+            let given = items.len() as u32 - 1;
+            if given != arity {
+                return Err(f.err(format!(
+                    "`recur` rebinds the {arity} name(s) its `loop` binds, given {given}"
+                )));
+            }
+            Ok(Core::Recur(self.exprs(&items[1..])?))
         }
 
         fn fn_form(&mut self, f: Form, items: &[Form]) -> Result<Core, LispErr> {
@@ -1988,8 +2114,23 @@ pub mod compile {
                 .into_iter()
                 .map(Some)
                 .collect(),
+            err: None,
         };
+        let existing = lo.protos.len();
         let idx = lo.proto(&top, Vec::new());
+        if let Some(e) = lo.err {
+            // Put the chunk back exactly as it was. A refused compile must not
+            // leave its protos behind in a REPL session's chunk (ADR-044) — the
+            // next input would be numbered past code that never ran, and every
+            // index after it would name the wrong function.
+            chunk.protos = lo
+                .protos
+                .into_iter()
+                .take(existing)
+                .map(|p| p.expect("an already-compiled proto is always filled in"))
+                .collect();
+            return Err(e);
+        }
         chunk.protos = lo
             .protos
             .into_iter()
@@ -2002,22 +2143,48 @@ pub mod compile {
     /// function, shared by bindings and temporaries and never reused (ADR-006).
     /// E-5 is what makes that affordable here: with unpacked operands a high
     /// slot index costs nothing at all.
-    pub fn lower(top: &FnDef) -> Chunk {
-        let mut lo = Lower { protos: Vec::new() };
+    pub fn lower(top: &FnDef) -> Result<Chunk, LispErr> {
+        let mut lo = Lower {
+            protos: Vec::new(),
+            err: None,
+        };
         lo.proto(top, Vec::new());
-        Chunk {
+        // Fallible since ADR-047: lowering is where tail position is known, so
+        // it is where a misplaced `recur` is caught.
+        if let Some(e) = lo.err {
+            return Err(e);
+        }
+        Ok(Chunk {
             protos: lo
                 .protos
                 .into_iter()
                 .map(|p| p.expect("every reserved proto is filled in"))
                 .collect(),
-        }
+        })
     }
 
     struct Lower {
         /// An index is reserved before its body is lowered, so a proto's number
         /// is its source order rather than the order compilation finished.
         protos: Vec<Option<Proto>>,
+        /// The first refusal, kept until the whole tree has been walked.
+        ///
+        /// Lowering is otherwise infallible, and ADR-047 needed one thing from
+        /// it that resolution cannot answer: whether a `recur` is in tail
+        /// position. Stashing the error here rather than making every lowering
+        /// method return `Result` is what keeps that judgement in the one place
+        /// that already makes it.
+        err: Option<LispErr>,
+    }
+
+    impl Lower {
+        /// First one wins. A `recur` in a bad position often makes the ones
+        /// after it look wrong too, and the first is the one to fix.
+        fn fail(&mut self, e: LispErr) {
+            if self.err.is_none() {
+                self.err = Some(e);
+            }
+        }
     }
 
     impl Lower {
@@ -2252,6 +2419,35 @@ pub mod compile {
                     self.emit(Instr::Throw { src }, o);
                 }
                 Core::Try(t) => self.try_form(lo, t, dst, tail, o),
+                Core::Recur(args) => {
+                    // The loop *is* a function (ADR-047), so re-entering it is a
+                    // tail call to itself and the conditions are the ones every
+                    // tail call already has to meet. Nothing here decides what
+                    // tail position is; it reads the decision.
+                    if !tail {
+                        lo.fail(LispErr::at_origin(
+                            o,
+                            "`recur` must be in tail position, because it re-enters the \
+                             loop rather than returning a value to its caller",
+                        ));
+                    } else if self.regions != 0 {
+                        // ADR-028 rule 2. Jumping back into the loop from inside
+                        // a handler region would leave the handler record on the
+                        // stack and skip the cleanup it names.
+                        lo.fail(LispErr::at_origin(
+                            o,
+                            "`recur` cannot cross a `try`: re-entering the loop would \
+                             skip the cleanup and leave the handler installed",
+                        ));
+                    }
+                    let argc = args.len() as u32;
+                    let base = self.alloc(1 + argc);
+                    self.emit(Instr::GetSelf { dst: base }, o);
+                    for (i, a) in args.iter().enumerate() {
+                        self.expr(lo, a, base + 1 + i as u32, false);
+                    }
+                    self.emit(Instr::TailCall { base, argc }, o);
+                }
             }
         }
 

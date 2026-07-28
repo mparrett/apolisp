@@ -108,3 +108,38 @@
 ; A cell is compared by identity, never by contents.
 (is (not (= (cell 1) (cell 1))))
 (is (= counter counter))
+
+; --- `loop`/`recur` (ADR-047) ------------------------------------------------
+(is= 55 (loop [i 1 acc 0] (if (> i 10) acc (recur (+ i 1) (+ acc i)))))
+(is= :ok (loop [] :ok))
+
+; Constant space. A count this size only completes if `recur` reuses the frame.
+(is= 200000 (loop [i 0] (if (= i 200000) i (recur (+ i 1)))))
+
+; The loop is not in the function's tail position here, and `recur` still is in
+; the loop's — the two are different questions and only the second binds it.
+(is= 6 (+ 1 (loop [i 0] (if (= i 5) i (recur (+ i 1))))))
+
+; Bindings are sequential, as `let`'s are: `b` sees the `a` above it.
+(is= [1 1] (loop [a 1 b a] [a b]))
+
+; And they shadow, so the loop's own name wins over an outer one.
+(is= 3 (let [a 99] (loop [a 1] (if (= a 3) a (recur (+ a 1))))))
+
+; An inner `loop` takes the `recur` inside it; the outer one is untouched.
+(is= 12 (loop [i 0 total 0]
+          (if (= i 3)
+            total
+            (recur (+ i 1) (+ total (loop [j 0 s 0] (if (= j 4) s (recur (+ j 1) (+ s 1)))))))))
+
+; The body is an implicit `do`, so everything but the last form runs for effect.
+(is= :done (loop [i 0] (cell 1) (if (= i 2) :done (recur (+ i 1)))))
+
+; A `recur` from a `catch` is allowed, and deliberately unlike Clojure. The VM
+; pops a handler record when it dispatches to it, so by the time the catch body
+; runs there is no region left to jump out of — `regions` is 0 and the ordinary
+; tail-call rule permits it. With a `finally` there *is* a region, and the same
+; rule refuses it; that refusal is pinned in `tests/compile.rs`.
+(is= 500 (loop [i 0] (try (if (= i 500) i (throw :again)) (catch e (recur (+ i 1))))))
+; The handler stack is clean afterwards rather than 500 records deep.
+(is= :outer (try (throw :outer) (catch e e)))

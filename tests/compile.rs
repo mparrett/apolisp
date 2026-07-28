@@ -652,3 +652,82 @@ fn a_core_form_cannot_be_shadowed_by_a_local() {
         1
     );
 }
+
+// --- `loop`/`recur` (ADR-047) ----------------------------------------------
+
+/// The refusals are the reason `loop`/`recur` is a core form rather than the
+/// eight-line prelude macro that has the same semantics
+/// (`docs/notes/loop-recur-attempt.md`). They are compile errors, so the
+/// in-language suite cannot hold them — a file that does not compile has no
+/// assertions in it.
+#[test]
+fn recur_is_refused_everywhere_it_would_not_be_a_tail_call() {
+    // Not in a loop at all.
+    let e = compile_err("(recur 1)");
+    assert!(e.contains("only valid inside `loop`"), "got {e:?}");
+
+    // Across a `fn`. The inner function's frame is not the loop's frame, so
+    // this is the same refusal and not a special case.
+    let e = compile_err("(loop [i 0] ((fn [] (recur 1))))");
+    assert!(e.contains("only valid inside `loop`"), "got {e:?}");
+
+    // Arity is the loop's, checked against the loop rather than at the call.
+    let e = compile_err("(loop [i 0] (recur 1 2))");
+    assert!(e.contains("rebinds the 1 name(s)"), "got {e:?}");
+
+    // Not in tail position. This is the diagnostic a macro cannot produce,
+    // because a macro does not know its own position.
+    let e = compile_err("(loop [i 0] (+ 1 (recur (+ i 1))))");
+    assert!(e.contains("must be in tail position"), "got {e:?}");
+
+    // Across a `try`, which ADR-028 rule 2 already forbids for tail calls.
+    let e = compile_err("(loop [i 0] (try (recur (+ i 1)) (finally nil)))");
+    assert!(e.contains("cannot cross a `try`"), "got {e:?}");
+
+    // And in a `finally`, which is not tail position to begin with.
+    let e = compile_err("(loop [i 0] (try 1 (finally (recur 2))))");
+    assert!(e.contains("must be in tail position"), "got {e:?}");
+}
+
+/// A `recur` in tail position is a `TailCall` and nothing else — the frame is
+/// reused, which is what makes a loop a loop rather than a stack leak.
+#[test]
+fn recur_lowers_to_a_tail_call_even_where_the_loop_is_not_in_tail_position() {
+    // The loop's *value* is an argument to `+`, so the loop is not in the
+    // function's tail position. The `recur` inside it still must be a tail
+    // call: it re-enters the loop rather than returning to `+`.
+    let (chunk, _) = compile_ok("(fn [] (+ 1 (loop [i 0] (if (= i 5) i (recur (+ i 1))))))");
+    let loop_proto = chunk
+        .protos
+        .iter()
+        .find(|p| p.code.iter().filter(|i| is_tail_call(i)).count() == 1)
+        .expect("the loop's own proto emits exactly one tail call");
+    assert_eq!(
+        count(loop_proto, is_tail_call),
+        1,
+        "the recur is the tail call"
+    );
+}
+
+/// A refused compile must leave the chunk exactly as it was. In a REPL session
+/// the chunk is shared across inputs (ADR-044), so a partially appended proto
+/// would renumber every closure compiled after it.
+#[test]
+fn a_refused_recur_leaves_the_chunk_untouched() {
+    let mut interner = Interner::new();
+    let mut chunk = Chunk { protos: Vec::new() };
+
+    let good = reader::read_all("(fn [] 1)", &mut interner).unwrap();
+    compile::compile_into(&mut chunk, &good, &mut interner).unwrap();
+    let before = chunk.protos.len();
+
+    let bad = reader::read_all("(loop [i 0] (+ 1 (recur (+ i 1))))", &mut interner).unwrap();
+    compile::compile_into(&mut chunk, &bad, &mut interner)
+        .expect_err("a non-tail recur should not compile");
+
+    assert_eq!(
+        chunk.protos.len(),
+        before,
+        "a refused compile appended protos to the chunk"
+    );
+}

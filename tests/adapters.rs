@@ -156,6 +156,64 @@ fn a_read_deadline_raises_a_network_kind_no_file_can_produce() {
     run(&mut s, "(io/close c) (io/close server) (io/close l)");
 }
 
+/// `:connection-reset` had no raiser any test provoked — it could be mapped to
+/// `:other` with the whole suite green (`notes/milestone-10-mutants.md`). It is
+/// the kind a program most wants to retry on, so a wrong classification is the
+/// one that costs most.
+///
+/// Provoked by closing the peer and writing: the first write lands in a buffer,
+/// the peer answers with RST, and the next write fails. How many writes that
+/// takes is a kernel detail, so this tries a bounded number and asserts one of
+/// them failed the right way rather than asserting which.
+#[cfg(feature = "tcp")]
+#[test]
+fn a_closed_peer_raises_connection_reset() {
+    let mut s = Session::new();
+    run(&mut s, r#"(def l (tcp/listen "127.0.0.1:0"))"#);
+    run(&mut s, "(def c (tcp/connect (tcp/local-addr l)))");
+    run(&mut s, "(def server (tcp/accept l))");
+    run(&mut s, "(io/close server) (io/close l)");
+
+    let mut kinds = Vec::new();
+    for _ in 0..40 {
+        let k = run(
+            &mut s,
+            r#"(try (io/write c "x") nil (catch e (get e :kind)))"#,
+        );
+        if k != "nil" {
+            kinds.push(k);
+            break;
+        }
+    }
+    run(&mut s, "(io/close c)");
+    assert_eq!(
+        kinds.first().map(String::as_str),
+        Some(":connection-reset"),
+        "writing to a closed peer should classify as a reset, got {kinds:?}"
+    );
+}
+
+/// ADR-042 part 1 puts `:path` in a fault only when the operation names a
+/// location. For a socket the address *is* the location, and dropping it
+/// survived the suite — a `:connection-reset` that does not say which peer
+/// names the failure and not the thing that failed.
+#[cfg(feature = "tcp")]
+#[test]
+fn a_socket_error_carries_the_address_it_was_for() {
+    let mut s = Session::new();
+    // Bind, learn the address, release it — so the connect below is refused
+    // deterministically rather than by hoping a port is free.
+    run(&mut s, r#"(def l (tcp/listen "127.0.0.1:0"))"#);
+    let addr = run(&mut s, "(tcp/local-addr l)");
+    run(&mut s, "(io/close l)");
+
+    let e = run(
+        &mut s,
+        &format!("(try (tcp/connect {addr}) (catch e [(get e :operation) (get e :path)]))"),
+    );
+    assert_eq!(e, format!("[:connect {addr}]"), "the address is missing");
+}
+
 /// ADR-045 part 5: a live socket refuses a snapshot through the check ADR-029
 /// already had, with no adapter-specific code. This is the handle table doing
 /// the job ADR-016 built it for.

@@ -58,25 +58,25 @@ fn from_json(j: &serde_json::Value) -> Value {
         serde_json::Value::Array(xs) => {
             Value::Vec(Rc::new(VecObj(xs.iter().map(from_json).collect())))
         }
-        // `serde_json` preserves insertion order only with a feature we have
-        // not taken, so this is sorted: determinism is a prerequisite
-        // (`BUILD.md`), and a map whose print order depends on a hash seed
-        // makes every transcript that touches it flap.
-        serde_json::Value::Object(o) => {
-            let mut pairs: Vec<(Value, Value)> = o
-                .iter()
+        // Key order comes from `serde_json`, whose default `Map` is a
+        // `BTreeMap` — so keys arrive sorted and iteration is deterministic
+        // without anything here doing it again.
+        //
+        // A sort *was* here, and a mutation pass showed it could be deleted
+        // with the whole suite green, because the library had already done it
+        // (`notes/milestone-10-mutants.md`). Milestone 2's finding applies:
+        // two mechanisms enforcing one rule means no test can say which is
+        // working, so the redundancy goes rather than the test.
+        //
+        // The dependency is real and worth naming: enabling `serde_json`'s
+        // `preserve_order` feature swaps the `BTreeMap` for an `IndexMap` and
+        // this becomes document order. Still deterministic, but different, and
+        // every golden holding a decoded object would move.
+        serde_json::Value::Object(o) => Value::Map(Rc::new(MapObj(
+            o.iter()
                 .map(|(k, v)| (Value::Str(Rc::new(StrObj(k.clone()))), from_json(v)))
-                .collect();
-            pairs.sort_by(|a, b| key_text(&a.0).cmp(key_text(&b.0)));
-            Value::Map(Rc::new(MapObj(pairs)))
-        }
-    }
-}
-
-fn key_text(v: &Value) -> &str {
-    match v {
-        Value::Str(s) => &s.0,
-        _ => "",
+                .collect(),
+        ))),
     }
 }
 

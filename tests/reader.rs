@@ -662,7 +662,33 @@ fn a_multibyte_escape_is_an_error_not_a_panic() {
 fn a_number_that_does_not_fit_is_an_error_not_a_symbol() {
     // Falling through to a symbol would be a silent wrong answer.
     let err = read("99999999999999999999999").expect_err("should not read");
-    assert!(err.contains("number"), "got {err:?}");
+    assert!(err.contains("does not fit"), "got {err:?}");
+
+    // And a typo is not an overflow. Both land in the same branch — numeric
+    // enough to commit to, not a number in the end — and reporting `1abc` as
+    // not fitting in 64 bits sends you looking for a range problem in a token
+    // with letters in it (ADR-046).
+    let err = read("1abc").expect_err("should not read");
+    assert!(err.contains("is not a valid number"), "got {err:?}");
+    assert!(!err.contains("does not fit"), "got {err:?}");
+}
+
+/// The reader and `parse-number` are the same grammar (ADR-046), which is only
+/// true while the non-finite spellings live in `parse_number` rather than in
+/// the token match beside it. This is the test that fails if they move back.
+#[test]
+fn the_non_finite_spellings_are_part_of_the_shared_number_grammar() {
+    for (text, want) in [("##Inf", f64::INFINITY), ("##-Inf", f64::NEG_INFINITY)] {
+        match reader::parse_number(text) {
+            Some(Ok(Value::Float(f))) => assert_eq!(f, want, "{text}"),
+            other => panic!("{text} parsed as {other:?}"),
+        }
+    }
+    match reader::parse_number("##NaN") {
+        Some(Ok(Value::Float(f))) => assert!(f.is_nan(), "##NaN parsed as {f}"),
+        other => panic!("##NaN parsed as {other:?}"),
+    }
+    assert!(reader::parse_number("##x").is_none(), "`##x` is a symbol");
 }
 
 /// The CLI is the artifact the goldens pin, so its contract gets one test:

@@ -897,14 +897,12 @@ pub mod reader {
                 "nil" => Value::Nil,
                 "true" => Value::Bool(true),
                 "false" => Value::Bool(false),
-                // Clojure's spellings, and exactly what the printer emits. A
-                // printer that emits tokens its own reader cannot read is a
-                // round-trip hole: `##Inf` read back as a symbol prints as
-                // `##Inf` again, so string-level comparison never notices the
-                // type change (ADR-032).
-                "##Inf" => Value::Float(f64::INFINITY),
-                "##-Inf" => Value::Float(f64::NEG_INFINITY),
-                "##NaN" => Value::Float(f64::NAN),
+                // The non-finite spellings used to be matched here, ahead of
+                // `parse_number`. They moved into it (ADR-046) so that the
+                // number grammar is in one function rather than in one function
+                // plus three arms of this match — which is what made
+                // `(parse-number "##Inf")` answer `nil` while the reader read
+                // the same three characters as a float.
                 _ => match parse_number(text) {
                     Some(Ok(v)) => v,
                     Some(Err(why)) => return Err(LispErr::at(span, why)),
@@ -944,7 +942,24 @@ pub mod reader {
     /// it looked like a number and was not one; that is an error rather than a
     /// symbol, because an integer too large for `i64` reaching the compiler as
     /// a variable name is a silent wrong answer.
-    fn parse_number(text: &str) -> Option<Result<Value, String>> {
+    /// Public because the `parse-number` primitive is this function (ADR-046).
+    /// The grammar a literal is read by and the grammar a string is parsed by
+    /// are one implementation, so they cannot drift.
+    pub fn parse_number(text: &str) -> Option<Result<Value, String>> {
+        // Clojure's spellings, and exactly what the printer emits. A printer
+        // that emits tokens its own reader cannot read is a round-trip hole:
+        // `##Inf` read back as a symbol prints as `##Inf` again, so
+        // string-level comparison never notices the type change (ADR-032).
+        //
+        // They are here rather than in the caller so that `print` and
+        // `parse-number` are inverses over every number, non-finite ones
+        // included.
+        match text {
+            "##Inf" => return Some(Ok(Value::Float(f64::INFINITY))),
+            "##-Inf" => return Some(Ok(Value::Float(f64::NEG_INFINITY))),
+            "##NaN" => return Some(Ok(Value::Float(f64::NAN))),
+            _ => {}
+        }
         let looks_numeric = {
             let mut cs = text.chars();
             match cs.next() {
@@ -963,9 +978,16 @@ pub mod reader {
         // to a float, which would lose digits without saying so. Q10 owns
         // overflow at runtime; this is the literal, which is decidable here.
         if !text.contains(['.', 'e', 'E']) {
-            return Some(Err(format!(
-                "number `{text}` does not fit in a 64-bit integer"
-            )));
+            // Two ways to land here and they are not the same mistake: `1abc`
+            // is a typo, and `99999999999999999999` is a number this machine
+            // cannot hold. Reporting the first as an overflow sent people
+            // looking for a range problem in a token that has letters in it.
+            let digits = text.trim_start_matches(['-', '+']);
+            return Some(Err(if digits.chars().all(|c| c.is_ascii_digit()) {
+                format!("number `{text}` does not fit in a 64-bit integer")
+            } else {
+                format!("`{text}` is not a valid number")
+            }));
         }
         if let Ok(f) = text.parse::<f64>() {
             // A finite-looking literal that overflows the range is rejected for
@@ -4453,6 +4475,27 @@ pub mod prim {
             }
             Ok(Value::Str(Rc::new(StrObj(s[from..to].to_string()))))
         });
+        // ADR-046. The language had no string-to-number conversion at all, and
+        // the only path that worked was `json/decode` — an *optional host
+        // adapter*, so `--no-default-features` removed the ability to read a
+        // number out of text. ADR-013 says features gate host capability and
+        // never language semantics; this is that claim being made true again.
+        //
+        // It is `reader::parse_number` and not a second implementation, so a
+        // literal and a parsed string cannot disagree about what a number is.
+        // `nil` for a string that is not numeric-looking; a fault for one that
+        // is and still is not a number, which is where the reader's diagnostics
+        // are worth more than a second `nil` the caller has to guess about.
+        vm.native(
+            "parse-number",
+            1,
+            false,
+            |_, a| match crate::reader::parse_number(string(&a[0], "parse-number")?) {
+                None => Ok(Value::Nil),
+                Some(Ok(v)) => Ok(v),
+                Some(Err(msg)) => Err(fault(Kind::Type, msg)),
+            },
+        );
         // Scalar values as integers, since ADR-025 has no character type.
         vm.native("str-scalars", 1, false, |_, a| {
             let s = string(&a[0], "str-scalars")?;

@@ -2552,6 +2552,91 @@ and this has not needed it yet.
 
 ---
 
+### ADR-047 — `loop` and `recur` are core forms
+
+*(New, 2026-07-27. Resolves Q5. Applies ADR-028 rule 2 rather than amending it.
+Diverges from Clojure once, on purpose.)*
+
+**Decision.** `loop` and `recur` are core forms. Q5 budgeted for "a fourteenth
+special form", singular; the answer needs two, because `recur` without `loop` has
+no target and `loop` without `recur` is `let`.
+
+**1. A `loop` is a `let` around an immediate call to an anonymous function whose
+parameters are the loop's names. A `recur` is a tail call to that function.**
+
+This is the entire implementation, and it is chosen for one property: **there is
+no second definition of tail position.** "Tail position for `recur`" is tail
+position for the loop's function, which is the flag the compiler already threads
+for every other tail call. The lowering for `Core::Recur` reads that decision and
+never makes its own.
+
+That property is the whole reason this is a core form. A prelude macro with
+identical semantics is eight lines and was written first
+(`notes/loop-recur-attempt.md`); what it could not do was diagnose, and every fix
+for its diagnostics required reimplementing tail-position analysis in the
+prelude — two definitions, in two languages, with no test that they agree, whose
+drift is a `recur` the macro accepts and the compiler does not make a tail call.
+A silent stack leak in the one construct people reach for to avoid one.
+
+The outer `let` is not ceremony. It keeps bindings sequential, as `let`'s are, so
+`(loop [a 1 b a] …)` sees `a`. Passing the initialisers straight in as arguments
+would evaluate them in the outer scope and change that without saying so.
+
+**2. What it refuses, and the rule each refusal comes from.** None is new
+policy:
+
+| Refused | Because |
+|---|---|
+| `recur` outside a `loop` | there is no function for it to re-enter |
+| `recur` across a `fn` | the inner function's frame is not the loop's frame |
+| `recur` with the wrong arity | it rebinds the loop's names, so it takes that many |
+| `recur` not in tail position | it re-enters rather than returning a value |
+| `recur` across a `try` | ADR-028 rule 2 — the frame is still needed |
+
+Arity is checked against the *loop* during resolution rather than at the call,
+because the loop's arity is known there and "rebinds the 1 name(s) its `loop`
+binds, given 2" beats an arity error naming a function the user never wrote.
+
+**3. Lowering becomes fallible.** Whether a `recur` is in tail position is known
+only while lowering, so `Lower` carries the first refusal and `compile_into`
+returns it. The alternative — threading tail position back into resolution —
+would have created the second definition this entry exists to avoid.
+
+A refused compile leaves the chunk exactly as it was. Under ADR-044 a REPL
+session's chunk is shared across inputs, so a half-appended proto would renumber
+every closure compiled after it.
+
+**4. `recur` targets a `loop` and never the enclosing `fn`.** Clojure allows
+both. Here the second is unnecessary: ADR-028 already makes a self-call in tail
+position run in constant space, so `recur` in a function body would buy a
+spelling and nothing else.
+
+**5. A `recur` from a `catch` is allowed. This differs from Clojure and the
+reason is a property of this VM.** The VM pops a handler record when it
+dispatches to it, so by the time a catch body runs there is no region left to
+leave — `regions` is 0 and the ordinary tail-call rule permits the jump. 50,000
+iterations through a firing `catch` run in constant space and leave the handler
+stack clean. With a `finally` there *is* an open region and the same rule refuses
+it, with no case analysis anywhere: the difference falls out of the counter
+ADR-028 rule 2 already maintains.
+
+**Cost.** `compile` goes from 942 lines to 1,138, and core from 6,088 to 6,303
+of 7,500. `compile` was already the largest layer and still is.
+
+**Rejected.** *The prelude macro* — complete on semantics, three unfixable
+diagnostics, and the fixes cost more than this did (`notes/loop-recur-attempt.md`
+has the measurements). *A dedicated jump-based loop with its own header and
+backward branch* — faster by a frame per loop entry, and it would have needed its
+own answer to what tail position is, which is the thing being avoided. *Leaving
+it out* — Life shrinks from 17 top-level definitions to 12 with this, and the
+five that go were never about Life.
+
+**Open.** Whether `recur` should eventually accept the enclosing `fn` as a
+target after all, if a `fn` body ever wants rebinding that a self-call spells
+worse. Nothing has wanted it.
+
+---
+
 ## Errata
 
 Factual corrections to entries whose **decision still stands**. A wrong reason is

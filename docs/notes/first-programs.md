@@ -39,7 +39,8 @@ Life is seventeen top-level definitions. Six of them are standard library:
 | `wrap` — negative-safe index wrap | `mod` (`rem` exists; it keeps the sign) |
 | `total` (in the service probe) — sum a vector | `reduce` |
 
-**The single biggest gap is `loop`/`recur`.** There is no looping form at all,
+**The single biggest gap is `loop`/`recur`.** *(Closed by ADR-047; the rewrite
+takes Life from 17 definitions to 12.)* There was no looping form at all,
 so every iteration becomes a *named top-level function with an accumulator
 parameter threaded by hand*. Five of Life's seventeen definitions exist only
 because of this, and none of them is about Life. It is also why the program

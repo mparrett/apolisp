@@ -100,6 +100,20 @@ The macro is not a cheap approximation of the special form. It is a complete one
 that is missing exactly the errors, and the errors are the part this project
 says it will not trade away.
 
+## Outcome
+
+**Core forms, by ADR-047.** The implementation is the shape this macro found:
+`loop` is a `let` around an immediate call to an anonymous function, and `recur`
+is a tail call to it. What the compiler adds is not a different mechanism but the
+refusals — and, because the loop *is* a function, "tail position for `recur`"
+turned out to be the flag the compiler already had, so the second definition of
+tail position feared above never had to be written.
+
+One thing the macro could not have reached: a `recur` from a `catch` is
+**allowed**, because this VM pops a handler record when it dispatches. That falls
+out of the region counter rather than being decided, and no macro could have
+consulted it.
+
 ## Note for whoever implements it
 
 The macro uses no gensym, so adding it to `prelude.xs` does **not** trigger the

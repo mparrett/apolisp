@@ -11,7 +11,7 @@ design review of 2026-07-25.
 Q3 (→ADR-025), Q4 (→ADR-028), Q7 (→ADR-029), Q9 (→ADR-029), Q10 (→ADR-037),
 Q11 (→ADR-027), Q13 (→ADR-041), Q17 (→ADR-027), Q21 (→ADR-030), Q23 (→ADR-039),
 Q24 (→ADR-038), Q25 (→ADR-038), Q26 (→ADR-041), Q6 (→ADR-041), Q27 (→ADR-042),
-Q8 (→ADR-043), Q22 (→ADR-043), Q1 (→ADR-044).*
+Q8 (→ADR-043), Q22 (→ADR-043), Q1 (→ADR-044), Q5 (→ADR-047).*
 
 ---
 
@@ -72,45 +72,6 @@ Decide when a macro actually wants a helper. Two smaller options exist and
 should be weighed first: writing the helper as a macro, or letting a macro
 body's helpers live in the prelude.
 
-**Q5 — `loop`/`recur`: macro or core form?**
-ADR-028 settles proper tail calls, which is what this was waiting on — a
-self-call in tail position now runs in constant space, so the machinery exists.
-Attempt `loop`/`recur` as a macro over the core forms and admit it as a fourteenth
-special form only on evidence from a real attempt. Note the interaction from
-ADR-028 rule 2: a `recur` inside a `try` with a `finally` is not a tail call, so
-the macro has to either reject that shape or accept the frame.
-
-**The need is now demonstrated; the attempt is still owed.** The first real
-program written in the language (`notes/first-programs.md`) is seventeen top-level
-definitions, and five of them exist *only* because there is no looping form —
-every iteration becomes a named function with an accumulator parameter threaded
-by hand, and none of those five functions is about the problem being solved.
-That is the evidence this entry was waiting for that the absence costs
-something.
-
-**The attempt is now done too** (`notes/loop-recur-attempt.md`). Eight prelude
-lines, no tree walk: `loop` names its function and `recur` calls that name, so
-nesting falls out of lexical shadowing rather than being implemented. Constant
-space at 200,000 iterations, arity checked, `try`/`finally` accepting the frame
-per ADR-028 rule 2, and Life drops from 17 definitions to 12.
-
-**It fails on diagnostics, and only on diagnostics.** Errors name
-`recur-target`, an identifier the user never wrote; a non-tail `recur` is
-silently accepted and grows the stack where Clojure rejects it at compile time;
-and a user binding called `recur-target` is captured without a word. All three
-are fixed by having `loop` walk its body — which requires knowing tail position
-for `if`, `do`, `let`, `try` and `fn`, **which is what the compiler already
-is**. Writing it again in the prelude puts "tail position" in two places with no
-test that they agree, and the drift shows up as a `recur` the macro accepted and
-the compiler did not make a tail call: a silent stack leak in the construct
-people use to avoid one.
-
-So the question is no longer whether a macro suffices for the semantics — it
-does, completely — but whether the diagnostics are worth a fourteenth core form
-in `compile`, already the largest layer at 942 lines. Given that `ETHOS.md` puts
-error quality outside the priority ranking, that is a real decision and not a
-formality.
-
 ## Before milestone 9 — REPL
 
 **Q29 — Can compiled code be shared between chunks?** *(REPL half resolved by
@@ -152,8 +113,8 @@ Two programs were written to make this concrete rather than theoretical
 (`notes/first-programs.md`). Both worked on the first run. What they found was
 not a missing capability but a missing *surface*: six of Life's seventeen
 definitions are standard library rebuilt by hand, five of them exist only
-because there is no looping form (Q5), and two findings were not ergonomics at
-all — `io/read` is a short read that no program can frame a protocol on
+because there is no looping form (**closed by ADR-047**), and two findings were
+not ergonomics at all — `io/read` is a short read that no program can frame a protocol on
 (`TRAPS.md`), and there is no string→number conversion anywhere except
 `json/decode`, which is an optional host adapter. ADR-013 says features gate
 host capability and never language semantics; that is the first place it has
@@ -163,8 +124,9 @@ suite parses a number from a string either.
 **Answered 2026-07-27: build the standard library** (candidate 2 below). The
 string→number hole is closed by ADR-046, which also records the limit it
 exposed — the subtraction harness can prove a capability is removable and
-cannot notice that a semantic went missing with it. `loop`/`recur` (Q5) and the
-sequence library (Q29) remain.
+cannot notice that a semantic went missing with it. `loop`/`recur` is closed by
+ADR-047, as a core form rather than the prelude macro. **The sequence library
+(Q29) is what remains**, and it is the one piece with a cost still unweighed.
 
 The candidates, and what each is really a bet on:
 
@@ -173,7 +135,7 @@ The candidates, and what each is really a bet on:
    exercises the VM rather than the surface — which the two probes support, in
    that none of the gaps above were on any list. Cheapest, and the only option
    that keeps producing evidence rather than consuming it.
-2. **Build the standard library.** `loop`/`recur` (Q5), a sequence library
+2. **Build the standard library.** `loop`/`recur` (→ADR-047), a sequence library
    (Q29's prelude-function half), and the string→number hole. Well-scoped, and
    would make option 1 pleasant instead of laborious. The risk is building it
    from taste rather than from use, which is how a standard library grows a

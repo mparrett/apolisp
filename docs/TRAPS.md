@@ -69,6 +69,15 @@ hand, and a first attempt works right up until a payload crosses a packet
 boundary. Found by writing one (`notes/first-programs.md`), where it passed by
 luck.
 
+**A `recur` from a `catch` is allowed here, and is not in Clojure.** This VM
+pops a handler record when it dispatches to it, so a catch body runs with no
+open region and the ordinary tail-call rule permits re-entering the loop —
+50,000 iterations through a firing `catch` stay in constant space. Add a
+`finally` and there *is* an open region, and the same rule refuses it. So the
+two shapes differ, the difference is not arbitrary, and code moved here from
+Clojure will compile where it did not before rather than the other way round
+(ADR-047 part 5).
+
 **Handle validity across migration.** Generational keys catch reuse; they do not
 catch a handle that was valid in the source VM and meaningless in the target.
 Every adapter declares its reacquisition semantics or refuses.

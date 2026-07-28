@@ -1,0 +1,8 @@
+# `target/` is Darwin artifacts. Excluding it is not a build-speed tweak — a
+# Linux build that found macOS `.rlib`s in its target directory is a wronger
+# build, not just a slower one.
+target
+
+# Nothing in the gate reads history: no git dependencies in Cargo.toml, and no
+# test shells out to git. A build context should carry what the build needs.
+.git

@@ -62,6 +62,18 @@ subtract:
     cargo clippy --no-default-features --features fs --all-targets -- -D warnings
     cargo test --no-default-features --features fs
 
+# BUILD.md's follow-up: the same gate, on Linux. Deliberately *not* a
+# dependency of `verify` — it needs a running daemon, and a gate with an
+# external prerequisite is a gate people learn to skip. This is a pre-tag and
+# pre-soak step, not an inner-loop one.
+#
+# The image is hermetic (see Dockerfile), so a source change recompiles from
+# scratch. That is the cost of the answer being about the source rather than
+# about the container's history.
+verify-linux:
+    docker build --tag apolisp-verify .
+    docker run --rm apolisp-verify
+
 # Install the advisory pre-commit hook (hooks/pre-commit). It never blocks a
 # commit; it just makes formatting and lint findings visible the same day.
 hooks:

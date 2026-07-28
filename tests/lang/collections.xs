@@ -143,3 +143,33 @@
 (is= 500 (loop [i 0] (try (if (= i 500) i (throw :again)) (catch e (recur (+ i 1))))))
 ; The handler stack is clean afterwards rather than 500 records deep.
 (is= :outer (try (throw :outer) (catch e e)))
+
+; --- the sequence library (ADR-048) ------------------------------------------
+; The first prelude functions. That they are callable at all is the point:
+; before ADR-048 a closure could not survive from the prelude into a unit.
+(is= [1 4 9] (map (fn [x] (* x x)) [1 2 3]))
+(is= [] (map (fn [x] x) []))
+; Works on a list as well as a vector, and always answers with a vector.
+(is= [2 4 6] (map (fn [x] (* x 2)) '(1 2 3)))
+
+(is= [3 4] (filter (fn [x] (> x 2)) [1 2 3 4]))
+(is= [] (filter (fn [x] (> x 9)) [1 2 3]))
+
+(is= 6 (reduce + 0 [1 2 3]))
+(is= 0 (reduce + 0 []))
+; The seed decides the result type, so reduce builds collections too.
+(is= [10 20] (reduce (fn [acc x] (conj acc (* x 10))) [] [1 2]))
+
+(is= [0 1 2] (range 3))
+(is= [] (range 0))
+(is= [:x :x] (repeat 2 :x))
+(is= [] (repeat 0 :x))
+
+(is= "a, b, c" (join ", " ["a" "b" "c"]))
+(is= "1" (join "-" [1]))
+(is= "" (join "-" []))
+; The separator goes between, never after — the off-by-one this exists to stop.
+(is= "1-2" (join "-" [1 2]))
+
+; They compose, which is the whole reason to have them.
+(is= 36 (reduce + 0 (map (fn [x] (* x 2)) (filter (fn [x] (> x 2)) (range 7)))))

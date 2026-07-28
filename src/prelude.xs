@@ -64,3 +64,55 @@
        (try
          (with-open ~(rest (rest bindings)) ~@body)
          (finally (io/close ~(first bindings)))))))
+
+; --- Sequences ---------------------------------------------------------------
+;
+; The first prelude *functions*, and the thing Q29 was open about. They are
+; compiled into every unit's chunk *after* the unit's own protos (ADR-048), so
+; adding one here never moves a program's proto indices and never touches a
+; `.disasm` golden. That property is what made these affordable; before it, four
+; functions cost 160 golden lines in each of nine corpus programs.
+;
+; Keep this small, for the reason the rest of this file is small: every line is
+; core language under ADR-030.
+;
+; They take and return vectors. There is no laziness in this language, and
+; `conj` puts a value where a vector is cheap to extend — so a seq abstraction
+; would buy nothing here but a second collection to explain.
+
+(def map
+  (fn map [f xs]
+    (loop [in xs out []]
+      (if (empty? in) out (recur (rest in) (conj out (f (first in))))))))
+
+(def filter
+  (fn filter [p xs]
+    (loop [in xs out []]
+      (if (empty? in)
+        out
+        (recur (rest in) (if (p (first in)) (conj out (first in)) out))))))
+
+; Three arguments, always. Clojure's one-argument-init form takes the first
+; element as the seed and errors on empty, which is two behaviours behind one
+; name — and the explicit seed is what makes the empty case obvious.
+(def reduce
+  (fn reduce [f init xs]
+    (loop [in xs acc init]
+      (if (empty? in) acc (recur (rest in) (f acc (first in)))))))
+
+(def range
+  (fn range [n]
+    (loop [i 0 out []] (if (= i n) out (recur (+ i 1) (conj out i))))))
+
+(def repeat
+  (fn repeat [n x]
+    (loop [i 0 out []] (if (= i n) out (recur (+ i 1) (conj out x))))))
+
+; `str` over a collection, with a separator between rather than after — the
+; off-by-one every program writing this by hand gets wrong once.
+(def join
+  (fn join [sep xs]
+    (if (empty? xs)
+      ""
+      (loop [in (rest xs) out (str (first xs))]
+        (if (empty? in) out (recur (rest in) (str out sep (first in))))))))

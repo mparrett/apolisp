@@ -1,0 +1,251 @@
+proto 0  <top>  params 0  slots 6
+  code
+    0000  CLOSURE     r1 <- proto 1          84:3
+    0001  SETGLOBAL   map <- r1              generated 83:1
+    0002  CLOSURE     r2 <- proto 3          89:3
+    0003  SETGLOBAL   filter <- r2           generated 88:1
+    0004  CLOSURE     r3 <- proto 5          99:3
+    0005  SETGLOBAL   reduce <- r3           generated 98:1
+    0006  CLOSURE     r4 <- proto 7          104:3
+    0007  SETGLOBAL   range <- r4            generated 103:1
+    0008  CLOSURE     r5 <- proto 9          108:3
+    0009  SETGLOBAL   repeat <- r5           generated 107:1
+    0010  CLOSURE     r0 <- proto 11         114:3
+    0011  SETGLOBAL   join <- r0             generated 113:1
+    0012  RETURN      r0                     generated 113:1
+
+proto 1  map  params 2  slots 9
+  code
+    0000  MOVE        r3 <- r1               85:15
+    0001  GETGLOBAL   r5 <- vector           85:22
+    0002  CALL        r4 <- r5(0)            85:22
+    0003  CLOSURE     r6 <- proto 2          85:5
+    0004  MOVE        r7 <- r3               85:5
+    0005  MOVE        r8 <- r4               85:5
+    0006  TAILCALL    r6(2)                  85:5
+    0007  RETURN      r2                     85:5
+
+proto 2  <fn>  params 2  slots 18
+  captures
+    c0  local r0
+  code
+    0000  GETGLOBAL   r4 <- empty?           86:12
+    0001  MOVE        r5 <- r0               86:19
+    0002  CALL        r3 <- r4(1)            86:11
+    0003  JUMPUNLESS  r3, 0006               86:7
+    0004  MOVE        r2 <- r1               86:23
+    0005  JUMP        0019                   86:7
+    0006  GETSELF     r6 <- self             86:27
+    0007  GETGLOBAL   r9 <- rest             86:35
+    0008  MOVE        r10 <- r0              86:40
+    0009  CALL        r7 <- r9(1)            86:34
+    0010  GETGLOBAL   r11 <- conj            86:45
+    0011  MOVE        r12 <- r1              86:50
+    0012  GETCAP      r14 <- c0              86:55
+    0013  GETGLOBAL   r16 <- first           86:58
+    0014  MOVE        r17 <- r0              86:64
+    0015  CALL        r15 <- r16(1)          86:57
+    0016  CALL        r13 <- r14(1)          86:54
+    0017  CALL        r8 <- r11(2)           86:44
+    0018  TAILCALL    r6(2)                  86:27
+    0019  RETURN      r2                     86:7
+
+proto 3  filter  params 2  slots 9
+  code
+    0000  MOVE        r3 <- r1               90:15
+    0001  GETGLOBAL   r5 <- vector           90:22
+    0002  CALL        r4 <- r5(0)            90:22
+    0003  CLOSURE     r6 <- proto 4          90:5
+    0004  MOVE        r7 <- r3               90:5
+    0005  MOVE        r8 <- r4               90:5
+    0006  TAILCALL    r6(2)                  90:5
+    0007  RETURN      r2                     90:5
+
+proto 4  <fn>  params 2  slots 21
+  captures
+    c0  local r0
+  code
+    0000  GETGLOBAL   r4 <- empty?           91:12
+    0001  MOVE        r5 <- r0               91:19
+    0002  CALL        r3 <- r4(1)            91:11
+    0003  JUMPUNLESS  r3, 0006               91:7
+    0004  MOVE        r2 <- r1               92:9
+    0005  JUMP        0025                   91:7
+    0006  GETSELF     r6 <- self             93:9
+    0007  GETGLOBAL   r9 <- rest             93:17
+    0008  MOVE        r10 <- r0              93:22
+    0009  CALL        r7 <- r9(1)            93:16
+    0010  GETCAP      r12 <- c0              93:31
+    0011  GETGLOBAL   r14 <- first           93:34
+    0012  MOVE        r15 <- r0              93:40
+    0013  CALL        r13 <- r14(1)          93:33
+    0014  CALL        r11 <- r12(1)          93:30
+    0015  JUMPUNLESS  r11, 0023              93:26
+    0016  GETGLOBAL   r16 <- conj            93:46
+    0017  MOVE        r17 <- r1              93:51
+    0018  GETGLOBAL   r19 <- first           93:56
+    0019  MOVE        r20 <- r0              93:62
+    0020  CALL        r18 <- r19(1)          93:55
+    0021  CALL        r8 <- r16(2)           93:45
+    0022  JUMP        0024                   93:26
+    0023  MOVE        r8 <- r1               93:67
+    0024  TAILCALL    r6(2)                  93:9
+    0025  RETURN      r2                     91:7
+
+proto 5  reduce  params 3  slots 9
+  code
+    0000  MOVE        r4 <- r2               100:15
+    0001  MOVE        r5 <- r1               100:22
+    0002  CLOSURE     r6 <- proto 6          100:5
+    0003  MOVE        r7 <- r4               100:5
+    0004  MOVE        r8 <- r5               100:5
+    0005  TAILCALL    r6(2)                  100:5
+    0006  RETURN      r3                     100:5
+
+proto 6  <fn>  params 2  slots 16
+  captures
+    c0  local r0
+  code
+    0000  GETGLOBAL   r4 <- empty?           101:12
+    0001  MOVE        r5 <- r0               101:19
+    0002  CALL        r3 <- r4(1)            101:11
+    0003  JUMPUNLESS  r3, 0006               101:7
+    0004  MOVE        r2 <- r1               101:23
+    0005  JUMP        0017                   101:7
+    0006  GETSELF     r6 <- self             101:27
+    0007  GETGLOBAL   r9 <- rest             101:35
+    0008  MOVE        r10 <- r0              101:40
+    0009  CALL        r7 <- r9(1)            101:34
+    0010  GETCAP      r11 <- c0              101:45
+    0011  MOVE        r12 <- r1              101:47
+    0012  GETGLOBAL   r14 <- first           101:52
+    0013  MOVE        r15 <- r0              101:58
+    0014  CALL        r13 <- r14(1)          101:51
+    0015  CALL        r8 <- r11(2)           101:44
+    0016  TAILCALL    r6(2)                  101:27
+    0017  RETURN      r2                     101:7
+
+proto 7  range  params 1  slots 8
+  constants
+    k0  0
+  code
+    0000  CONST       r2 <- k0               105:14
+    0001  GETGLOBAL   r4 <- vector           105:20
+    0002  CALL        r3 <- r4(0)            105:20
+    0003  CLOSURE     r5 <- proto 8          105:5
+    0004  MOVE        r6 <- r2               105:5
+    0005  MOVE        r7 <- r3               105:5
+    0006  TAILCALL    r5(2)                  105:5
+    0007  RETURN      r1                     105:5
+
+proto 8  <fn>  params 2  slots 16
+  constants
+    k0  1
+  captures
+    c0  local r0
+  code
+    0000  GETGLOBAL   r4 <- =                105:29
+    0001  MOVE        r5 <- r0               105:31
+    0002  GETCAP      r6 <- c0               105:33
+    0003  CALL        r3 <- r4(2)            105:28
+    0004  JUMPUNLESS  r3, 0007               105:24
+    0005  MOVE        r2 <- r1               105:36
+    0006  JUMP        0017                   105:24
+    0007  GETSELF     r7 <- self             105:40
+    0008  GETGLOBAL   r10 <- +               105:48
+    0009  MOVE        r11 <- r0              105:50
+    0010  CONST       r12 <- k0              105:52
+    0011  CALL        r8 <- r10(2)           105:47
+    0012  GETGLOBAL   r13 <- conj            105:56
+    0013  MOVE        r14 <- r1              105:61
+    0014  MOVE        r15 <- r0              105:65
+    0015  CALL        r9 <- r13(2)           105:55
+    0016  TAILCALL    r7(2)                  105:40
+    0017  RETURN      r2                     105:24
+
+proto 9  repeat  params 2  slots 9
+  constants
+    k0  0
+  code
+    0000  CONST       r3 <- k0               109:14
+    0001  GETGLOBAL   r5 <- vector           109:20
+    0002  CALL        r4 <- r5(0)            109:20
+    0003  CLOSURE     r6 <- proto 10         109:5
+    0004  MOVE        r7 <- r3               109:5
+    0005  MOVE        r8 <- r4               109:5
+    0006  TAILCALL    r6(2)                  109:5
+    0007  RETURN      r2                     109:5
+
+proto 10  <fn>  params 2  slots 16
+  constants
+    k0  1
+  captures
+    c0  local r0
+    c1  local r1
+  code
+    0000  GETGLOBAL   r4 <- =                109:29
+    0001  MOVE        r5 <- r0               109:31
+    0002  GETCAP      r6 <- c0               109:33
+    0003  CALL        r3 <- r4(2)            109:28
+    0004  JUMPUNLESS  r3, 0007               109:24
+    0005  MOVE        r2 <- r1               109:36
+    0006  JUMP        0017                   109:24
+    0007  GETSELF     r7 <- self             109:40
+    0008  GETGLOBAL   r10 <- +               109:48
+    0009  MOVE        r11 <- r0              109:50
+    0010  CONST       r12 <- k0              109:52
+    0011  CALL        r8 <- r10(2)           109:47
+    0012  GETGLOBAL   r13 <- conj            109:56
+    0013  MOVE        r14 <- r1              109:61
+    0014  GETCAP      r15 <- c1              109:65
+    0015  CALL        r9 <- r13(2)           109:55
+    0016  TAILCALL    r7(2)                  109:40
+    0017  RETURN      r2                     109:24
+
+proto 11  join  params 2  slots 17
+  constants
+    k0  ""
+  code
+    0000  GETGLOBAL   r4 <- empty?           115:10
+    0001  MOVE        r5 <- r1               115:17
+    0002  CALL        r3 <- r4(1)            115:9
+    0003  JUMPUNLESS  r3, 0006               115:5
+    0004  CONST       r2 <- k0               116:7
+    0005  JUMP        0018                   115:5
+    0006  GETGLOBAL   r7 <- rest             117:18
+    0007  MOVE        r8 <- r1               117:23
+    0008  CALL        r6 <- r7(1)            117:17
+    0009  GETGLOBAL   r10 <- str             117:32
+    0010  GETGLOBAL   r12 <- first           117:37
+    0011  MOVE        r13 <- r1              117:43
+    0012  CALL        r11 <- r12(1)          117:36
+    0013  CALL        r9 <- r10(1)           117:31
+    0014  CLOSURE     r14 <- proto 12        117:7
+    0015  MOVE        r15 <- r6              117:7
+    0016  MOVE        r16 <- r9              117:7
+    0017  TAILCALL    r14(2)                 117:7
+    0018  RETURN      r2                     115:5
+
+proto 12  <fn>  params 2  slots 17
+  captures
+    c0  local r0
+  code
+    0000  GETGLOBAL   r4 <- empty?           118:14
+    0001  MOVE        r5 <- r0               118:21
+    0002  CALL        r3 <- r4(1)            118:13
+    0003  JUMPUNLESS  r3, 0006               118:9
+    0004  MOVE        r2 <- r1               118:25
+    0005  JUMP        0018                   118:9
+    0006  GETSELF     r6 <- self             118:29
+    0007  GETGLOBAL   r9 <- rest             118:37
+    0008  MOVE        r10 <- r0              118:42
+    0009  CALL        r7 <- r9(1)            118:36
+    0010  GETGLOBAL   r11 <- str             118:47
+    0011  MOVE        r12 <- r1              118:51
+    0012  GETCAP      r13 <- c0              118:55
+    0013  GETGLOBAL   r15 <- first           118:60
+    0014  MOVE        r16 <- r0              118:66
+    0015  CALL        r14 <- r15(1)          118:59
+    0016  CALL        r8 <- r11(3)           118:46
+    0017  TAILCALL    r6(2)                  118:29
+    0018  RETURN      r2                     118:9

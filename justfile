@@ -101,6 +101,9 @@ bless:
     # that failed, and since ADR-039 that is a transcript like any other — the
     # driver's own failures are 2 and 3, and those still stop the recipe.
     for f in tests/corpus/*.xs; do if [ -f "${f%.xs}.out" ]; then cargo run --quiet -- run "$f" > "${f%.xs}.out" || [ $? -eq 1 ]; fi; done
+    # ADR-048: the prelude is compiled into every unit and printed in none of
+    # them, so it needs its own golden or it is pinned nowhere.
+    cargo run --quiet -- prelude > tests/prelude.disasm
     @echo 'goldens regenerated — run `git diff` and justify every hunk before committing'
 
 # Milestone 9. A session is one compilation unit, so definitions and macros

@@ -1275,14 +1275,49 @@ pub mod bytecode {
     #[derive(Debug)]
     pub struct Chunk {
         pub protos: Vec<Proto>,
+        /// Which protos belong to the prelude rather than to the unit
+        /// (ADR-048). `None` for a chunk compiled without one.
+        pub prelude: Option<PreludeSpan>,
     }
 
+    /// The prelude's protos: `top` is its top level, which the driver runs
+    /// before the unit's so the definitions exist, and `len` is how many protos
+    /// it owns from there.
+    ///
+    /// A span rather than a boundary because the two callers order the chunk
+    /// differently and both are right: a file puts the unit first so its proto
+    /// indices never move as the prelude grows, and a session puts the prelude
+    /// first because its inputs keep appending after.
+    #[derive(Debug, Clone, Copy)]
+    pub struct PreludeSpan {
+        pub top: u32,
+        pub len: u32,
+    }
+
+    impl PreludeSpan {
+        fn contains(&self, i: usize) -> bool {
+            let i = i as u32;
+            i >= self.top && i < self.top + self.len
+        }
+    }
+
+    /// The unit's protos, and never the prelude's.
+    ///
+    /// A `.disasm` golden is about the program it names. Printing the prelude
+    /// into all nine of them would add 160 lines each for four functions and
+    /// grow forever, which is the cost Q29 declined to pay — the prelude gets
+    /// one golden of its own instead (ADR-048).
     pub fn disassemble(chunk: &Chunk, interner: &Interner, src: &str) -> String {
         let mut out = String::new();
+        let mut first = true;
         for (i, p) in chunk.protos.iter().enumerate() {
-            if i > 0 {
+            if chunk.prelude.is_some_and(|s| s.contains(i)) {
+                continue;
+            }
+            if !first {
                 out.push('\n');
             }
+            first = false;
             disasm_proto(&mut out, i, p, interner, src);
         }
         out
@@ -1390,7 +1425,7 @@ pub mod bytecode {
 /// "no liveness analysis, no reuse".
 pub mod compile {
     use crate::bytecode::{
-        CaptureIdx, CaptureSrc, Chunk, ConstIdx, Instr, Pc, Proto, ProtoIdx, Slot,
+        CaptureIdx, CaptureSrc, Chunk, ConstIdx, Instr, Pc, PreludeSpan, Proto, ProtoIdx, Slot,
     };
     use crate::error::{LispErr, SpanOrigin};
     use crate::value::{kind_name, same_const, Interner, LocatedForm, Origins, SymId, Value};
@@ -2088,8 +2123,38 @@ pub mod compile {
     // --- lowering -----------------------------------------------------------
 
     pub fn compile(forms: &[LocatedForm], interner: &mut Interner) -> Result<Chunk, LispErr> {
-        let mut chunk = Chunk { protos: Vec::new() };
+        let mut chunk = Chunk {
+            protos: Vec::new(),
+            prelude: None,
+        };
         compile_into(&mut chunk, forms, interner)?;
+        Ok(chunk)
+    }
+
+    /// A unit plus the prelude's runtime definitions (ADR-048).
+    ///
+    /// **The unit is compiled first, and the prelude appended after.** That
+    /// order is the whole decision: a unit's proto indices then depend only on
+    /// the unit, so `.disasm` goldens stay pinned to the program they are about
+    /// and do not move every time the prelude gains a function. The returned
+    /// `prelude.top` is the proto the driver has to run *before* `protos[0]`,
+    /// because the definitions have to exist before the program refers to them.
+    pub fn compile_unit(
+        forms: &[LocatedForm],
+        prelude: &[LocatedForm],
+        interner: &mut Interner,
+    ) -> Result<Chunk, LispErr> {
+        let mut chunk = Chunk {
+            protos: Vec::new(),
+            prelude: None,
+        };
+        compile_into(&mut chunk, forms, interner)?;
+        let before = chunk.protos.len() as u32;
+        let top = compile_into(&mut chunk, prelude, interner)?;
+        chunk.prelude = Some(PreludeSpan {
+            top,
+            len: chunk.protos.len() as u32 - before,
+        });
         Ok(chunk)
     }
 
@@ -2160,6 +2225,7 @@ pub mod compile {
                 .into_iter()
                 .map(|p| p.expect("every reserved proto is filled in"))
                 .collect(),
+            prelude: None,
         })
     }
 
@@ -3096,6 +3162,32 @@ pub mod vm {
         run_traced(vm, chunk).0
     }
 
+    /// The prelude's definitions, then the unit (ADR-048).
+    ///
+    /// Two runs rather than one, because the prelude's top level is its own
+    /// proto — which is the point: the unit's `<top>` holds only the unit, so
+    /// its goldens say what the program does and nothing about how large the
+    /// prelude has become.
+    ///
+    /// A prelude that throws is a host bug and not a program's diagnostic
+    /// (ADR-028 rule 5's spirit, and the same stance `expand` takes on a prelude
+    /// that will not expand), so it panics rather than being reported as the
+    /// program's failure.
+    pub fn run_unit(vm: &mut Vm, chunk: &Chunk) -> Outcome {
+        if let Some(s) = chunk.prelude {
+            let ex = start_at(chunk, s.top);
+            match run_fueled(vm, chunk, ex, u64::MAX).0 {
+                Outcome::Returned(_) => {}
+                Outcome::Threw(u) => panic!(
+                    "the prelude threw: {}",
+                    crate::printer::print(&u.value, &vm.interner)
+                ),
+                Outcome::Suspended => unreachable!("the prelude runs un-fuelled"),
+            }
+        }
+        run(vm, chunk)
+    }
+
     /// `run`, plus the high-water marks. Separate because the marks exist for
     /// the constant-space property and have no place in the driver.
     pub fn run_traced(vm: &mut Vm, chunk: &Chunk) -> (Outcome, (usize, usize)) {
@@ -3710,7 +3802,10 @@ pub mod expand {
     use std::rc::Rc;
 
     /// `def` and `defmacro`, written in the language (ADR-027, ADR-040).
-    const PRELUDE: &str = include_str!("prelude.xs");
+    /// Public so the driver's `prelude` stage can render positions into it
+    /// (ADR-048): a disassembly whose every instruction says `1:1` pins the
+    /// code and loses the one thing the golden is for.
+    pub const PRELUDE: &str = include_str!("prelude.xs");
 
     /// A macro that rewrites to itself makes no progress and would otherwise
     /// hang. The bound is per form and generous; hitting it is a bug in the
@@ -3766,6 +3861,14 @@ pub mod expand {
         /// Looked up, never iterated — so no ordering of this map can reach
         /// output (BUILD.md, determinism).
         table: HashMap<SymId, Macro>,
+        /// The prelude's runtime definitions, in source order (ADR-048).
+        ///
+        /// Two products come out of expanding the prelude, not one. Its
+        /// `set-macro!` forms are consumed here and leave nothing behind; its
+        /// `set-global!` forms are code that has to run, and they are handed to
+        /// the compiler rather than discarded. Before ADR-048 the prelude was
+        /// only ever macros, so there was nothing to carry.
+        definitions: Vec<LocatedForm>,
     }
 
     impl Macros {
@@ -3775,6 +3878,7 @@ pub mod expand {
         pub fn with_prelude(vm: &mut Vm) -> Macros {
             let mut m = Macros {
                 table: HashMap::new(),
+                definitions: Vec::new(),
             };
             let names = Names::new(&mut vm.interner);
             let mut ex = Expander {
@@ -3782,9 +3886,37 @@ pub mod expand {
                 names,
                 macros: &mut m.table,
                 depth: 0,
+                definitions: Vec::new(),
             };
             ex.prelude();
+            m.definitions = std::mem::take(&mut ex.definitions);
             m
+        }
+
+        pub fn definitions(&self) -> &[LocatedForm] {
+            &self.definitions
+        }
+    }
+
+    /// The prelude's runtime definitions on their own, for a caller that
+    /// compiles a unit without holding a macro table (the driver's `run`).
+    ///
+    /// Call it *before* expanding the unit. Expanding the prelude advances the
+    /// gensym counter; `expand_all` resets the counter before the unit
+    /// (ADR-040), so doing this first leaves no trace on the unit. Doing it
+    /// afterwards is also safe for the unit — but then the prelude's own
+    /// gensyms are numbered from wherever the program's expansion stopped, and
+    /// the prelude would compile differently for different programs.
+    pub fn prelude_definitions(vm: &mut Vm) -> Vec<LocatedForm> {
+        Macros::with_prelude(vm).definitions
+    }
+
+    fn is_call_to(v: &Value, interner: &Interner, name: &str) -> bool {
+        match v {
+            Value::List(l) => {
+                matches!(l.0.first(), Some(Value::Sym(s)) if interner.name(s.0) == name)
+            }
+            _ => false,
         }
     }
 
@@ -3793,6 +3925,8 @@ pub mod expand {
         names: Names,
         macros: &'a mut HashMap<SymId, Macro>,
         depth: usize,
+        /// Non-empty only while expanding the prelude; see `Macros`.
+        definitions: Vec<LocatedForm>,
     }
 
     /// Expand one compilation unit: the prelude first, then the unit's own
@@ -3830,6 +3964,7 @@ pub mod expand {
             names,
             macros: &mut macros.table,
             depth: 0,
+            definitions: Vec::new(),
         };
         forms.into_iter().map(|f| ex.form(f)).collect()
     }
@@ -3844,12 +3979,21 @@ pub mod expand {
                 panic!("prelude does not read: {}", e.render("prelude.xs", PRELUDE))
             });
             for f in forms {
-                self.form(f).unwrap_or_else(|e| {
+                let out = self.form(f).unwrap_or_else(|e| {
                     panic!(
                         "prelude does not expand: {}",
                         e.render("prelude.xs", PRELUDE)
                     )
                 });
+                // A macro definition expands to `(quote name)` and has already
+                // done its work by installing itself; a function definition
+                // expands to `(set-global! …)` and still has to run (ADR-048).
+                // Keeping only `set-global!` is what tells the two apart, and it
+                // is deliberately a whitelist: a prelude form that is neither is
+                // a form nobody decided the meaning of.
+                if is_call_to(&out.root, &self.vm.interner, "set-global!") {
+                    self.definitions.push(out);
+                }
             }
         }
 
@@ -5861,7 +6005,7 @@ pub mod image {
 pub mod adapters;
 
 pub mod session {
-    use crate::bytecode::Chunk;
+    use crate::bytecode::{Chunk, PreludeSpan};
     use crate::error::LispErr;
     use crate::expand::Macros;
     use crate::value::Value;
@@ -5893,11 +6037,27 @@ pub mod session {
             // fresh name.
             vm.reset_gensym();
             let macros = Macros::with_prelude(&mut vm);
-            Session {
-                vm,
-                chunk: Chunk { protos: Vec::new() },
-                macros,
-            }
+            let mut chunk = Chunk {
+                protos: Vec::new(),
+                prelude: None,
+            };
+            // The prelude goes in first here, and last in a file (ADR-048).
+            // Both orders keep the same promise — a unit's proto indices do not
+            // move when the prelude grows — and they differ because a session's
+            // inputs keep appending, so "last" is a place that does not exist.
+            //
+            // Run once, now, rather than per input: a session is one unit
+            // (ADR-044), and re-running the definitions at every prompt would
+            // rebind names the user may have deliberately shadowed.
+            let top = compile::compile_into(&mut chunk, macros.definitions(), &mut vm.interner)
+                .expect("the prelude compiles");
+            chunk.prelude = Some(PreludeSpan {
+                top,
+                len: chunk.protos.len() as u32,
+            });
+            let ex = vm::start_at(&chunk, top);
+            vm::run_fueled(&mut vm, &chunk, ex, u64::MAX);
+            Session { vm, chunk, macros }
         }
 
         /// Read, expand, compile into the session's chunk, and run what was

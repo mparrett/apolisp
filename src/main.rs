@@ -12,7 +12,7 @@ use std::process::ExitCode;
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().collect();
     if args.len() < 2 {
-        eprintln!("usage: apolisp <read|spans|sizes|repl|expand|compile|run> [file.xs]");
+        eprintln!("usage: apolisp <read|spans|sizes|repl|prelude|expand|compile|run> [file.xs]");
         return ExitCode::from(2);
     }
     if args[1] == "sizes" {
@@ -22,6 +22,14 @@ fn main() -> ExitCode {
     // session, and there is nothing to read off disk (ADR-044 part 1).
     if args[1] == "repl" {
         return repl();
+    }
+    // ADR-048. The prelude's functions are compiled into every unit and left
+    // out of every unit's disassembly, so without this they would be the only
+    // code in the language with no golden at all — pinned nowhere, changing
+    // silently. It takes no file for the same reason `repl` does not: the
+    // prelude is the input.
+    if args[1] == "prelude" {
+        return print_prelude();
     }
     if args.len() < 3 {
         eprintln!("usage: apolisp <read|spans|expand|compile|run> <file.xs>");
@@ -105,12 +113,20 @@ fn main() -> ExitCode {
         // source alone (ADR-004 said so before there was any).
         "compile" => {
             let mut vm = vm::Vm::new();
+            // Before the unit is expanded, so the prelude's own gensyms start
+            // from zero and compile identically for every program. After, they
+            // would be numbered from wherever the program's expansion left the
+            // counter, and the prelude's golden would depend on the program.
+            let prelude = expand::prelude_definitions(&mut vm);
             let forms = match pipeline(&src, path, &mut vm) {
                 Ok(forms) => forms,
                 Err(code) => return code,
             };
+            // `compile_unit` and not `compile`: the chunk a golden pins has
+            // to be the chunk that runs (ADR-048). `disassemble` leaves the
+            // prelude's protos out, so what prints is still only the program.
             let interner = &mut vm.interner;
-            match compile::compile(&forms, interner) {
+            match compile::compile_unit(&forms, &prelude, interner) {
                 Ok(chunk) => {
                     print!("{}", bytecode::disassemble(&chunk, interner, &src));
                     ExitCode::SUCCESS
@@ -126,18 +142,20 @@ fn main() -> ExitCode {
         // cannot be pinned, and milestone 4 adds the thrown-value half.
         "run" => {
             let mut vm = vm::Vm::new();
+            // Before the unit, for the reason the `compile` stage gives.
+            let prelude = expand::prelude_definitions(&mut vm);
             let forms = match pipeline(&src, path, &mut vm) {
                 Ok(forms) => forms,
                 Err(code) => return code,
             };
-            let chunk = match compile::compile(&forms, &mut vm.interner) {
+            let chunk = match compile::compile_unit(&forms, &prelude, &mut vm.interner) {
                 Ok(chunk) => chunk,
                 Err(e) => {
                     eprintln!("{}", e.render(path, &src));
                     return ExitCode::FAILURE;
                 }
             };
-            let outcome = vm::run(&mut vm, &chunk);
+            let outcome = vm::run_unit(&mut vm, &chunk);
             let stdout = vm.take_output();
             print!("--- stdout\n{stdout}");
             match outcome {
@@ -242,6 +260,34 @@ fn repl() -> ExitCode {
             // `<repl>` rather than a path: the position is real, and the file
             // it points into is the line just typed.
             Err(e) => println!("{}", e.render("<repl>", &src)),
+        }
+    }
+}
+
+/// The prelude's own disassembly (ADR-048).
+///
+/// Compiled on its own, so proto 0 is the prelude's top level and the numbering
+/// does not depend on any program. That is *not* the numbering it has inside a
+/// unit's chunk, where it is appended after the unit — which is the point of
+/// appending it there, and the reason this golden stays put while programs come
+/// and go.
+fn print_prelude() -> ExitCode {
+    let mut vm = vm::Vm::new();
+    let forms = expand::prelude_definitions(&mut vm);
+    match compile::compile(&forms, &mut vm.interner) {
+        Ok(chunk) => {
+            print!(
+                "{}",
+                bytecode::disassemble(&chunk, &vm.interner, expand::PRELUDE)
+            );
+            ExitCode::SUCCESS
+        }
+        Err(e) => {
+            eprintln!(
+                "prelude does not compile: {}",
+                e.render("prelude.xs", expand::PRELUDE)
+            );
+            ExitCode::from(2)
         }
     }
 }

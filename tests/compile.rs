@@ -715,7 +715,10 @@ fn recur_lowers_to_a_tail_call_even_where_the_loop_is_not_in_tail_position() {
 #[test]
 fn a_refused_recur_leaves_the_chunk_untouched() {
     let mut interner = Interner::new();
-    let mut chunk = Chunk { protos: Vec::new() };
+    let mut chunk = Chunk {
+        protos: Vec::new(),
+        prelude: None,
+    };
 
     let good = reader::read_all("(fn [] 1)", &mut interner).unwrap();
     compile::compile_into(&mut chunk, &good, &mut interner).unwrap();
@@ -730,4 +733,74 @@ fn a_refused_recur_leaves_the_chunk_untouched() {
         before,
         "a refused compile appended protos to the chunk"
     );
+}
+
+// --- The prelude's own golden (ADR-048) -------------------------------------
+
+/// The prelude's functions are compiled into every unit and left out of every
+/// unit's disassembly, so this is the only thing pinning them. Without it they
+/// would be the one piece of code in the language with no golden at all.
+///
+/// Compiled standalone, so proto 0 is the prelude's top level. That is *not*
+/// the numbering it has inside a unit's chunk, where it is appended after the
+/// unit — and appending it there is exactly what keeps every other `.disasm`
+/// golden still while the prelude grows.
+#[test]
+fn the_prelude_disassembly_matches_its_golden() {
+    let out = std::process::Command::new(common::bin())
+        .current_dir(common::repo_root())
+        .arg("prelude")
+        .output()
+        .expect("failed to run apolisp");
+    assert!(out.status.success(), "`apolisp prelude` failed");
+    let got = String::from_utf8_lossy(&out.stdout);
+
+    let mut path = common::repo_root();
+    path.push("tests/prelude.disasm");
+    let want = std::fs::read_to_string(&path).expect("tests/prelude.disasm is missing");
+
+    assert_eq!(
+        got, want,
+        "the prelude's disassembly changed. Read the diff and say why \
+         before running `just bless` (BUILD.md: the oracle is review-gated)."
+    );
+}
+
+/// ADR-048's promise, stated as a test rather than as a comment: a unit's
+/// protos come first and the prelude's after, so a program's proto indices
+/// depend on the program alone.
+///
+/// If this inverts, every `.disasm` golden in the corpus moves the next time
+/// the prelude gains a function — which is the cost Q29 spent four milestones
+/// declining to pay.
+#[test]
+fn the_prelude_is_appended_after_the_unit_and_left_out_of_the_disassembly() {
+    let mut interner = Interner::new();
+    let unit = reader::read_all("(fn [] 1)", &mut interner).unwrap();
+    let prelude = reader::read_all("(set-global! k (fn [] 2))", &mut interner).unwrap();
+
+    let alone = compile::compile(&unit, &mut interner).expect("compiles");
+    let together = compile::compile_unit(&unit, &prelude, &mut interner).expect("compiles");
+
+    let span = together.prelude.expect("compile_unit records the span");
+    assert_eq!(
+        span.top as usize,
+        alone.protos.len(),
+        "the prelude must start where the unit ends"
+    );
+    assert!(span.len > 0, "the prelude contributed no protos");
+
+    // The unit's protos are byte-identical to compiling it with no prelude at
+    // all, which is the property the goldens rest on.
+    for (i, p) in alone.protos.iter().enumerate() {
+        assert_eq!(
+            format!("{:?}", together.protos[i]),
+            format!("{p:?}"),
+            "proto {i} changed when a prelude was added"
+        );
+    }
+
+    // And the disassembly shows the unit only.
+    let text = bytecode::disassemble(&together, &interner, "");
+    assert!(!text.contains(&format!("proto {}", span.top)), "{text}");
 }

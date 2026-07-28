@@ -50,6 +50,15 @@ constants. Silent, which is what makes it the dangerous one.
 graph blows up exponentially on sharing, breaks identity for cells and atoms, and
 does not terminate on a cell cycle — which ADR-003 explicitly permits (Q8).
 
+**A read deadline raises `:would-block`, not `:timeout`.** `tcp/set-timeout`
+sets `set_read_timeout`/`set_write_timeout`, and Rust documents the resulting
+error kind as `WouldBlock` **or** `TimedOut` depending on the platform — Unix
+gives the first, Windows the second. So a program handling a read deadline has
+to accept both, and one written and tested on macOS will silently stop
+retrying on Windows. `:timeout`'s only reliable raiser is `tcp/connect` with a
+timeout argument, which is `connect_timeout` underneath and does return
+`TimedOut`. Verified on macOS at milestone 10, not on Windows.
+
 **Handle validity across migration.** Generational keys catch reuse; they do not
 catch a handle that was valid in the source VM and meaningless in the target.
 Every adapter declares its reacquisition semantics or refuses.

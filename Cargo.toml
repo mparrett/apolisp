@@ -4,6 +4,11 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+# ADR-045: two, both outside the line budget, both pre-approved by ADR-014 for
+# exactly this. The *language* still has none — `cargo tree
+# --no-default-features` shows an empty tree, and that stays checkable.
+crossterm = { version = "0.28", optional = true }
+serde_json = { version = "1", optional = true }
 
 # ADR-013: features gate *host capability* and never language semantics, so
 # there is one language here and not 2ⁿ. They exist as the subtraction test
@@ -11,8 +16,11 @@ edition = "2021"
 # "seams exist for subtraction" stays a fact. `just verify` builds without
 # them, because a seam nothing compiles is a seam nobody can trust.
 [features]
-default = ["fs"]
+default = ["fs", "tcp", "term", "json"]
 fs = []
+tcp = []
+term = ["dep:crossterm"]
+json = ["dep:serde_json"]
 
 [profile.release]
 # ADR-037 makes *language* arithmetic checked explicitly, so the two profiles

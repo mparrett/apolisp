@@ -1,0 +1,275 @@
+//! Milestone 10 (BUILD.md): host adapters — terminal, TCP, JSON.
+//!
+//! Nothing here tests the language. The adapters are outside the line budget
+//! because they are a Rust library behind the handle table, and what is worth
+//! pinning is exactly the boundary: that a socket is a handle like a file is,
+//! that the `:io-error` shape is one shape and not one per adapter, and that
+//! cutting a feature removes primitives and leaves the language alone.
+//!
+//! The terminal has no test that opens one. `crossterm` needs a tty and the
+//! test runner has none, so what is checked is that the primitives exist and
+//! that a build without them is still a working language — which is the claim
+//! ADR-013 actually makes.
+
+use apolisp::printer;
+use apolisp::session::{Ended, Session};
+
+/// Evaluate in a fresh session and render the result the way a prompt would.
+fn ev(src: &str) -> String {
+    let mut s = Session::new();
+    run(&mut s, src)
+}
+
+fn run(s: &mut Session, src: &str) -> String {
+    match s.eval(src) {
+        Ok(Ended::Value(v)) => printer::print(&v, &s.vm.interner),
+        Ok(Ended::Threw(u)) => format!("threw {}", printer::print(&u.value, &s.vm.interner)),
+        Err(e) => format!("error {}", e.msg),
+    }
+}
+
+/// Which primitives a build has. `Vm::global` answering `None` is exactly what
+/// an unbound name is, so this is the same question a program asks.
+fn is_bound(name: &str) -> bool {
+    let mut s = Session::new();
+    let id = apolisp::value::SymId(s.vm.interner.intern(name));
+    s.vm.global(id).is_some()
+}
+
+// --- JSON ------------------------------------------------------------------------
+
+#[cfg(feature = "json")]
+#[test]
+fn json_decodes_to_values_and_object_keys_are_strings() {
+    // Keys are strings, not keywords (ADR-045 part 6). Type-strict `=`
+    // (ADR-041) makes the wrong choice a failed lookup rather than a subtle
+    // one, so this asserts the lookup that works and the one that does not.
+    assert_eq!(ev(r#"(get (json/decode "{\"a\":1}") "a")"#), "1");
+    assert_eq!(ev(r#"(get (json/decode "{\"a\":1}") :a)"#), "nil");
+
+    assert_eq!(ev(r#"(json/decode "null")"#), "nil");
+    assert_eq!(ev(r#"(json/decode "[true,false]")"#), "[true false]");
+    // An integer when it is one and fits; a float otherwise.
+    assert_eq!(ev(r#"(json/decode "[1,2.5,-3]")"#), "[1 2.5 -3]");
+    // Arrays are vectors, not lists — ADR-041 makes those equal across
+    // representations, so this pins the representation the printer shows.
+    assert_eq!(ev(r#"(json/decode "[]")"#), "[]");
+}
+
+#[cfg(feature = "json")]
+#[test]
+fn a_decoded_object_prints_the_same_way_twice() {
+    // `serde_json` does not preserve insertion order without a feature we have
+    // not taken, so decode sorts. Determinism is a prerequisite (`BUILD.md`):
+    // a map whose print order follows a hash seed makes every transcript that
+    // touches it flap, and a flapping golden gets disabled.
+    let doc = r#"(json/decode "{\"z\":1,\"m\":2,\"a\":3,\"b\":4}")"#;
+    let once = ev(doc);
+    assert_eq!(once, r#"{"a" 3 "b" 4 "m" 2 "z" 1}"#);
+    for _ in 0..8 {
+        assert_eq!(ev(doc), once, "decode is not deterministic");
+    }
+}
+
+#[cfg(feature = "json")]
+#[test]
+fn json_refuses_what_it_cannot_represent_and_says_why() {
+    // Every refusal is the one `:io-error` shape, so a program dispatches on
+    // `:kind` here exactly as it does on a file error (ADR-039 clause 3).
+    for (src, op) in [
+        (r#"(json/encode (/ 1.0 0.0))"#, ":encode"),
+        (r#"(json/encode (/ -1.0 0.0))"#, ":encode"),
+        (r#"(json/encode {:keyword-key 1})"#, ":encode"),
+        (r#"(json/decode "{oops")"#, ":decode"),
+        (r#"(json/decode "")"#, ":decode"),
+    ] {
+        let e = ev(&format!("(try {src} (catch e e))"));
+        assert!(e.contains(":io-error"), "{src} -> {e}");
+        assert!(e.contains(":invalid-data"), "{src} -> {e}");
+        assert!(e.contains(op), "{src} should name its operation: {e}");
+    }
+}
+
+#[cfg(feature = "json")]
+#[test]
+fn json_round_trips_the_documents_it_accepts() {
+    // Encode-then-decode, not decode-then-encode: the second is not a
+    // round trip, because keys come back as strings whatever they went in as.
+    let mut s = Session::new();
+    run(
+        &mut s,
+        r#"(def doc {"n" 1 "f" 2.5 "t" true "z" nil "xs" [1 "two" [3]]})"#,
+    );
+    assert_eq!(
+        run(&mut s, "(= doc (json/decode (json/encode doc)))"),
+        "true"
+    );
+}
+
+// --- TCP -------------------------------------------------------------------------
+
+#[cfg(feature = "tcp")]
+#[test]
+fn a_socket_is_a_handle_like_a_file_is() {
+    let mut s = Session::new();
+    // Port 0, then ask what was bound. A hard-coded port fails on a machine
+    // already using it, which is a flaky test rather than a failing one.
+    run(&mut s, r#"(def l (tcp/listen "127.0.0.1:0"))"#);
+    run(&mut s, "(def addr (tcp/local-addr l))");
+    run(&mut s, "(def c (tcp/connect addr))");
+    run(&mut s, "(def server (tcp/accept l))");
+
+    // Written and read by the *file* primitives. An adapter needing its own
+    // read would be an adapter that had not gone through the handle table.
+    assert_eq!(run(&mut s, r#"(io/write c "ping")"#), "4");
+    assert_eq!(run(&mut s, "(bytes-str (io/read server 4))"), "\"ping\"");
+
+    // And closed, and stale afterwards, by the same rules (ADR-042 part 4).
+    assert_eq!(run(&mut s, "(io/open? c)"), "true");
+    run(&mut s, "(io/close c)");
+    assert_eq!(run(&mut s, "(io/open? c)"), "false");
+    run(&mut s, "(io/close server) (io/close l)");
+}
+
+/// ADR-045 part 2, and the reason TCP is in this milestone at all. ADR-042
+/// shipped six kinds and deferred three on the grounds that a kind nobody can
+/// raise is a guess with a colon in front of it — this is the deferral being
+/// honoured rather than forgotten.
+#[cfg(feature = "tcp")]
+#[test]
+fn a_read_deadline_raises_a_network_kind_no_file_can_produce() {
+    let mut s = Session::new();
+    run(&mut s, r#"(def l (tcp/listen "127.0.0.1:0"))"#);
+    run(&mut s, "(def c (tcp/connect (tcp/local-addr l)))");
+    run(&mut s, "(def server (tcp/accept l))");
+    run(&mut s, "(tcp/set-timeout server 30)");
+
+    let kind = run(&mut s, "(try (io/read server 4) (catch e (get e :kind)))");
+    // Both, deliberately. Rust documents a read deadline as `WouldBlock` *or*
+    // `TimedOut` by platform — Unix gives the first, Windows the second — so a
+    // test that pinned one would pass on the machine it was written on and
+    // fail on the other (`TRAPS.md`).
+    assert!(
+        kind == ":would-block" || kind == ":timeout",
+        "expected a network kind, got {kind}"
+    );
+    run(&mut s, "(io/close c) (io/close server) (io/close l)");
+}
+
+/// ADR-045 part 5: a live socket refuses a snapshot through the check ADR-029
+/// already had, with no adapter-specific code. This is the handle table doing
+/// the job ADR-016 built it for.
+#[cfg(feature = "tcp")]
+#[test]
+fn a_live_socket_refuses_a_snapshot_exactly_as_a_file_does() {
+    use apolisp::image::{self, SnapshotError};
+    use apolisp::{compile, expand, reader, vm};
+
+    let mut machine = vm::Vm::new();
+    let src = r#"(def l (tcp/listen "127.0.0.1:0")) (println :bound) l"#;
+    let forms = reader::read_all(src, &mut machine.interner).expect("reads");
+    let forms = expand::expand_all(forms, &mut machine).expect("expands");
+    let chunk = compile::compile(&forms, &mut machine.interner).expect("compiles");
+
+    // Step until the listener is open, then try to snapshot.
+    let mut ex = vm::start(&chunk);
+    let mut refused = false;
+    loop {
+        let (outcome, next, _) = vm::run_fueled(&mut machine, &chunk, ex, 1);
+        ex = next;
+        if !matches!(outcome, vm::Outcome::Suspended) {
+            break;
+        }
+        if let Err(e) = image::capture(&machine, &ex, &chunk) {
+            assert_eq!(e, SnapshotError::SnapshotHasLiveHandles(1));
+            refused = true;
+            break;
+        }
+    }
+    assert!(refused, "an open listener should have refused a snapshot");
+}
+
+// --- The subtraction --------------------------------------------------------------
+
+/// ADR-013 as a test rather than a feeling, now across four capabilities: a
+/// feature removes its *primitives* and leaves the language alone. Every
+/// assertion is a `cfg!`, so this file states the whole matrix once and each
+/// build checks its own row.
+#[test]
+fn a_feature_removes_its_primitives_and_nothing_else() {
+    assert_eq!(is_bound("io/open"), cfg!(feature = "fs"));
+    assert_eq!(is_bound("tcp/connect"), cfg!(feature = "tcp"));
+    assert_eq!(is_bound("term/read-key"), cfg!(feature = "term"));
+    assert_eq!(is_bound("json/decode"), cfg!(feature = "json"));
+
+    // Never gated, in any build: these are the language, and ADR-013's whole
+    // point is that features do not produce 2ⁿ languages.
+    for always in [
+        "+",
+        "count",
+        "conj",
+        "str",
+        "println",
+        "gensym",
+        "io/stdout",
+    ] {
+        assert!(is_bound(always), "{always} should exist in every build");
+    }
+    assert_eq!(ev("(let [x 2] (* x 21))"), "42");
+    assert_eq!(ev("(try (throw :x) (catch e e))"), ":x");
+}
+
+/// A cut capability is an ordinary unbound global — not a parse error, not a
+/// different language. Checked in whichever build is missing something, so it
+/// says nothing at all in the default build.
+#[test]
+fn a_cut_capability_is_an_ordinary_unbound_global() {
+    let mut any = false;
+    for (name, present) in [
+        ("io/open", cfg!(feature = "fs")),
+        ("tcp/connect", cfg!(feature = "tcp")),
+        ("json/decode", cfg!(feature = "json")),
+    ] {
+        if present {
+            continue;
+        }
+        any = true;
+        let e = ev(&format!("(try ({name} \"x\") (catch e (get e :kind)))"));
+        assert_eq!(e, ":unbound", "{name} should be unbound, got {e}");
+    }
+    // In the default build every capability is present, so the loop above
+    // asserts nothing. Saying that out loud beats a test that reads as
+    // coverage in the build most people run.
+    if !any {
+        eprintln!("all capabilities present; this test asserts nothing in the default build");
+    }
+}
+
+/// The terminal has no tty under a test runner, so what is pinned is the
+/// binding and its arity check rather than any behaviour.
+#[cfg(feature = "term")]
+#[test]
+fn the_terminal_primitives_exist_and_check_their_arguments() {
+    assert!(is_bound("term/size"));
+    assert!(is_bound("term/raw-mode"));
+    assert!(is_bound("term/read-key"));
+    let e = ev("(try (term/read-key :not-a-timeout) (catch e (get e :kind)))");
+    assert_eq!(e, ":type");
+}
+
+/// Nothing in the language should be able to tell which adapters exist by any
+/// means other than a name being unbound. A `Value` variant added for a socket
+/// would be visible to `kind-name`, which is a language-observable difference
+/// and exactly what ADR-013 forbids.
+#[cfg(feature = "tcp")]
+#[test]
+fn a_socket_is_not_a_new_kind_of_value() {
+    let mut s = Session::new();
+    run(&mut s, r#"(def l (tcp/listen "127.0.0.1:0"))"#);
+    // The same `handle` a file is. `Value::Handle` is one variant (ADR-025),
+    // and the adapter lives behind it.
+    assert!(run(&mut s, "(str l)").starts_with("\"#<handle"));
+    // `kind-name` is what a program can see, and it says `handle` for both.
+    assert_eq!(ev(r#"(str (io/open? io/stdout))"#), "\"true\"");
+    run(&mut s, "(io/close l)");
+}

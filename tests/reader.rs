@@ -326,6 +326,26 @@ fn core_stays_within_the_line_budget() {
         .collect();
     files.sort();
 
+    // ADR-045: host adapters are outside the budget, and the exclusion prints.
+    // `BUILD.md` has said adapters are outside since before any existed, which
+    // cost nothing while it described an empty set. The moment it describes
+    // real files it becomes a way to move lines out of a budget by moving them
+    // into a directory, and the only defence is that the move is visible on
+    // every run.
+    let mut excluded: Vec<(String, usize)> = Vec::new();
+    let adapters = src.join("adapters");
+    if let Ok(entries) = std::fs::read_dir(&adapters) {
+        let mut paths: Vec<PathBuf> = entries.filter_map(|e| e.ok().map(|e| e.path())).collect();
+        paths.sort();
+        for p in paths {
+            let n = std::fs::read_to_string(&p).unwrap().lines().count();
+            excluded.push((
+                format!("adapters/{}", p.file_name().unwrap().to_string_lossy()),
+                n,
+            ));
+        }
+    }
+
     let mut total = 0;
     let mut report = String::new();
     for path in &files {
@@ -338,7 +358,15 @@ fn core_stays_within_the_line_budget() {
             report.push_str(&format!("  {layer:<10} {n:5}\n"));
         }
     }
-    eprintln!("core: {total}/{BUDGET} lines (ADR-030)\n{report}");
+    let mut excluded_report = String::new();
+    let excluded_total: usize = excluded.iter().map(|(_, n)| n).sum();
+    for (name, n) in &excluded {
+        excluded_report.push_str(&format!("  {name:<22} {n:5}\n"));
+    }
+    eprintln!(
+        "core: {total}/{BUDGET} lines (ADR-030)\n{report}\n\
+         outside the budget (ADR-045): {excluded_total} lines\n{excluded_report}"
+    );
 
     assert!(
         total <= TRIPWIRE,

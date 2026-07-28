@@ -52,9 +52,15 @@ verify: fmt-check check lint test subtract
 # It is a full `test` and not a `check` on purpose. Compiling proves the cfgs
 # line up; running proves `io/open` degrades to an ordinary unbound global and
 # takes nothing else with it.
+# Three points, not the whole 2^4 lattice: everything off, and `fs` alone. The
+# middle point is the one that catches a `#[cfg]` written as if two features
+# always travel together — with only all-on and all-off, `any(a, b)` and
+# `all(a, b)` are indistinguishable.
 subtract:
     cargo clippy --no-default-features --all-targets -- -D warnings
     cargo test --no-default-features
+    cargo clippy --no-default-features --features fs --all-targets -- -D warnings
+    cargo test --no-default-features --features fs
 
 # Install the advisory pre-commit hook (hooks/pre-commit). It never blocks a
 # commit; it just makes formatting and lint findings visible the same day.

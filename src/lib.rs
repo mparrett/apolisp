@@ -2311,7 +2311,7 @@ pub mod compile {
 pub mod vm {
     use crate::bytecode::{CaptureSrc, Chunk, Instr, Slot};
     use crate::error::SpanOrigin;
-    use crate::host::{IoKind, IoOp};
+    pub use crate::host::{IoKind, IoOp};
     use crate::value::{
         CellId, Closure, HandleId, Interner, KwId, ListObj, MapObj, NativeId, StrObj, SymId, Value,
     };
@@ -2575,6 +2575,7 @@ pub mod vm {
             // and never in the dispatch loop.
             crate::prim::install(&mut vm);
             crate::host::install(&mut vm);
+            crate::adapters::install(&mut vm);
             vm
         }
 
@@ -4797,7 +4798,7 @@ pub mod host {
     // Only a file is written through a `Write`. `io/stdout` is the buffered
     // host and goes through `Vm::emit`, so without `fs` nothing in this module
     // writes to the outside world at all — which is the subtraction working.
-    #[cfg(feature = "fs")]
+    #[cfg(any(feature = "fs", feature = "tcp"))]
     use std::io::Write;
     use std::rc::Rc;
 
@@ -4816,6 +4817,15 @@ pub mod host {
         /// emitted effects to be part of the serialization comparison rather
         /// than escaping it, so a write here goes where `println` goes.
         Stdout,
+        /// ADR-045 part 5: a socket is a handle like a file is, so it reads and
+        /// writes through the same primitives and refuses a snapshot through
+        /// the same check. ADR-043 declares only the standard streams
+        /// reconstructible, so a live connection makes `capture` fail with no
+        /// new code at all.
+        #[cfg(feature = "tcp")]
+        Tcp(std::net::TcpStream),
+        #[cfg(feature = "tcp")]
+        Listener(std::net::TcpListener),
     }
 
     /// The closed `:kind` vocabulary for `:type :io-error` (ADR-042 part 1).
@@ -4829,6 +4839,13 @@ pub mod host {
         Closed,
         InvalidData,
         Interrupted,
+        /// ADR-045 part 2. ADR-042 named these three and deferred them to the
+        /// entry that adds the subsystem raising them, on the grounds that a
+        /// kind nobody can raise is a guess with a colon in front of it. TCP
+        /// is that subsystem; a file can produce none of them.
+        Timeout,
+        WouldBlock,
+        ConnectionReset,
         /// Documented as *do not dispatch on this, read the message*. It exists
         /// because `std::io::ErrorKind` is `#[non_exhaustive]` and the set of
         /// things an operating system can refuse is not ours to close.
@@ -4837,12 +4854,15 @@ pub mod host {
 
     impl IoKind {
         /// In discriminant order, which is what `kind as usize` indexes.
-        pub const ALL: [IoKind; 6] = [
+        pub const ALL: [IoKind; 9] = [
             IoKind::NotFound,
             IoKind::PermissionDenied,
             IoKind::Closed,
             IoKind::InvalidData,
             IoKind::Interrupted,
+            IoKind::Timeout,
+            IoKind::WouldBlock,
+            IoKind::ConnectionReset,
             IoKind::Other,
         ];
 
@@ -4853,6 +4873,9 @@ pub mod host {
                 IoKind::Closed => "closed",
                 IoKind::InvalidData => "invalid-data",
                 IoKind::Interrupted => "interrupted",
+                IoKind::Timeout => "timeout",
+                IoKind::WouldBlock => "would-block",
+                IoKind::ConnectionReset => "connection-reset",
                 IoKind::Other => "other",
             }
         }
@@ -4867,10 +4890,28 @@ pub mod host {
         Close,
         Read,
         Write,
+        /// The socket operations (ADR-045). `:connect` and `:accept` are the
+        /// two a `:timeout` or a `:connection-reset` actually comes out of, so
+        /// naming them is what makes those kinds dispatchable.
+        Connect,
+        Listen,
+        Accept,
+        Encode,
+        Decode,
     }
 
     impl IoOp {
-        pub const ALL: [IoOp; 4] = [IoOp::Open, IoOp::Close, IoOp::Read, IoOp::Write];
+        pub const ALL: [IoOp; 9] = [
+            IoOp::Open,
+            IoOp::Close,
+            IoOp::Read,
+            IoOp::Write,
+            IoOp::Connect,
+            IoOp::Listen,
+            IoOp::Accept,
+            IoOp::Encode,
+            IoOp::Decode,
+        ];
 
         pub fn name(self) -> &'static str {
             match self {
@@ -4878,6 +4919,11 @@ pub mod host {
                 IoOp::Close => "close",
                 IoOp::Read => "read",
                 IoOp::Write => "write",
+                IoOp::Connect => "connect",
+                IoOp::Listen => "listen",
+                IoOp::Accept => "accept",
+                IoOp::Encode => "encode",
+                IoOp::Decode => "decode",
             }
         }
     }
@@ -4894,11 +4940,19 @@ pub mod host {
             E::PermissionDenied => (IoKind::PermissionDenied, "permission denied"),
             E::InvalidData => (IoKind::InvalidData, "not valid data"),
             E::Interrupted => (IoKind::Interrupted, "interrupted"),
+            E::TimedOut => (IoKind::Timeout, "the operation timed out"),
+            E::WouldBlock => (IoKind::WouldBlock, "the operation would block"),
+            E::ConnectionReset | E::ConnectionAborted | E::BrokenPipe => {
+                (IoKind::ConnectionReset, "the connection was reset")
+            }
+            // `ConnectionRefused` is deliberately not `:connection-reset`:
+            // nothing was ever connected, so a program retrying a reset would
+            // retry the wrong thing.
             _ => (IoKind::Other, "the host refused the operation"),
         }
     }
 
-    fn host_failed(op: IoOp, path: Option<String>, e: &std::io::Error) -> Fault {
+    pub(crate) fn host_failed(op: IoOp, path: Option<String>, e: &std::io::Error) -> Fault {
         let (kind, msg) = classify(e);
         Fault::Io {
             op,
@@ -4908,7 +4962,7 @@ pub mod host {
         }
     }
 
-    fn io_fault(op: IoOp, kind: IoKind, msg: impl Into<String>) -> Fault {
+    pub(crate) fn io_fault(op: IoOp, kind: IoKind, msg: impl Into<String>) -> Fault {
         Fault::Io {
             op,
             path: None,
@@ -4920,7 +4974,7 @@ pub mod host {
     /// A closed *or* stale handle. Both are `:closed` to a program: the id does
     /// not name a live resource, and which of the two ways it fails to is a
     /// distinction only `io/close` draws (ADR-042 part 4).
-    fn not_live(op: IoOp) -> Fault {
+    pub(crate) fn not_live(op: IoOp) -> Fault {
         io_fault(
             op,
             IoKind::Closed,
@@ -4931,14 +4985,14 @@ pub mod host {
     /// A misuse is a `:vm-error :type`, not an `:io-error`. Passing a string
     /// where a handle belongs is the same class of mistake as `(+ 1 "x")`, and
     /// nothing about the host was involved.
-    fn misuse(msg: impl Into<String>) -> Fault {
+    pub(crate) fn misuse(msg: impl Into<String>) -> Fault {
         Fault::Vm {
             kind: Kind::Type,
             msg: msg.into(),
         }
     }
 
-    fn handle_arg(v: &Value, op: &str) -> Result<HandleId, Fault> {
+    pub(crate) fn handle_arg(v: &Value, op: &str) -> Result<HandleId, Fault> {
         match v {
             Value::Handle(h) => Ok(*h),
             other => Err(misuse(format!(
@@ -4948,8 +5002,8 @@ pub mod host {
         }
     }
 
-    #[cfg(feature = "fs")]
-    fn string_arg<'a>(v: &'a Value, op: &str) -> Result<&'a str, Fault> {
+    #[cfg(any(feature = "fs", feature = "tcp"))]
+    pub(crate) fn string_arg<'a>(v: &'a Value, op: &str) -> Result<&'a str, Fault> {
         match v {
             Value::Str(s) => Ok(&s.0),
             other => Err(misuse(format!(
@@ -5045,6 +5099,10 @@ pub mod host {
             let got = match vm.host_mut(id).ok_or_else(|| not_live(IoOp::Read))? {
                 #[cfg(feature = "fs")]
                 Host::File(f) => f.read(&mut buf),
+                #[cfg(feature = "tcp")]
+                Host::Tcp(t) => t.read(&mut buf),
+                #[cfg(feature = "tcp")]
+                Host::Listener(_) => return Err(misuse("`io/read` cannot read from a listener")),
                 Host::Stdin => std::io::stdin().read(&mut buf),
                 Host::Stdout => return Err(misuse("`io/read` cannot read from `io/stdout`")),
             };
@@ -5066,6 +5124,12 @@ pub mod host {
             let got = match vm.host_mut(id).ok_or_else(|| not_live(IoOp::Read))? {
                 #[cfg(feature = "fs")]
                 Host::File(f) => f.read_to_end(&mut buf),
+                #[cfg(feature = "tcp")]
+                Host::Tcp(t) => t.read_to_end(&mut buf),
+                #[cfg(feature = "tcp")]
+                Host::Listener(_) => {
+                    return Err(misuse("`io/read-all` cannot read from a listener"))
+                }
                 Host::Stdin => std::io::stdin().read_to_end(&mut buf),
                 Host::Stdout => return Err(misuse("`io/read-all` cannot read from `io/stdout`")),
             };
@@ -5114,6 +5178,13 @@ pub mod host {
                     .write_all(&bytes)
                     .map(|()| n)
                     .map_err(|e| host_failed(IoOp::Write, None, &e)),
+                #[cfg(feature = "tcp")]
+                Host::Tcp(t) => t
+                    .write_all(&bytes)
+                    .map(|()| n)
+                    .map_err(|e| host_failed(IoOp::Write, None, &e)),
+                #[cfg(feature = "tcp")]
+                Host::Listener(_) => Err(misuse("`io/write` cannot write to a listener")),
                 Host::Stdin => Err(misuse("`io/write` cannot write to `io/stdin`")),
                 Host::Stdout => unreachable!("settled above, before the mutable borrow"),
             }
@@ -5543,6 +5614,13 @@ pub mod image {
 /// The semantics live here and the prompt lives in `src/main.rs`, per ADR-031 —
 /// a change in this module can change what a program means, and a change there
 /// may not. That split is why the session is testable without a terminal.
+/// Host adapters (ADR-045). File modules rather than inline `mod` blocks, and
+/// **outside the line budget** — `BUILD.md` draws that boundary because
+/// substantial host capability is a Rust library behind the handle table, not a
+/// language subsystem. The budget test excludes this directory by path and
+/// prints what it excluded, so the exclusion cannot be used to hide growth.
+pub mod adapters;
+
 pub mod session {
     use crate::bytecode::Chunk;
     use crate::error::LispErr;

@@ -239,6 +239,16 @@ in-language suite green → serialization round-trip green → merge → soak �
 **Merge ≠ release.** The soak is where leak checks, reader fuzzing, and
 release-build divergence testing happen.
 
+**Follow-up: a Dockerfile that runs `just verify` on Linux.** Everything to
+date has been verified on macOS only, and milestone 10 is where that stopped
+being harmless. `TRAPS.md` records a read deadline raising `:would-block` on
+Unix and `:timeout` on Windows; the same class of divergence is available
+between macOS and Linux for socket errors, terminal capability detection, and
+path handling, and none of it is exercised. The point is not portability as a
+goal — it is that a platform-specific assumption baked into a golden or a
+`:kind` mapping is invisible on the machine that wrote it. Cheap, and it makes
+the existing gate say something it currently only implies.
+
 ## On process
 
 You write it, we argue about it, the corpus catches regressions. A diff-only

@@ -80,6 +80,15 @@ special form only on evidence from a real attempt. Note the interaction from
 ADR-028 rule 2: a `recur` inside a `try` with a `finally` is not a tail call, so
 the macro has to either reject that shape or accept the frame.
 
+**The need is now demonstrated; the attempt is still owed.** The first real
+program written in the language (`notes/first-programs.md`) is twelve top-level
+definitions, and four of them exist *only* because there is no looping form —
+every iteration becomes a named function with an accumulator parameter threaded
+by hand, and none of those four functions is about the problem being solved.
+That is the evidence this entry was waiting for that the absence costs
+something. It says nothing yet about macro versus special form, which still
+needs someone to try writing the macro.
+
 ## Before milestone 9 — REPL
 
 **Q29 — Can compiled code be shared between chunks?** *(REPL half resolved by
@@ -99,7 +108,59 @@ in `prelude.xs`, and the reason has changed: ADR-044's mechanism would fix it �
 compile the prelude into the unit's chunk — but then the prelude's protos land
 in every `.disasm` golden in the corpus and grow with the prelude forever. That
 is a cost to weigh, not an impossibility. Weigh it when something actually
-wants a function there; writing `map` per file has not hurt yet.
+wants a function there.
+
+**Something now does.** Writing `map` per file had not hurt because nothing
+outside the test suite had been written, and a suite that exercises the VM calls
+primitives directly and never needs `map` twice. Two programs later, six of
+Life's twelve definitions are standard library rebuilt from scratch
+(`notes/first-programs.md`). The cost was invisible from inside the tests by
+construction.
+
+## After milestone 10 — what the project is for now
+
+**Q31 — What comes after the build order?** *(Filed 2026-07-27. Gates nothing
+mechanically and everything in practice.)*
+`BUILD.md`'s ten milestones are all Done and there is no queue. Nothing in the
+docs says what this project is for past milestone 10, so the next thing built
+will be whatever someone happens to start — which is the one way a project with
+no compatibility contract can still acquire decisions nobody agreed to.
+
+Two programs were written to make this concrete rather than theoretical
+(`notes/first-programs.md`). Both worked on the first run. What they found was
+not a missing capability but a missing *surface*: six of Life's twelve
+definitions are standard library rebuilt by hand, four of them exist only
+because there is no looping form (Q5), and two findings were not ergonomics at
+all — `io/read` is a short read that no program can frame a protocol on
+(`TRAPS.md`), and there is no string→number conversion anywhere except
+`json/decode`, which is an optional host adapter. ADR-013 says features gate
+host capability and never language semantics; that is the first place it has
+stopped being true, and `just subtract` cannot see it because nothing in the
+suite parses a number from a string either.
+
+The candidates, and what each is really a bet on:
+
+1. **Write programs, fix what they break.** The bet is that the test suite has
+   stopped being a source of information about the language, because it
+   exercises the VM rather than the surface — which the two probes support, in
+   that none of the gaps above were on any list. Cheapest, and the only option
+   that keeps producing evidence rather than consuming it.
+2. **Build the standard library.** `loop`/`recur` (Q5), a sequence library
+   (Q29's prelude-function half), and the string→number hole. Well-scoped, and
+   would make option 1 pleasant instead of laborious. The risk is building it
+   from taste rather than from use, which is how a standard library grows a
+   surface nobody needed — and Q29 has already declined once on a cost that has
+   not changed.
+3. **Performance.** ADR-021 removed the gate, Q19 is open, and the tooling now
+   exists (`valgrind --tool=dhat` via the soak image). Genuinely fun per ETHOS
+   constraint #3, and the least urgent — nothing has been slow yet because
+   nothing real has run long enough to be.
+4. **Tag v0.1 and stop adding.** The ladder is `merge → soak → tag`, the soak
+   now runs and is green on two platforms, and this is a natural stopping point.
+
+These are not exclusive; the ordering is the decision. Not resolvable by
+argument from inside the repository — it depends on what the project is *for*,
+which is the one thing no document here records.
 
 ## No milestone — decide when evidence arrives
 
@@ -235,14 +296,53 @@ workload we have not run. Against reversing: in C every value is an arena cell,
 so tracing is cheap there in a way it is not in safe Rust. For reversing: ADR-004
 hands us a precise root set for free.
 
-Under ADR-021 this reaches every subsystem and needs an argument, not a
-benchmark. Not for v1.
+The `cycle`-does-not-leak half is no longer prose. `tests/soak/cycle.xs` builds
+a self-referential cell and comes back clean under valgrind — 2,406 allocs,
+2,405 frees, nothing definitely lost. First evidence for a claim this entry has
+been asserting since ADR-025.
 
-Reading filed against this and not yet done:
-<https://pranitha.dev/posts/rust-and-memory-allocators/>. `../wallisp`'s
-finding was that refcounting's penalty tracks call volume rather than
-allocation, so what an allocation costs in Rust is one of the inputs to
-re-deciding this. Before the benchmark, not after.
+**The filed reading is done, and it was filed against the wrong question.**
+<https://pranitha.dev/posts/rust-and-memory-allocators/> is about RSS that never
+comes back down after a bursty load: glibc arenas, the top-chunk deadbolt, and
+cached chunks that never consolidate. It measures *memory returned to the OS*,
+not what an allocation costs — which was the input this entry wanted. Most of
+its mechanism is out of scope besides: thread arenas, work-stealing and
+cross-thread frees all need threads, and multithreaded execution within one VM
+is an ETHOS non-goal. The single-threaded top-chunk deadbolt does still apply to
+any long-running apolisp process.
+
+It supplied two things anyway.
+
+*A trap for whatever benchmark eventually settles this.* Their heap went from a
+1.4 GB peak to 10,798 bytes at exit while RSS stayed pinned at the container
+limit. **RSS is not a measure of allocation behaviour.** A benchmark that reads
+it would be measuring glibc's arena policy and reporting it as a fact about
+`Rc`.
+
+*An instrument, with no dependency to add.* dhat's `t-gmax`/`t-end` is what
+separated their allocator behaviour from a real leak, and it is reachable as
+`valgrind --tool=dhat`, which the soak image already carries — so ADR-014's
+budget stays unspent. Pointed at `tests/soak/churn.xs`:
+
+```
+Total:     127,622,370 bytes in 1,482,053 blocks
+At t-gmax:      67,202 bytes in       675 blocks
+At t-end:          544 bytes in         1 block
+```
+
+Roughly 296 allocations per iteration against a live set that never exceeds
+67 KB. Two consequences. The article's failure mode cannot bite here — a peak
+that small is never going to strand pages. And the allocation *rate* is high
+relative to the live set, which is exactly the regime where allocator cost is
+visible, so this remains a real question rather than a settled one.
+
+Caveat with the numbers: `churn.xs` is a synthetic allocation-heavy program
+written for the leak check. It characterises itself, not a representative
+workload, and there is still no representative workload to characterise — see
+Q31.
+
+Under ADR-021 this reaches every subsystem and needs an argument, not a
+benchmark. Still not for v1.
 
 **Q14 — The name.** `apolisp` is the repo; `lispylang` was the SPEC v0.1 working
 name; `.xs` is the working extension.

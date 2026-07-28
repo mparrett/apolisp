@@ -61,6 +61,14 @@ timeout argument, which is `connect_timeout` underneath and does return
 it also gives `:would-block` — so the both-kinds tolerance is carrying Windows
 alone, and no run has ever exercised the branch that needs it.
 
+**`io/read` is a short read.** `(io/read sock n)` returns *up to* `n` bytes and
+returns as soon as any arrive — asking for 99 with 3 in flight gives 3, with no
+error and no way to tell that apart from a peer that sent exactly 3. Nothing in
+the language reads exactly `n` bytes, so every framed protocol has to loop by
+hand, and a first attempt works right up until a payload crosses a packet
+boundary. Found by writing one (`notes/first-programs.md`), where it passed by
+luck.
+
 **Handle validity across migration.** Generational keys catch reuse; they do not
 catch a handle that was valid in the source VM and meaningless in the target.
 Every adapter declares its reacquisition semantics or refuses.

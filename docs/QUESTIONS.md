@@ -11,7 +11,7 @@ design review of 2026-07-25.
 Q3 (→ADR-025), Q4 (→ADR-028), Q7 (→ADR-029), Q9 (→ADR-029), Q10 (→ADR-037),
 Q11 (→ADR-027), Q13 (→ADR-041), Q17 (→ADR-027), Q21 (→ADR-030), Q23 (→ADR-039),
 Q24 (→ADR-038), Q25 (→ADR-038), Q26 (→ADR-041), Q6 (→ADR-041), Q27 (→ADR-042),
-Q8 (→ADR-043), Q22 (→ADR-043), Q1 (→ADR-044), Q5 (→ADR-047).*
+Q8 (→ADR-043), Q22 (→ADR-043), Q1 (→ADR-044), Q5 (→ADR-047), Q29 (→ADR-048).*
 
 ---
 
@@ -72,34 +72,6 @@ Decide when a macro actually wants a helper. Two smaller options exist and
 should be weighed first: writing the helper as a macro, or letting a macro
 body's helpers live in the prelude.
 
-## Before milestone 9 — REPL
-
-**Q29 — Can compiled code be shared between chunks?** *(REPL half resolved by
-ADR-044.)*
-A `Closure` names its proto by index into the chunk it was compiled in
-(ADR-034), so a closure is meaningless outside that chunk. The expander already
-works around this by keeping a macro's chunk beside the macro.
-
-**The REPL half is gone rather than answered.** ADR-044 gives a session one
-chunk and appends each input's protos to it, so indices never move and no
-closure ever leaves its chunk. The registry this question proposed was not
-built, because a closure carrying a chunk id has to resolve that id after an
-`Image` is restored, which puts every `Chunk` into the DTO.
-
-**What remains is the prelude function.** `map` and `reduce` still cannot live
-in `prelude.xs`, and the reason has changed: ADR-044's mechanism would fix it —
-compile the prelude into the unit's chunk — but then the prelude's protos land
-in every `.disasm` golden in the corpus and grow with the prelude forever. That
-is a cost to weigh, not an impossibility. Weigh it when something actually
-wants a function there.
-
-**Something now does.** Writing `map` per file had not hurt because nothing
-outside the test suite had been written, and a suite that exercises the VM calls
-primitives directly and never needs `map` twice. Two programs later, six of
-Life's seventeen definitions are standard library rebuilt from scratch
-(`notes/first-programs.md`). The cost was invisible from inside the tests by
-construction.
-
 ## After milestone 10 — what the project is for now
 
 **Q31 — What comes after the build order?** *(Filed 2026-07-27. Gates nothing
@@ -125,8 +97,15 @@ suite parses a number from a string either.
 string→number hole is closed by ADR-046, which also records the limit it
 exposed — the subtraction harness can prove a capability is removable and
 cannot notice that a semantic went missing with it. `loop`/`recur` is closed by
-ADR-047, as a core form rather than the prelude macro. **The sequence library
-(Q29) is what remains**, and it is the one piece with a cost still unweighed.
+ADR-047, as a core form rather than the prelude macro, and the sequence library
+by ADR-048 — which weighed Q29's cost by measuring it (4 functions = 160 golden
+lines per program, or zero if the prelude is appended after the unit) rather
+than by arguing about it.
+
+**All three pieces of candidate 2 are done.** What comes next is open again, and
+the honest next move is probably candidate 1: write more programs and see what
+*they* break. The two that produced this list found four things nobody had
+listed.
 
 The candidates, and what each is really a bet on:
 
@@ -136,11 +115,11 @@ The candidates, and what each is really a bet on:
    that none of the gaps above were on any list. Cheapest, and the only option
    that keeps producing evidence rather than consuming it.
 2. **Build the standard library.** `loop`/`recur` (→ADR-047), a sequence library
-   (Q29's prelude-function half), and the string→number hole. Well-scoped, and
-   would make option 1 pleasant instead of laborious. The risk is building it
-   from taste rather than from use, which is how a standard library grows a
-   surface nobody needed — and Q29 has already declined once on a cost that has
-   not changed.
+   (→ADR-048), and the string→number hole (→ADR-046). ***Chosen, and done.***
+   The stated risk was building from taste rather than from use; what happened
+   instead is that each piece was scoped by a program that had already wanted
+   it, and the one genuinely open cost — Q29's — turned out to be avoidable by
+   ordering rather than payable. Six functions, and no golden moved.
 3. **Performance.** ADR-021 removed the gate, Q19 is open, and the tooling now
    exists (`valgrind --tool=dhat` via the soak image). Genuinely fun per ETHOS
    constraint #3, and the least urgent — nothing has been slow yet because

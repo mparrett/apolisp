@@ -2637,6 +2637,87 @@ worse. Nothing has wanted it.
 
 ---
 
+### ADR-048 — Prelude functions, appended after the unit
+
+*(New, 2026-07-28. Resolves Q29. Uses ADR-044's mechanism for the case ADR-044
+deferred. Adds the sequence library.)*
+
+**Decision.** The prelude may define runtime functions, not only macros. They are
+compiled into every unit's chunk **after the unit's own protos**, and the
+prelude's top level is its own proto, run before the unit's.
+
+**1. Appending after the unit is the entire decision.** A unit's proto indices
+then depend on the unit alone, so a `.disasm` golden is pinned to the program it
+names and does not move when the prelude gains a function.
+
+The cost of getting this wrong was measured before choosing: four sequence
+functions compile to 9 protos and 160 lines of disassembly. Compiled in front of
+each unit that is **+1,440 lines across the nine corpus goldens**, taking them
+from 672 to 2,112 — a 3.1× blow-up for four functions, growing with every
+function ever added. That is the cost Q29 declined for four milestones, and it
+was right to. As built, six functions were added and **not one golden changed.**
+
+**2. The prelude's top level is a separate proto.** The driver runs it, then the
+unit's `protos[0]`. The alternative — the definitions as a prologue inside the
+unit's `<top>` — would put prelude instructions in every program's `<top>` and
+in every `.expanded` golden, which is the same leak by another route.
+
+**3. A session orders it first; a file orders it last.** Both keep the same
+promise, and they differ because a REPL session's inputs keep appending, so
+"last" is not a place. `Chunk::prelude` is therefore a `PreludeSpan { top, len }`
+rather than a boundary index — a span can say either. A session runs the prelude
+once at construction rather than per input: a session is one unit (ADR-044), and
+re-running the definitions at each prompt would rebind names the user may have
+deliberately shadowed.
+
+**4. Expanding the prelude now has two products.** Its `set-macro!` forms are
+consumed as before and leave nothing behind; its `set-global!` forms are code
+that still has to run and are carried to the compiler. The filter is a
+**whitelist** — only `set-global!` is kept — because a prelude form that is
+neither is a form whose meaning nobody decided.
+
+`prelude_definitions` runs *before* the unit is expanded. Expanding the prelude
+advances the gensym counter and `expand_all` resets it, so doing this first
+leaves no trace on the unit. Done afterwards it is still safe for the unit, but
+the prelude's own gensyms would be numbered from wherever the program's expansion
+stopped — and the prelude would compile differently for different programs, which
+is a determinism failure with a golden attached.
+
+**5. The prelude gets its own golden.** `apolisp prelude` disassembles it
+standalone, pinned by `tests/prelude.disasm`. Without it the prelude's functions
+would be the only code in the language pinned nowhere: compiled into every unit
+and printed in none of them. `just bless` regenerates it with the rest.
+
+**6. The library, and its shape.** `map`, `filter`, `reduce`, `range`, `repeat`,
+`join`.
+
+They take and return **vectors, not lazy seqs**. There is no laziness here, and
+`conj` extends a vector where it is cheap, so a seq abstraction would buy nothing
+but a second collection to explain. `reduce` takes an explicit seed **always** —
+Clojure's one-argument form takes the first element as the seed and errors on
+empty, which is two behaviours behind one name. `join` puts the separator
+between and never after, which is the off-by-one every hand-written version gets
+wrong once.
+
+**Cost.** Core goes from 6,303 to 6,561 of 7,500; `prelude.xs` from 66 lines to
+118. Life, the probe from `notes/first-programs.md`, goes from 48 lines to 26 —
+37 of those with `loop`/`recur` alone (ADR-047) and the rest from these six.
+
+**Rejected.** *Prepending the prelude*, measured above at 3.1× on the goldens and
+unbounded. *A separate prelude chunk with tagged proto indices* — cleanest
+separation, and it wanted the high bit of every proto index plus surgery on frame
+handling and ADR-029's fingerprint, which is the machinery constraint #2 depends
+on; not worth it when ordering alone buys the same golden stability. *A
+concatenated `lib/seq.xs`*, which is what `tests/lang/harness.xs` already does
+and what Q12 documents — zero risk and zero cost, and `map` is unavailable until
+you paste it.
+
+**Open.** Whether the prelude should ever hold something that is neither a macro
+nor a `set-global!`. The whitelist will refuse it, loudly, which is the intended
+way to find out.
+
+---
+
 ## Errata
 
 Factual corrections to entries whose **decision still stands**. A wrong reason is

@@ -39,6 +39,9 @@ Life is seventeen top-level definitions. Six of them are standard library:
 | `wrap` — negative-safe index wrap | `mod` (`rem` exists; it keeps the sign) |
 | `total` (in the service probe) — sum a vector | `reduce` |
 
+*All six now exist* — `loop`/`recur` by ADR-047, the rest by ADR-048. Life is
+48 lines here, 37 with `loop`/`recur`, and 26 with the sequence library.
+
 **The single biggest gap is `loop`/`recur`.** *(Closed by ADR-047; the rewrite
 takes Life from 17 definitions to 12.)* There was no looping form at all,
 so every iteration becomes a *named top-level function with an accumulator

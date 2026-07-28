@@ -1,0 +1,496 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>apolisp — nobody had written a program in it</title>
+<meta name="description" content="The build order finished and the test suite stopped being able to say anything new about the language. What an afternoon of ordinary programs found that a hundred tests could not — and two more ways an instrument can report a finding that never happened.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%9C%8D%EF%B8%8F%3C/text%3E%3C/svg%3E">
+<style>
+  :root {
+    color-scheme: light dark;
+
+    --ground:    #edf0f3;
+    --panel:     #f8fafb;
+    --panel-2:   #e2e7ec;
+    --ink:       #14181d;
+    --muted:     #525c68;
+    --faint:     #7f8996;
+    --accent:    #1f5f7a;
+    --accent-w:  #d7e6ed;
+    --dead:      #9c3327;
+    --dead-w:    #f3ddd9;
+    --live:      #14614f;
+    --live-w:    #d6eae4;
+    --hair:      #ccd4db;
+    --hair-2:    #b0bac4;
+
+    --serif: "Charter", "Bitstream Charter", "Iowan Old Style", Georgia, ui-serif, serif;
+    --util:  "Avenir Next", Avenir, Futura, Optima, ui-sans-serif, system-ui, sans-serif;
+    --mono:  ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+
+    --measure: 64ch;
+    --rule: 1px solid var(--hair);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground:   #131619;
+      --panel:    #191d21;
+      --panel-2:  #22272d;
+      --ink:      #e3e7ec;
+      --muted:    #98a2ae;
+      --faint:    #6b7581;
+      --accent:   #6cb6d4;
+      --accent-w: #14313d;
+      --dead:     #e0837a;
+      --dead-w:   #38201d;
+      --live:     #5cc0a8;
+      --live-w:   #123029;
+      --hair:     #2a3037;
+      --hair-2:   #3a424b;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:#131619; --panel:#191d21; --panel-2:#22272d; --ink:#e3e7ec;
+    --muted:#98a2ae; --faint:#6b7581; --accent:#6cb6d4; --accent-w:#14313d;
+    --dead:#e0837a; --dead-w:#38201d; --live:#5cc0a8; --live-w:#123029;
+    --hair:#2a3037; --hair-2:#3a424b;
+  }
+  :root[data-theme="light"] {
+    --ground:#edf0f3; --panel:#f8fafb; --panel-2:#e2e7ec; --ink:#14181d;
+    --muted:#525c68; --faint:#7f8996; --accent:#1f5f7a; --accent-w:#d7e6ed;
+    --dead:#9c3327; --dead-w:#f3ddd9; --live:#14614f; --live-w:#d6eae4;
+    --hair:#ccd4db; --hair-2:#b0bac4;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--serif);
+    font-size: 1.0625rem;
+    line-height: 1.62;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  .wrap {
+    max-width: calc(var(--measure) + 4rem);
+    margin: 0 auto;
+    padding: 3.5rem 2rem 6rem;
+  }
+
+  header { border-bottom: var(--rule); padding-bottom: 2rem; margin-bottom: 2.5rem; }
+
+  h1 {
+    font-size: clamp(1.9rem, 5.2vw, 2.7rem);
+    line-height: 1.12;
+    letter-spacing: -0.018em;
+    margin: 0 0 0.9rem;
+    font-weight: 600;
+  }
+
+  .dek {
+    font-size: 1.15rem;
+    line-height: 1.5;
+    color: var(--muted);
+    margin: 0 0 1.4rem;
+  }
+
+  .byline {
+    font-family: var(--util);
+    font-size: 0.775rem;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--faint);
+    margin: 0;
+    /* The spans have no whitespace between them, so without this the whole
+       line is one unbreakable run and the page scrolls sideways on a phone. */
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+  }
+  .byline span { white-space: nowrap; }
+  .byline .sep { margin: 0 0.55rem; opacity: 0.5; }
+
+  section { margin: 0 0 3rem; }
+
+  .eyebrow {
+    display: block;
+    font-family: var(--util);
+    font-size: 0.7rem;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 0.5rem;
+  }
+
+  h2 {
+    font-size: clamp(1.3rem, 3.4vw, 1.6rem);
+    line-height: 1.22;
+    letter-spacing: -0.012em;
+    margin: 0 0 1rem;
+    font-weight: 600;
+  }
+
+  h3 {
+    font-family: var(--util);
+    font-size: 0.95rem;
+    letter-spacing: 0.01em;
+    margin: 1.8rem 0 0.6rem;
+    font-weight: 600;
+  }
+
+  p { margin: 0 0 1.05rem; max-width: var(--measure); }
+
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+  code {
+    font-family: var(--mono);
+    font-size: 0.86em;
+    background: var(--panel-2);
+    padding: 0.08em 0.32em;
+    border-radius: 3px;
+  }
+
+  pre {
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    line-height: 1.55;
+    background: var(--panel);
+    border: var(--rule);
+    border-left: 3px solid var(--hair-2);
+    border-radius: 4px;
+    padding: 0.95rem 1.1rem;
+    overflow-x: auto;
+    margin: 0 0 1.2rem;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; }
+  pre .hi { color: var(--dead); font-style: normal; }
+  pre .dim { color: var(--faint); }
+
+  .note {
+    border: var(--rule);
+    border-left: 3px solid var(--hair-2);
+    background: var(--panel);
+    border-radius: 4px;
+    padding: 1rem 1.15rem 0.4rem;
+    margin: 0 0 1.3rem;
+    max-width: var(--measure);
+  }
+  .note p { font-size: 0.965rem; }
+  .note .tag {
+    display: block;
+    font-family: var(--util);
+    font-size: 0.7rem;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+  }
+  .note.found { border-left-color: var(--dead); background: var(--dead-w); }
+  .note.found .tag { color: var(--dead); }
+  .note.clean { border-left-color: var(--live); background: var(--live-w); }
+  .note.clean .tag { color: var(--live); }
+
+  .tablewrap { overflow-x: auto; margin: 0 0 1.4rem; }
+  table {
+    border-collapse: collapse;
+    font-family: var(--util);
+    font-size: 0.87rem;
+    width: 100%;
+    min-width: 30rem;
+  }
+  th, td { text-align: left; padding: 0.5rem 0.85rem 0.5rem 0; border-bottom: var(--rule); vertical-align: top; }
+  th {
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--faint);
+    font-weight: 600;
+    border-bottom: 1px solid var(--hair-2);
+  }
+  td.v { white-space: nowrap; font-weight: 600; }
+  td.v.survived { color: var(--dead); }
+  td.v.died { color: var(--live); }
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+    gap: 1px;
+    background: var(--hair);
+    border: var(--rule);
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 0 0 1.5rem;
+  }
+  .stat { background: var(--panel); padding: 0.85rem 0.95rem; }
+  .stat b {
+    display: block;
+    font-family: var(--util);
+    font-size: 1.35rem;
+    letter-spacing: -0.02em;
+    font-weight: 600;
+    line-height: 1.1;
+  }
+  .stat span {
+    font-family: var(--util);
+    font-size: 0.68rem;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+
+  blockquote {
+    margin: 0 0 1.2rem;
+    padding-left: 1.1rem;
+    border-left: 2px solid var(--accent);
+    color: var(--muted);
+    font-style: italic;
+    max-width: var(--measure);
+  }
+  blockquote p { margin-bottom: 0; }
+
+  ul { max-width: var(--measure); padding-left: 1.15rem; margin: 0 0 1.1rem; }
+  li { margin-bottom: 0.45rem; }
+
+  hr { border: 0; border-top: var(--rule); margin: 2.5rem 0; }
+
+  .next {
+    margin-top: 1.7rem;
+    padding-top: 1.1rem;
+    border-top: var(--rule);
+    font-family: var(--util);
+    font-size: 0.85rem;
+    line-height: 1.65;
+    color: var(--muted);
+  }
+
+  footer {
+    border-top: var(--rule);
+    padding-top: 1.6rem;
+    color: var(--faint);
+    font-family: var(--util);
+    font-size: 0.8rem;
+    line-height: 1.6;
+  }
+  footer p { max-width: var(--measure); }
+</style></head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>Nobody had written a program in it</h1>
+  <p class="dek">Ten milestones produced a working machine and a suite of a hundred tests that had stopped being able to say anything new about it. The gaps were all one layer up, in the part a test suite structurally cannot see — and finding them took an afternoon of ordinary programs rather than another property.</p>
+  <p class="byline">
+    <span>apolisp</span><span class="sep">/</span><span>Rust; zero dependencies in the language</span><span class="sep">/</span><span>build order complete</span><span class="sep">/</span><span>50 decision records</span>
+  </p>
+</header>
+
+<section>
+  <h2>Where this left off</h2>
+
+  <p><a href="oracle.html">Chapter one</a> broke its own tests over the first three milestones and found three kinds of failure. <a href="limits.html">Chapter two</a> did it over the next three and found three more. <a href="instrument.html">Chapter three</a> finished the build order, and found that the instrument doing the finding can report a result that never happened: a mutation whose pattern no longer matched left the tree untouched, the suite green, and a run indistinguishable from a surviving mutant.</p>
+
+  <p>That is where the queue ran out. Ten of ten milestones done, forty-five decision records, and nothing in any document saying what the project was <em>for</em> past that point. This chapter is what happened next, which was mostly not what the plan would have been.</p>
+</section>
+
+<section>
+  <span class="eyebrow">Verification</span>
+  <h2>A gate that found nothing</h2>
+
+  <p>Everything had been verified on one machine, on one operating system. The follow-up had been filed for a while: run the same gate on Linux, because a platform assumption baked into a golden or an error classification is invisible on the machine that wrote it.</p>
+
+  <p>The prediction, written down first, was that socket error classification would be where the two platforms parted. It is the newest code, and the trap file already records one platform split there. It was refuted immediately — green on the first run, no source change, and a direct probe gives the same answer on both:</p>
+
+<pre><code><span class="dim">;; the same program, macOS and Linux</span>
+read-deadline: :would-block
+reset: :connection-reset after 2 writes
+</code></pre>
+
+  <p>Which turns out to say something the green run did not. The test for that deadline accepts <em>either</em> of two error kinds, because the language documents one on Unix and another on Windows. Both Unixes agree, so that tolerance is carrying Windows alone — and no run has ever taken the branch that needs it. A test written to be robust across three platforms has been exercised on two, and the third is the one it was written for.</p>
+
+  <div class="note found">
+    <span class="tag">The negative result is the result</span>
+    <p>108 tests, three points of the feature lattice, two operating systems, no diff. What that buys is not confidence that the code is portable — it is knowing which tolerance in the suite is currently untested, and why.</p>
+  </div>
+</section>
+
+<section>
+  <span class="eyebrow">The soak</span>
+  <h2>A mutant that reached the source and not the binary</h2>
+
+  <p>The verification ladder had ended <code>merge &rarr; soak &rarr; tag</code> since the beginning, and the soak had never run. It was three words in a document: leak checks, reader fuzzing, release-build divergence. Written out, it is a script and a container stage.</p>
+
+  <p>The reader fuzzer is the ordinary half. Two generators — token soup, and character-level mutation of real corpus programs — and three claims: the reader never panics, whatever it accepts round-trips with well-formed origins, and whatever it rejects renders. The third is free, because rendering an error whose span falls outside the source or off a character boundary panics rather than returning a wrong answer.</p>
+
+  <p>Two checks on the fuzzer itself, both of which mattered. Counting how many generated inputs parse: token soup 13%, corpus mutation 68%. Without that the accept-side oracles could have been firing on almost nothing. Then reintroducing a real bug the reader&rsquo;s own comment warns about — recovering a multi-byte escape&rsquo;s span by subtracting a byte count — which it caught in 246 inputs and, because the harness catches panics on purpose, named the input that did it.</p>
+
+  <p>The leak check is where it got interesting. Nothing written in this language can leak, so the tool had to be validated by mutation instead: inject 150,000 definite leaks into a hot path and watch valgrind find them.</p>
+
+  <p>It found nothing. Exit zero, <em>definitely lost: 0 bytes in 0 blocks</em>. The mutation was in the source — <code>grep</code> confirmed it — and the build had recompiled. The heap summary is the tell:</p>
+
+<pre><code>total heap usage: 1,482,053 allocs, 1,482,052 frees, 127,622,370 bytes allocated
+</code></pre>
+
+  <p>Allocations and frees differ by one, the single block the runtime holds at exit. The 150,000 boxes were never allocated at all. A <code>Box</code> that is allocated, never read and never freed is unobservable, and the optimizer is entitled to delete it. Wrapped in a barrier that forces the allocation to count, the same mutant was caught instantly: 149,999 blocks, exactly.</p>
+
+  <div class="note found">
+    <span class="tag">A second way to get chapter three&rsquo;s wrong answer, which chapter three&rsquo;s rule does not catch</span>
+    <p>Chapter three&rsquo;s finding was a mutation that never applied, and its rule was: assert the old text was present before writing the new. That rule <em>passes</em> here. The mutation was real in the source and absent from the machine code.</p>
+  </div>
+
+  <p>The vulnerable shape is a mutant that adds work with no observable effect — a dead store, an unused allocation, a pure call whose result is dropped. One that changes an observable result is safe, which is why the earlier passes were mostly safe by luck rather than by rule. And anything mutated under an optimizing build is exposed, which is where the soak lives.</p>
+
+  <p>The check that caught it generalizes: <strong>read the counters, not the verdict.</strong> <em>Total heap usage</em> distinguishes &ldquo;nothing leaked&rdquo; from &ldquo;nothing happened&rdquo;, and every tool has an equivalent — an instruction count, a transcript, a timing. A verdict alone cannot tell the two apart, and the flattering reading is still the wrong one.</p>
+</section>
+
+<section>
+  <span class="eyebrow">The pivot</span>
+  <h2>Nobody had written a program in it</h2>
+
+  <p>The ethos names three target workloads. After ten milestones, nothing had been written in any of them. Everything the language had ever run was a test of the language.</p>
+
+  <p>So: two programs. Conway&rsquo;s Life on a wrapping board, and a request/response round trip over TCP with a JSON body. Both correct on the first run, which is the first result — nothing was missing that stops a real program being written.</p>
+
+  <p>What was missing was the layer above. Six of Life&rsquo;s seventeen definitions were standard library rebuilt by hand, and five of those existed only because there was no looping form. But two findings were not ergonomics at all.</p>
+
+  <p>The first: a framed read looked correct and was not. The header said 27 bytes, the code asked for 42 and got 27, because a socket read returns as soon as any bytes arrive. It would have failed the first time a payload crossed a packet boundary. The second is sharper:</p>
+
+<pre><code><span class="dim">;; the only way to turn a string into a number</span>
+(+ 1 (json/decode "27"))   <span class="dim">;; => 28</span>
+</code></pre>
+
+  <p>There was no string-to-number conversion in the language. Not an awkward one — none. The primitive table went value-to-string and never back, so a length header, a config value, and a line of user input were all unreachable. The one path that worked ran through the JSON adapter, which is <em>optional</em>: building without it removed the language&rsquo;s only way to read a number out of text.</p>
+
+  <p>A decision record from early on says features gate host capability and never language semantics. That had quietly stopped being true — not because a feature gated a semantic, but because a semantic had no home and was squatting in a feature. And the harness built to catch this could not:</p>
+
+  <div class="note found">
+    <span class="tag">The subtraction harness proves a capability can be removed. It cannot notice a semantic went missing with it</span>
+    <p>The build without JSON was green throughout, and always would have been, because nothing in the suite parses a number from a string either. The harness compares a build against a test suite, and the suite shares the blind spot.</p>
+  </div>
+
+  <p>Ten milestones did not notice, and the reason is structural rather than careless. A suite that exercises a virtual machine builds its numbers as literals. It never needs to parse one.</p>
+</section>
+
+<section>
+  <span class="eyebrow">Q5</span>
+  <h2>A macro that was complete, and still the wrong answer</h2>
+
+  <p>The looping form had been deferred for nine milestones behind a rule: attempt it as a macro first, and admit a core form only on evidence from a real attempt.</p>
+
+  <p>The macro is eight lines and there is no tree walk in it. <code>loop</code> names its function; <code>recur</code> expands to a call to that name. Not walking the body is what keeps it short — and nesting then falls out of lexical scope for free, which is the real language&rsquo;s rule arrived at by not implementing it.</p>
+
+  <p>It works. 200,000 iterations in constant space, arity checked, cleanup semantics correct. It fails on diagnostics, and only on diagnostics: errors name an identifier the user never wrote, a non-tail <code>recur</code> is silently accepted and grows the stack, and a user binding of that name is captured without a word.</p>
+
+  <p>All three have one fix — have <code>loop</code> walk its body — and that fix is the argument against it. The walk has to know which positions are tail positions, which is <em>what the compiler already is</em>. Writing it again in the prelude puts one definition in two places, in two languages, with no test that they agree, and the drift shows up as a <code>recur</code> the macro accepted and the compiler did not make a tail call: a silent stack leak in the construct people reach for to avoid one.</p>
+
+  <p>So, a core form. And the implementation made the feared duplication unnecessary rather than merely acceptable: a <code>loop</code> lowers to an immediate call to an anonymous function, so <code>recur</code> is a tail call to it, and &ldquo;tail position for <code>recur</code>&rdquo; <em>is</em> the flag the compiler already threads for every other tail call. The refusals read that decision; they do not make one.</p>
+
+  <p>One divergence from the dialect it borrows from, and it falls out rather than being chosen. A <code>recur</code> from a <code>catch</code> is allowed here, because this machine pops a handler record when it dispatches — so by the time a catch body runs there is no region to leave, and the ordinary tail-call rule permits it. Add a <code>finally</code> and there <em>is</em> an open region, and the same rule refuses it. No case analysis anywhere; the difference comes out of a counter that already existed.</p>
+</section>
+
+<section>
+  <span class="eyebrow">Q29</span>
+  <h2>A cost that was avoidable rather than payable</h2>
+
+  <p>The next gap was the sequence library, and it had been blocked for four milestones by a real cost. Prelude functions have to be compiled into every program&rsquo;s chunk; the prelude&rsquo;s bytecode would then land in every disassembly golden in the corpus and grow with the prelude forever.</p>
+
+  <p>That had been argued about and never measured. Measured, it is worse than the argument suggested: four sequence functions are nine protos and 160 lines of disassembly, which across nine corpus programs is <strong>+1,440 golden lines — 672 to 2,112, a 3.1&times; blow-up for four functions</strong>.</p>
+
+  <p>And it is entirely a consequence of ordering. Compile the unit first and append the prelude <em>after</em>, and a program&rsquo;s proto indices depend on the program alone:</p>
+
+<pre><code><span class="dim">;; six functions added to the prelude</span>
+$ git status --short tests/corpus/
+<span class="dim">;; (nothing)</span>
+</code></pre>
+
+  <p>The prelude&rsquo;s top level becomes its own proto, run before the program&rsquo;s, so no prelude instruction appears in any program&rsquo;s entry point or expansion golden either. A session orders it first instead of last, because a prompt&rsquo;s inputs keep appending and &ldquo;last&rdquo; is not a place there — so the record is a span rather than a boundary, which can say both.</p>
+
+  <p>It has now held three times under real changes: six functions, then three more, then six more, and the nine corpus goldens have not moved once. The prelude gets a golden of its own, because otherwise it would be the only code in the language pinned nowhere — compiled into every program and printed in none of them.</p>
+</section>
+
+<section>
+  <span class="eyebrow">The report program</span>
+  <h2>The language refuses the ambiguous spelling, then ships one</h2>
+
+  <p>With iteration and sequences in place, the next program was chosen to <em>not</em> be shaped by what the language has: read a CSV, total by name, print a report sorted by total. The most ordinary program there is.</p>
+
+  <p>It works. The accounting is the finding — 54 lines of code, of which 30 are standard library the program has to define before it can start. The ratio had moved since Life, but less than it looked: what the previous two entries removed was iteration boilerplate, and what that exposed underneath was a different layer.</p>
+
+  <p>And underneath it was a trap. Strings are deliberately not sequences here, and the surface is emphatic about it: slicing raises when a cut lands inside a character, and <code>count</code> on a string is <em>refused outright</em> — with an error that tells you to name the unit. It then pointed at a length function whose name does not name its unit:</p>
+
+<pre><code>str-len "dave"  <span class="dim">;; 4</span>
+str-len "josé"  <span class="dim">;; 5 — four characters</span>
+
+<span class="dim">;; so the padding idiom every report writes:</span>
+dave        |
+josé       |
+</code></pre>
+
+  <div class="note found">
+    <span class="tag">The one place the argument was quiet was the one place it mattered</span>
+    <p>One space short, one row misaligned, no error and nothing to notice. The refusal of <code>count</code> exists <em>because</em> this is where Unicode assumptions get made by accident. The length function was the hole in its own argument.</p>
+  </div>
+
+  <p>The fix is naming, and the reason it is naming rather than a blanket rule about byte offsets is worth keeping:</p>
+
+  <p><strong>An ambiguous unit is dangerous when it flows into arithmetic and safe when it flows into an operation that validates.</strong> A byte index from a substring search can only be spent on a slice, which raises rather than guessing when a bound splits a character — so a unit mistake announces itself on the first non-ASCII input. A length is spent on subtraction, and arithmetic checks nothing.</p>
+
+  <p>Which also disposes of the friendly-looking option. Redefining the length function to count characters would be worse, not better: its result would stop being a legal slice bound, so the obvious full-string slice would work on ASCII and silently truncate on everything else — trading a visible misalignment for invisible data loss.</p>
+</section>
+
+<section>
+  <span class="eyebrow">Ordering</span>
+  <h2>Twenty-one lines</h2>
+
+  <p>The rest of what the report program had to define was sorting, and sorting needed something first. The comparison operators are numbers only, so there was no way to order two strings <em>at all</em> — and a sort that cannot order a list of names is not a sort anybody wanted.</p>
+
+  <p>So an ordering that stops where it runs out: within numbers, within strings, and a refusal by name for everything else. Not a total order over every value, because ordering a keyword against a vector is a ruling nothing needs and everything would then be stuck with. Strings order by code point, which is an order and not a collation — no locale is consulted, and that is a limit to know rather than a bug to file.</p>
+
+  <p>The sort is a merge sort, and that is the decision rather than the detail. The version everyone writes first — take the smallest, remove it with a filter, repeat — removes <em>every</em> element equal to the smallest rather than one of them, so it silently drops ties. It is wrong on the first input with a duplicate and looks right on every input without one.</p>
+
+  <p>The same program, three times:</p>
+
+  <div class="stats">
+    <div class="stat"><b>54</b><span>lines &mdash; 30 of them library</span></div>
+    <div class="stat"><b>41</b><span>after the string pass &mdash; 19 library</span></div>
+    <div class="stat"><b>21</b><span>after ordering &mdash; none</span></div>
+  </div>
+
+  <p>One item on the list was deliberately not built. Calling a function with a computed argument list needs an argument count that is not known until run time, and this machine fixes both the count in the instruction and the frame&rsquo;s slot count at compile time — so there is nowhere for a runtime-length argument list to go. Supporting it means a frame that grows after it is created, which reaches the slot model and the image that serializes frames, and the image is the part of this system least worth disturbing for a convenience.</p>
+
+  <p>But the disqualifying reason is smaller than the technical one. Nothing asked for it. It appeared in a capability probe — a list of names checked for boundness — and not in any program, while every other piece built this week was scoped by a program that had already wanted it. It is filed with the measurement and a rule for revisiting it: build it when a program wants it, and check first whether that program wants dynamic arity or only a fold.</p>
+</section>
+
+<section>
+  <h2>What changed</h2>
+
+  <div class="stats">
+    <div class="stat"><b>6,749</b><span>core lines / ~7,500</span></div>
+    <div class="stat"><b>5</b><span>decision records added</span></div>
+    <div class="stat"><b>2</b><span>questions retired</span></div>
+    <div class="stat"><b>2</b><span>operating systems</span></div>
+  </div>
+
+  <p>The character of the finding has changed in every chapter, and this is the largest change yet. Chapters one and two found defects. Chapter three found holes — code that was correct and untested. This chapter found that the suite had stopped being a source of information about the language at all.</p>
+
+  <p>Not through neglect. 115 tests pass, on two operating systems, across three points of the feature lattice, with a fuzzer and a soak behind them. They exercise the virtual machine, which is what they were built to do and what nine of the ten milestones were about. A suite shaped that way calls primitives directly and never needs a sequence function twice, never parses a number from a string, and never pads a column — so it cannot see that any of those are missing or wrong. The subtraction harness inherits the blind spot exactly, because it compares a build against that suite.</p>
+
+  <p>Every gap in this chapter was found by writing a program, and none of them was on any list. The two that mattered most were not missing features but a semantic squatting in an optional adapter and a function whose name did not say its unit — neither of which a stronger property would have surfaced, because both were <em>correct</em> under every test that existed.</p>
+
+  <p>The instrument for &ldquo;what is my suite not checking&rdquo; is still mutation, and it acquired a second failure mode here to go with chapter three&rsquo;s: a mutation can be real in the source, survive the build, and never reach the machine code. Both failures are silent, both produce a confident and entirely fictional finding, and both were caught by the same habit — writing down what should happen before running it, then noticing that it did not.</p>
+
+  <p>The instrument for &ldquo;what is my <em>language</em> not doing&rdquo; turns out to be simpler and was available the whole time. Write a program in it. The build order took ten milestones and produced a machine that works; an afternoon of ordinary programs produced five decision records, every one of them scoped by a program that had already wanted it.</p>
+
+  <p class="next">Earlier chapters: <a href="oracle.html">The tests were green and two of them were dead</a> (milestones 1&ndash;3), <a href="limits.html">What a mutation check cannot find</a> (milestones 4&ndash;6), and <a href="instrument.html">The instrument that can lie</a> (milestones 7&ndash;10).</p>
+</section>
+
+<footer>
+  <p>apolisp is a personal project with one user and no stability promise. Its decision log is append-only; corrections go in errata rather than over the original, which is how a paragraph that was reviewed, committed, and wrong gets fixed without erasing that it was believed. The programs quoted here are reproduced in <code>docs/notes/</code> rather than committed as examples &mdash; they are evidence for a question about what the project is for, and committing them would settle it by drift.</p>
+</footer>
+
+</div>
+</body>
+</html>

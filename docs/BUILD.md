@@ -239,15 +239,31 @@ in-language suite green → serialization round-trip green → merge → soak �
 **Merge ≠ release.** The soak is where leak checks, reader fuzzing, and
 release-build divergence testing happen.
 
-**Follow-up: a Dockerfile that runs `just verify` on Linux.** Everything to
-date has been verified on macOS only, and milestone 10 is where that stopped
-being harmless. `TRAPS.md` records a read deadline raising `:would-block` on
-Unix and `:timeout` on Windows; the same class of divergence is available
-between macOS and Linux for socket errors, terminal capability detection, and
-path handling, and none of it is exercised. The point is not portability as a
-goal — it is that a platform-specific assumption baked into a golden or a
-`:kind` mapping is invisible on the machine that wrote it. Cheap, and it makes
-the existing gate say something it currently only implies.
+**The gate also runs on Linux.** `just verify-linux` builds the `Dockerfile` and
+runs exactly `just verify` inside it — exactly, because a container that ran a
+rung the host gate does not would make a red container ambiguous between "Linux
+differs" and "this rung was never in the gate". Not a dependency of `verify`: it
+needs a running daemon, and a gate with an external prerequisite is one people
+learn to skip.
+
+The point was never portability as a goal. It is that a platform-specific
+assumption baked into a golden or a `:kind` mapping is invisible on the machine
+that wrote it.
+
+*It found nothing, and the nothing is worth writing down.* The expectation was
+that socket error classification would be where macOS and Linux parted, since
+that is the newest code and the one place `TRAPS.md` already records a platform
+split. Both give `:would-block` for a read deadline, both classify a write to a
+closed peer as `:connection-reset`, and both take exactly two writes to get
+there. 108 tests, three feature-lattice points, no diff. So the `:would-block`
+**or** `:timeout` tolerance in `tests/adapters.rs` is carrying Windows alone —
+it is not a macOS-versus-Linux hedge, and no run has ever taken the branch that
+needs it.
+
+What this does **not** cover: the daemon on an arm64 host runs arm64 Linux, so
+this is an OS axis and not an architecture one. `--platform linux/amd64` gets
+the other, emulated and slow, and nothing has yet suggested an arch-sensitive
+assumption is in here to find.
 
 ## On process
 

@@ -57,7 +57,9 @@ gives the first, Windows the second. So a program handling a read deadline has
 to accept both, and one written and tested on macOS will silently stop
 retrying on Windows. `:timeout`'s only reliable raiser is `tcp/connect` with a
 timeout argument, which is `connect_timeout` underneath and does return
-`TimedOut`. Verified on macOS at milestone 10, not on Windows.
+`TimedOut`. Verified on macOS at milestone 10, and on Linux afterwards, where
+it also gives `:would-block` — so the both-kinds tolerance is carrying Windows
+alone, and no run has ever exercised the branch that needs it.
 
 **Handle validity across migration.** Generational keys catch reuse; they do not
 catch a handle that was valid in the source VM and meaningless in the target.

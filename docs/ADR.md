@@ -2718,6 +2718,79 @@ way to find out.
 
 ---
 
+### ADR-049 — The string surface names its units
+
+*(New, 2026-07-28. Refines ADR-018 and ADR-041 part 5. Removes `str-len`.
+Prompted by `notes/the-report-program.md`.)*
+
+**Decision.** Five parts.
+
+**1. `str-len` is removed. `str-byte-len` and `str-scalar-len` replace it.**
+
+ADR-041 part 5 already made the rule, and made it as an error message: `count`
+refuses a string and *says to name the unit*. The surface then pointed at
+`str-len` as the byte answer — a name that does not name its unit. The language
+was refusing the ambiguous spelling and shipping one.
+
+It answered 5 for `"josé"`, so the column-padding idiom every report writes
+misaligned by one space per non-ASCII character, with no error and nothing to
+notice. `str-slice` raises when a cut lands inside a character and `count`
+refuses outright; this was the hole in the same argument.
+
+**2. Why `str-index-of` returns a byte index and does *not* say so.** The
+distinction is worth stating, because it is the rule for the next function
+somebody adds:
+
+> An ambiguous unit is dangerous when it flows into **arithmetic** and safe when
+> it flows into an operation that **validates**.
+
+An index from `str-index-of` can only be spent on `str-slice`, which raises
+rather than guessing when a bound lands inside a character — so a unit mistake
+announces itself on the first non-ASCII input. `str-len`'s result was spent on
+subtraction, and arithmetic checks nothing. This is why the fix is naming rather
+than a blanket rule about byte offsets.
+
+**3. `str-index-of` is added:** `(str-index-of s needle from)` → byte index or
+`nil`. The `from` offset exists so a scan does not re-read what it has passed,
+which is what keeps `split` linear rather than quadratic in slices. An empty
+needle is refused: it matches at every position, so every caller that advances
+past a match would loop forever, and that is better refused once here than
+guarded in each of them.
+
+**4. `split`, `pad-right` and `pad-left` join the prelude.** They are the three
+functions every text program defines before it can start.
+
+The padders use `str-scalar-len`. That is the point of the entry: **a column
+lines up because the library counts characters, not because each caller
+remembered which unit a length was in.** They return the string unchanged when
+it is already too wide, because losing data to make a column line up is the
+wrong trade to make silently.
+
+`split` keeps empty fields — a trailing separator yields a trailing empty field.
+Dropping it is the caller's decision and not the split's.
+
+**5. The surface stays byte-indexed.** ADR-018 promises no O(1) character
+indexing and that is unchanged; `str-slice` still takes byte indices.
+
+**Rejected.** *Keeping `str-len` as an alias for the byte version* — the
+ambiguous name is the defect, so keeping it keeps the defect and adds a synonym.
+*Redefining `str-len` to mean scalars*, which reads like the friendly choice and
+is worse: its result would no longer be a legal `str-slice` bound, so
+`(str-slice s 0 (str-len s))` would be correct on ASCII and wrong on everything
+else — converting a loud misalignment into a silent truncation. *Scalar-indexed
+slicing*, which is ADR-018's O(1)-character-indexing promise being broken to
+avoid naming a unit.
+
+**Cost.** Core goes from 6,561 to 6,639 of 7,500; `prim` 702 → 755 and
+`prelude.xs` 118 → 143. The report program that prompted this goes from 54 lines
+to 41, and the standard library it has to define first from 30 lines to 19 — all
+19 of which are `sort`, which this entry does not address.
+
+**Open.** `sort`, `take`/`drop`, and `apply`, all named by the same program and
+none of them a string question.
+
+---
+
 ## Errata
 
 Factual corrections to entries whose **decision still stands**. A wrong reason is

@@ -78,15 +78,21 @@ two shapes differ, the difference is not arbitrary, and code moved here from
 Clojure will compile where it did not before rather than the other way round
 (ADR-047 part 5).
 
-**`str-len` is bytes, and it is the quiet one.** ADR-018 and ADR-041 part 5
-decide this deliberately, and the language is loud about it everywhere else:
-`str-slice` errors when a cut lands inside a character, and `count` on a string
-is refused outright because that is where Unicode assumptions get made by
-accident. `str-len` just answers — `"josé"` is 5 — so the column-padding idiom
-every report writes, `(repeat (- width (str-len name)) " ")`, misaligns by one
-space per non-ASCII character with no error and nothing to notice. Character
-count is `(count (str-scalars s))`, which allocates every code point in order to
-count them. Found by writing a report (`notes/the-report-program.md`).
+**A length is bytes or scalars and never "length".** *(The `str-len` trap is
+gone — ADR-049 removed the name. This is what replaced it and why.)* The surface
+is byte-indexed: `str-byte-len` and `str-slice` speak bytes, `str-scalar-len`
+and `str-scalars` speak characters, and mixing them is a real error rather than
+a style question. Use `str-byte-len` for slicing and framing, `str-scalar-len`
+for anything a person will look at — the prelude's `pad-left`/`pad-right`
+already do.
+
+The reason the old `str-len` was worse than `str-slice`'s byte indices, and the
+rule for whatever gets added next: **an ambiguous unit is dangerous when it
+flows into arithmetic and safe when it flows into an operation that validates.**
+`str-slice` raises when a bound splits a character, so a mistake announces
+itself; a length spent on subtraction is checked by nothing, and misaligns a
+column by one space per non-ASCII character with no error at all
+(`notes/the-report-program.md`).
 
 **Removing the maximum with `filter` drops duplicates.** The obvious selection
 sort — take the largest, `filter` it out, repeat — removes *every* element equal

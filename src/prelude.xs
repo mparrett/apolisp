@@ -116,3 +116,28 @@
       ""
       (loop [in (rest xs) out (str (first xs))]
         (if (empty? in) out (recur (rest in) (str out sep (first in))))))))
+
+; --- Strings (ADR-049) -------------------------------------------------------
+;
+; `split` and the two padders, written here because they are the three every
+; text program defines before it can start. The padders use `str-scalar-len`
+; and not `str-byte-len`, which is the whole point: a column lines up because
+; the library counts characters, not because each caller remembered to.
+
+(def split
+  (fn split [sep s]
+    (loop [from 0 out []]
+      (let [hit (str-index-of s sep from)]
+        (if (= hit nil)
+          (conj out (str-slice s from (str-byte-len s)))
+          (recur (+ hit (str-byte-len sep)) (conj out (str-slice s from hit))))))))
+
+(def pad-right
+  (fn pad-right [width s]
+    (let [n (- width (str-scalar-len s))]
+      (if (< n 1) s (str s (join "" (repeat n " ")))))))
+
+(def pad-left
+  (fn pad-left [width s]
+    (let [n (- width (str-scalar-len s))]
+      (if (< n 1) s (str (join "" (repeat n " ")) s)))))

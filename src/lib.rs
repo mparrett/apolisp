@@ -4564,8 +4564,8 @@ pub mod prim {
             // question "in what unit" wearing a shorter name.
             Value::Str(_) => Err(fault(
                 Kind::Type,
-                "`count` on a string: say the unit — `str-len` for bytes, \
-                 `str-scalars` for scalar values (ADR-018)"
+                "`count` on a string: say the unit — `str-byte-len` or \
+                 `str-scalar-len` (ADR-018, ADR-049)"
                     .to_string(),
             )),
             other => Err(fault(
@@ -4792,8 +4792,61 @@ pub mod prim {
             }
             Ok(Value::Str(Rc::new(StrObj(out))))
         });
-        vm.native("str-len", 1, false, |_, a| {
-            Ok(Value::Int(string(&a[0], "str-len")?.len() as i64))
+        // ADR-049. `str-len` used to be this, and its name was the one place in
+        // the string surface that did not say its unit — while `count` refused
+        // a string specifically *to make* callers say it. It answered 5 for
+        // "josé" and the column-padding idiom misaligned with no error
+        // (`notes/the-report-program.md`).
+        vm.native("str-byte-len", 1, false, |_, a| {
+            Ok(Value::Int(string(&a[0], "str-byte-len")?.len() as i64))
+        });
+        // What display code actually wants, and O(n) without allocating —
+        // which is the difference from `(count (str-scalars s))`, the spelling
+        // that exists today and builds a vector of every code point in order to
+        // count them.
+        vm.native("str-scalar-len", 1, false, |_, a| {
+            Ok(Value::Int(
+                string(&a[0], "str-scalar-len")?.chars().count() as i64
+            ))
+        });
+        // Substring search, from a byte offset so a split does not re-scan what
+        // it has already passed. `nil` for no match.
+        //
+        // The result is a byte index and the name does not say so, unlike the
+        // two above — deliberately. An index here can only be spent on
+        // `str-slice`, which raises rather than guesses when a bound lands
+        // inside a character, so a unit mistake announces itself. `str-len`
+        // was dangerous because its result was spent on *arithmetic*, and
+        // arithmetic checks nothing.
+        vm.native("str-index-of", 3, false, |_, a| {
+            let s = string(&a[0], "str-index-of")?;
+            let needle = string(&a[1], "str-index-of")?;
+            let from = index(&a[2], "str-index-of")?;
+            // An empty needle matches at every position, so every caller that
+            // advances past a match would loop forever. Refused here rather
+            // than guarded in each of them.
+            if needle.is_empty() {
+                return Err(fault(
+                    Kind::Type,
+                    "`str-index-of` needs a non-empty needle".to_string(),
+                ));
+            }
+            if from > s.len() {
+                return Err(fault(
+                    Kind::Type,
+                    format!("`str-index-of` starts at {from} of {} bytes", s.len()),
+                ));
+            }
+            if !s.is_char_boundary(from) {
+                return Err(fault(
+                    Kind::Type,
+                    format!("`str-index-of` starts at {from}, inside a character"),
+                ));
+            }
+            Ok(match s[from..].find(needle) {
+                Some(i) => Value::Int((from + i) as i64),
+                None => Value::Nil,
+            })
         });
         // Byte indices, because ADR-018 promises no O(1) character indexing.
         // A cut that lands inside a character is an error rather than a panic

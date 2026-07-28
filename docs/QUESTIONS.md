@@ -109,11 +109,14 @@ since the first two programs but not as far as it looks — what ADR-047 and
 ADR-048 removed was iteration boilerplate, and what it exposed underneath is a
 different layer.
 
-Missing now, in the order a program meets them: `split` (and the substring
-search a multi-character separator needs), `sort`, `take`/`drop`, `apply`, and a
-string-padding function. Plus one trap rather than a gap: `str-len` is bytes, so
-the column-padding idiom misaligns on non-ASCII silently, which is the one place
-ADR-018's surface is quiet where the rest of it is loud (`TRAPS.md`).
+The string half of that list is done: **ADR-049** removed `str-len` for
+`str-byte-len` and `str-scalar-len`, added `str-index-of`, and put `split`,
+`pad-left` and `pad-right` in the prelude — which took the report program from
+54 lines to 41 and its hand-written library from 30 to 19.
+
+**What remains is not a string question**: `sort`, `take`/`drop`, and `apply`.
+All 19 of the report program's remaining library lines are `sort`, so that is
+the next one a program has already asked for.
 
 That is the same shape of evidence that produced ADR-046 through ADR-048 — each
 piece scoped by a program that had already wanted it — so another round of

@@ -78,6 +78,22 @@ two shapes differ, the difference is not arbitrary, and code moved here from
 Clojure will compile where it did not before rather than the other way round
 (ADR-047 part 5).
 
+**`str-len` is bytes, and it is the quiet one.** ADR-018 and ADR-041 part 5
+decide this deliberately, and the language is loud about it everywhere else:
+`str-slice` errors when a cut lands inside a character, and `count` on a string
+is refused outright because that is where Unicode assumptions get made by
+accident. `str-len` just answers — `"josé"` is 5 — so the column-padding idiom
+every report writes, `(repeat (- width (str-len name)) " ")`, misaligns by one
+space per non-ASCII character with no error and nothing to notice. Character
+count is `(count (str-scalars s))`, which allocates every code point in order to
+count them. Found by writing a report (`notes/the-report-program.md`).
+
+**Removing the maximum with `filter` drops duplicates.** The obvious selection
+sort — take the largest, `filter` it out, repeat — removes *every* element equal
+to the largest rather than one of them, so a list with a repeated key comes back
+short. It is the first thing anyone reaches for in a language with no `sort`,
+and it is wrong on the first input with a tie.
+
 **Handle validity across migration.** Generational keys catch reuse; they do not
 catch a handle that was valid in the source VM and meaningless in the target.
 Every adapter declares its reacquisition semantics or refuses.

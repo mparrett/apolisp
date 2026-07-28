@@ -102,10 +102,22 @@ by ADR-048 — which weighed Q29's cost by measuring it (4 functions = 160 golde
 lines per program, or zero if the prelude is appended after the unit) rather
 than by arguing about it.
 
-**All three pieces of candidate 2 are done.** What comes next is open again, and
-the honest next move is probably candidate 1: write more programs and see what
-*they* break. The two that produced this list found four things nobody had
-listed.
+**All three pieces of candidate 2 are done**, and candidate 1 was run again on
+top of them (`notes/the-report-program.md`): a CSV report, 54 lines, of which
+**30 are standard library the program had to define first**. The ratio has moved
+since the first two programs but not as far as it looks — what ADR-047 and
+ADR-048 removed was iteration boilerplate, and what it exposed underneath is a
+different layer.
+
+Missing now, in the order a program meets them: `split` (and the substring
+search a multi-character separator needs), `sort`, `take`/`drop`, `apply`, and a
+string-padding function. Plus one trap rather than a gap: `str-len` is bytes, so
+the column-padding idiom misaligns on non-ASCII silently, which is the one place
+ADR-018's surface is quiet where the rest of it is loud (`TRAPS.md`).
+
+That is the same shape of evidence that produced ADR-046 through ADR-048 — each
+piece scoped by a program that had already wanted it — so another round of
+candidate 2 is available whenever it is wanted, and now has its list.
 
 The candidates, and what each is really a bet on:
 

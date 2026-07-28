@@ -257,6 +257,16 @@
 
   hr { border: 0; border-top: var(--rule); margin: 2.5rem 0; }
 
+  .next {
+    margin-top: 1.7rem;
+    padding-top: 1.1rem;
+    border-top: var(--rule);
+    font-family: var(--util);
+    font-size: 0.85rem;
+    line-height: 1.65;
+    color: var(--muted);
+  }
+
   footer {
     border-top: var(--rule);
     padding-top: 1.6rem;
@@ -323,7 +333,7 @@ fn drop_frame(ex: &amp;mut Execution) -&gt; Frame {
 
   <p>&ldquo;Unwinding forgets to give the slots back&rdquo; is no longer expressible as a local change. Writing it means breaking returning too, and that is caught by eight tests.</p>
 
-  <p>One more from this round, worth keeping for its shape. A mutant that stopped merging a displaced cleanup error into the one that replaced it was caught — but not by any assertion about errors. It was caught by a check that the run finishes with an empty handler stack, which exists because dropping a handler pop is the first mutation anyone would try. The assertion was doing work no test about the feature was doing.</p>
+  <p>One more from this round, for its shape. A mutant that stopped merging a displaced cleanup error into the one that replaced it was caught — but not by any assertion about errors. It was caught by a check that the run finishes with an empty handler stack, which exists because dropping a handler pop is the first mutation anyone would try. The assertion was doing work no test about the feature was doing.</p>
 </section>
 
 <section>
@@ -344,7 +354,7 @@ fn drop_frame(ex: &amp;mut Execution) -&gt; Frame {
 
   <p>A macro receives <em>forms</em> — unevaluated, and unexpanded. It is the most basic rule macros have, it is the first line of every tutorial about them, and nothing in the suite observed it.</p>
 
-  <p>The reason is worth sitting with. Every macro in the test suite <em>used</em> its arguments as code, and for those, expanding early and expanding late produce identical output. Telling the two apart requires a macro that keeps an argument as <strong>data</strong> — which is a shape nobody writes by accident, and which therefore did not exist in the corpus until a mutant demanded it.</p>
+  <p>The reason: every macro in the test suite <em>used</em> its arguments as code, and for those, expanding early and expanding late produce identical output. Telling the two apart requires a macro that keeps an argument as <strong>data</strong> — which is a shape nobody writes by accident, and which therefore did not exist in the corpus until a mutant demanded it.</p>
 
   <div class="note found">
     <span class="tag">The corpus claimed to cover a case it did not</span>
@@ -457,6 +467,8 @@ conj: strong=1 <span class="hi">copied=true</span>
   <p>What is still not proven is the thing the whole design is for. The execution state is plain data so that a running computation can be suspended, serialized, moved, and resumed — and that claim gets its oracle at milestone 8: run to fuel exhaustion, snapshot, resume in a fresh VM, compare the entire transcript against an uninterrupted run, emitted effects included.</p>
 
   <p>Chapter one ended on that sentence too. It is still the most important property in the project and still an aspiration rather than a fact, which is the only honest way to describe an untested claim — and is, more or less, the point of everything above.</p>
+
+  <p class="next">Next: <a href="instrument.html">The instrument that can lie</a> — milestones 7 to 10, where that property finally arrives and immediately shows its blind spot.</p>
 </section>
 
 <footer>

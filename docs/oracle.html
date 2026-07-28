@@ -257,6 +257,16 @@
 
   hr { border: 0; border-top: var(--rule); margin: 2.5rem 0; }
 
+  .next {
+    margin-top: 1.7rem;
+    padding-top: 1.1rem;
+    border-top: var(--rule);
+    font-family: var(--util);
+    font-size: 0.85rem;
+    line-height: 1.65;
+    color: var(--muted);
+  }
+
   footer {
     border-top: var(--rule);
     padding-top: 1.6rem;
@@ -341,7 +351,7 @@
 
   <p>The fix was deletion, not another test. The lowering now passes the flag through untouched and the counter is the single enforcement point, at the site where the decision is actually made. The mutant now fails.</p>
 
-  <p>The confirmation is the part worth keeping: <strong>no golden file changed.</strong> Removing the redundant clause produced byte-identical bytecode across the whole corpus, which is exactly what &ldquo;this branch was unreachable&rdquo; should look like from the outside.</p>
+  <p><strong>No golden file changed.</strong> Removing the redundant clause produced byte-identical bytecode across the whole corpus, which is exactly what &ldquo;this branch was unreachable&rdquo; should look like from the outside.</p>
 
   <p>So a mutation check does not only find dead tests. It finds <em>duplicated enforcement</em> — two mechanisms implementing one rule, with no way for the suite to say which is working. Adding a test that pinned both would have preserved the ambiguity rather than resolving it.</p>
 </section>
@@ -453,6 +463,8 @@
   <p>What is not yet proven is the thing the whole design is <em>for</em>. This VM keeps its entire execution state in plain data — an explicit frame stack, flat slots, arena-indexed cells — so that a running computation can be suspended, serialized, moved, and resumed. That claim gets its oracle at milestone 8: run to fuel exhaustion, snapshot, resume in a fresh VM, and compare the full transcript against an uninterrupted run, effects included.</p>
 
   <p>Until that test exists, the most important property in the project is an aspiration rather than a fact. Which is, more or less, the point of everything above.</p>
+
+  <p class="next">Next: <a href="limits.html">What a mutation check cannot find</a> — milestones 4 to 6, and three edges of the instrument. Then <a href="instrument.html">The instrument that can lie</a>, which finishes the build order.</p>
 </section>
 
 <footer>

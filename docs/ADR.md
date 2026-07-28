@@ -2334,6 +2334,146 @@ shape ADR-043's open clause wanted and this entry does not reach.
 
 ---
 
+### ADR-045 — Host adapters: where they live, what they cost, and the kinds they finally raise
+
+*(New, 2026-07-27. Spends ADR-014's dependency budget. Adds the network half of
+ADR-042's `:io-error` vocabulary. Takes ADR-015's second step for one directory
+only.)*
+
+**Decision.** Six parts.
+
+**1. Adapters live in `src/adapters/`, and the budget excludes them by path.**
+`term.rs`, `tcp.rs`, `json.rs`, behind `pub mod adapters` in `src/lib.rs`. This
+is ADR-015's second step — one crate with file modules — taken for this
+directory and nowhere else; `src/lib.rs` is still one file with inline `mod`
+blocks.
+
+The budget test excludes the directory and **prints what it excluded, with line
+counts**. An exclusion nobody can see is how a budget stops measuring anything.
+
+**2. The `:io-error` vocabulary gains its network kinds:** `:timeout`,
+`:would-block`, and `:connection-reset`. ADR-042 shipped six and named these
+three as belonging to "the entry that adds the subsystem raising them". This is
+that entry, and they now have raisers.
+
+**3. Two dependencies: `crossterm` and `serde_json`.** Both pre-approved by
+ADR-014, both outside the line budget. TCP takes none — `std::net` is the
+protocol.
+
+The zero-dependency property ends here, and it ends *asymmetrically*: the
+language has no dependencies and the adapters have two. That is the boundary
+`BUILD.md` already draws, made visible in `Cargo.toml` rather than only in
+prose.
+
+**4. One Cargo feature per capability**, `default = ["fs", "tcp", "term",
+"json"]`. `just subtract` builds and tests three points rather than the whole
+2⁴ lattice: everything off, everything on, and `fs` alone. The middle point is
+the one that catches a `#[cfg]` written as if two features always travel
+together.
+
+**5. A socket goes through the handle table like a file, and refuses a snapshot
+like one.** `Host::Tcp` and `Host::Listener` join `Host::File`. ADR-043 part 5
+declares only `io/stdin` and `io/stdout` reconstructible, so a live socket
+makes `capture` return `SnapshotHasLiveHandles` with no new code and no new
+decision — which is the handle table doing the job ADR-016 built it for.
+
+**6. JSON maps to values losslessly, and object keys become strings.**
+`null` ↔ `nil`, `true`/`false` ↔ booleans, arrays ↔ vectors, objects ↔ maps
+with **string** keys. A JSON number is an `Int` when it is integral and fits
+`i64`, otherwise a `Float`. Encoding `##NaN` or `##Inf` throws
+`:type :io-error :kind :invalid-data` rather than emitting something no parser
+accepts.
+
+**Why.**
+
+*File modules for one directory is the first level of ADR-015's progression
+that suffices, which is the rule ADR-015 states.* A workspace would be the
+harder boundary — adapters could then only reach the VM through its public API
+— and ADR-015 reserves that for a deployment boundary. There is no deployment
+boundary here: it is one binary, and the subtraction that matters is already
+done by Cargo features, which work within one crate.
+
+The exclusion printing is the part worth arguing for. `BUILD.md` has said
+adapters are outside the budget since before any existed, and until now that
+cost nothing because the sentence described an empty set. The moment it
+describes real files it becomes a way to move lines out of a budget by moving
+them into a directory, and the only defence is that the move is visible on
+every run.
+
+*The network kinds arrive now because ADR-042's argument was that a kind
+nobody can raise is a guess with a colon in front of it.* That argument only
+pays if the deferral is actually honoured — an entry that defers three kinds
+and then never adds them has not been careful, it has been lucky. `:timeout`
+and `:would-block` come straight from `std::io::ErrorKind`;
+`:connection-reset` is the one a program most wants to retry on and the one a
+file can never produce.
+
+*The dependencies are ADR-014's own test applied, not re-litigated.* "Would
+implementing this teach us something about our language, or merely reproduce a
+protocol or standard algorithm?" JSON string escaping, number formats, and
+terminal capability detection are all the second thing. Writing them here would
+add several hundred lines of protocol nobody reviews carefully, outside the
+budget so nothing would even flag the growth.
+
+What is lost is a fact two write-ups assert. It is worth being precise rather
+than quietly dropping it: **the language still has zero dependencies**, and it
+is checkable — `cargo tree --no-default-features` shows nothing. The bylines
+need a clause, not a deletion.
+
+*Object keys are strings because keywords do not round-trip.* Our keywords are
+interned and can hold any text, so `{"a b": 1}` could become `{:a b 1}` — which
+prints as something the reader would read back as two forms. Type-strict `=`
+(ADR-041) makes the choice visible rather than subtle: a program that got
+`:a` where it expected `"a"` fails immediately instead of silently missing a
+lookup. Keywordising is a convenience a caller can apply; un-keywordising after
+a lossy conversion is not available to anyone.
+
+*`##NaN` throws on encode because JSON has no spelling for it.* ADR-032 made
+the reader and printer agree on a spelling for every float a program can hold,
+and JSON is a third party that agrees with neither. Emitting `NaN` produces a
+document no conforming parser reads; emitting `null` silently turns a number
+into an absence. A throw is the only option that does not lie.
+
+**Cost.** Two dependencies, their transitive trees, and their release cadence,
+in a project that had none. `crossterm` in particular is a large surface for
+what will initially be a handful of primitives.
+
+Three features means eight subtraction builds exist and three are tested. A
+`#[cfg(all(feature = "tcp", feature = "json"))]` written by mistake would be
+caught; one written as `#[cfg(any(...))]` in the two untested combinations
+would not.
+
+The JSON mapping is not a bijection in the other direction: a map with
+non-string keys cannot be encoded, and that is a throw at encode time rather
+than something the type system prevents. Same for a map that is not a valid
+JSON object at any depth — the failure is found by walking, and the position it
+reports is the value, not the source that built it.
+
+A terminal adapter exists that the REPL does not use. ADR-044 chose plain stdin
+and this entry does not revisit it: wiring line editing into the prompt would
+make the REPL depend on a *feature*, so `--no-default-features` would produce a
+REPL with different behaviour rather than a smaller one. That is a decision, not
+an oversight, and it is the one thing here most likely to look like unfinished
+work.
+
+**Rejected.** *A workspace crate* — ADR-015 reserves it for a deployment
+boundary and there is none; Cargo features already subtract within one crate.
+*Hand-rolling JSON and terminal handling* — ADR-014 exists to decline exactly
+this, and outside the budget the reimplementation would grow unobserved.
+*Keywordised JSON object keys* — not reversible, and type-strict `=` turns the
+mismatch into a silent failed lookup. *Emitting `null` for `##NaN`* — turns a
+number into an absence. *Testing the whole feature lattice* — eight builds per
+gate run for two combinations nothing else distinguishes. *Rewiring the REPL
+onto `crossterm`* — makes a feature change the prompt's behaviour rather than
+its size.
+
+**Open.** Whether the REPL should eventually use the terminal adapter, and what
+it would mean for `--no-default-features` if it did. Whether an adapter can ever
+checkpoint a live handle, which ADR-029 called "a later opt-in" and nothing has
+needed yet.
+
+---
+
 ## Errata
 
 Factual corrections to entries whose **decision still stands**. A wrong reason is
@@ -2441,6 +2581,20 @@ Nearly free today, since `ListObj` and `VecObj` are both `Vec<Value>` and
 arguments already occupy contiguous slots. Declined because it would quietly
 constrain Q20's still-open cross-type sequential equality, which currently
 answers `false` for list-versus-vector.
+
+**E-15 — E-12, the duplication no longer reaches a snapshot.** That erratum
+closes by saying the `finally` proto duplication "matters because `Chunk.protos`
+is what an `Image` serializes (ADR-029), so the duplication reaches the snapshot
+and not only the compiler's output." True when written and false since ADR-043
+part 6: an `Image` carries a *chunk fingerprint*, and `restore` takes the chunk
+from its caller. No `Chunk` is serialized at all, so the duplication reaches the
+compiler's output and stops there.
+
+E-12's substance is unaffected — the proto table does double under nested
+`finally`, and that is still a size statement rather than a correctness one.
+What is wrong is the consequence, and the reason it went stale is worth more
+than the correction: ADR-043 changed what an `Image` contains, and nothing
+walked the errata to see what had been asserted about it.
 
 **E-14 — ADR-043, the two-pass decode that is not needed.** The cost clause
 says "the decode is now two passes rather than one for every object kind,"

@@ -219,6 +219,21 @@ usable range is not the obvious one.
 
 ---
 
+## Outside reading
+
+Not a sibling repo, and recorded because it argues against a decision we made
+rather than for one.
+
+- **[Bytecode-to-source mapping](https://tidefield.dev/bytecode-to-source-mapping/)**
+  — makes the case for `(offset, line)` pairs at run boundaries with binary
+  search, over a parallel array indexed by instruction. Correct for line
+  numbers and near-useless for spans: measured on our corpus, run-length over
+  spans compresses 0.89 where run-length over lines compresses 0.24. It is the
+  clearest statement of the cost ADR-023 point 2 chose to pay, which is why it
+  is worth keeping the link. Filed as **Q30**.
+
+---
+
 ## What this changed
 
 | Change | Where |
@@ -230,3 +245,4 @@ usable range is not the obvious one.
 | Host-stack recursion presents as unrelated corruption, not a clean overflow | `TRAPS.md` |
 | Tagged integers do not have the obvious range | `TRAPS.md` |
 | Pre-registered predictions as the habit that makes ADR-021's freedom pay | `BUILD.md` |
+| The parallel `lines` array has a cheaper alternative that only works for line numbers | Q30 |

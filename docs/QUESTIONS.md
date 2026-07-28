@@ -187,6 +187,42 @@ nothing about whether a test can fail at all. Worth doing for a handful of
 load-bearing lines — the span-restore path is the obvious first one. Not worth a
 general mutation-testing framework.
 
+**Q30 — Is `Proto.lines` the wrong shape?** *(Filed 2026-07-27 from
+<https://tidefield.dev/bytecode-to-source-mapping/>. Nothing has measured a
+problem; this exists so the option is on record rather than rediscovered.)*
+ADR-023 point 2 makes `lines[i]` the origin of instruction `i` — a parallel
+array, one `SpanOrigin` per instruction, `O(n)` memory and `O(1)` lookup, kept
+parallel structurally because `emit` is the only thing that pushes to either.
+
+That article argues for `(offset, line)` pairs at run boundaries instead:
+`O(r)` memory, `O(log r)` random lookup by binary search, `O(n)` sequential by
+cursor. It is the right structure for what it stores. Measured against our
+corpus, it is close to worthless for what *we* store:
+
+```
+instructions            497
+runs of equal span      441   ratio 0.89   ← what we would compress
+runs of equal line only 121   ratio 0.24   ← what it compresses
+```
+
+Consecutive instructions almost always come from different sub-expressions of
+the same line, so a span-keyed run encoding has nothing to collapse: ~11%
+saved, paid for with a search. Two further reasons it does not transfer.
+Our `n` counts *instructions*, not bytes — `Instr` is a typed 16-byte enum
+(ADR-034) — so the row that article calls `O(n)` is already several times
+smaller here. And `SpanOrigin` carries `Generated` and `Unknown` beside
+`Source` (ADR-026), which an `(offset, line)` pair has nowhere to put; a
+run-boundary encoding would also blur exactly the macro-output boundary that
+`.disasm` goldens exist to show.
+
+**What would reopen it:** a measurement showing `Proto.lines` matters — memory
+in a large chunk, or a `.disasm` pass that is slow enough to notice. The
+structure applies cleanly to a *line projection* of the origins (0.24 there),
+so the fallback is available without giving up spans: keep `lines` and derive a
+compressed line table for whatever wants one. Do not trade spans for lines to
+get the compression; that is paying in diagnostics for memory nobody has
+missed.
+
 **Q19 — Does `Rc` survive contact with the evidence?** *(Would reopen ADR-003.)*
 `../wallisp` measured refcounting as the slowest of four GC strategies
 (~1.1–1.25× worse than mark-sweep, penalty tracking call volume rather than

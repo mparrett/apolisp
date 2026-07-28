@@ -238,6 +238,12 @@ hands us a precise root set for free.
 Under ADR-021 this reaches every subsystem and needs an argument, not a
 benchmark. Not for v1.
 
+Reading filed against this and not yet done:
+<https://pranitha.dev/posts/rust-and-memory-allocators/>. `../wallisp`'s
+finding was that refcounting's penalty tracks call volume rather than
+allocation, so what an allocation costs in Rust is one of the inputs to
+re-deciding this. Before the benchmark, not after.
+
 **Q14 — The name.** `apolisp` is the repo; `lispylang` was the SPEC v0.1 working
 name; `.xs` is the working extension.
 

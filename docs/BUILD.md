@@ -50,7 +50,7 @@ Each milestone is a runnable artifact.
 | 7 | Host handle table + blocking file/stdio | **Done** (`1e7555e`) — `with-open` closes on all four paths; a stale id reaches nothing |
 | 8 | Fuel suspension + `Image` + resume | **Done** (`ab75b1b`) — the round-trip cuts at *every* instruction boundary; live handles are refused |
 | 9 | REPL | **Done** (`5644b58`) — a session is one unit and one chunk; a function defined in one input is callable from the next |
-| 10 | Host adapters: terminal, TCP, JSON | Outside the line budget |
+| 10 | Host adapters: terminal, TCP, JSON | **Done** (`6017088`) — outside the budget, and the exclusion prints; ADR-042's three network kinds finally have raisers |
 
 ## The oracle
 

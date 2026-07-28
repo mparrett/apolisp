@@ -231,6 +231,14 @@ rather than for one.
   spans compresses 0.89 where run-length over lines compresses 0.24. It is the
   clearest statement of the cost ADR-023 point 2 chose to pay, which is why it
   is worth keeping the link. Filed as **Q30**.
+- **[Rust and memory allocators](https://pranitha.dev/posts/rust-and-memory-allocators/)**
+  — *filed unread, 2026-07-27; the site returns 403 to an automated fetch.*
+  Recorded against **Q19** and **ADR-021**, which are where it would bear:
+  Q19 reopened `Rc`-versus-tracing on `../wallisp`'s measurement that
+  refcounting was the slowest of four strategies, with the penalty tracking
+  *call volume* rather than allocation. Anything that changes what an
+  allocation costs in Rust changes the weight of that result. Read it before
+  running the benchmark Q19 is waiting for, not after.
 
 ---
 

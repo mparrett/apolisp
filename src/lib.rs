@@ -5289,10 +5289,11 @@ pub mod host {
     use crate::value::{kind_name, BytesObj, HandleId, Value};
     use crate::vm::{Fault, Kind, Vm};
     use std::io::Read;
-    // Only a file is written through a `Write`. `io/stdout` is the buffered
-    // host and goes through `Vm::emit`, so without `fs` nothing in this module
-    // writes to the outside world at all — which is the subtraction working.
-    #[cfg(any(feature = "fs", feature = "tcp"))]
+    // Only a descriptor is written through a `Write`. `io/stdout` is the
+    // buffered host and goes through `Vm::emit`, so with none of these three
+    // nothing in this module writes to the outside world at all — which is the
+    // subtraction working.
+    #[cfg(any(feature = "fs", feature = "tcp", feature = "term"))]
     use std::io::Write;
     use std::rc::Rc;
 
@@ -5301,10 +5302,16 @@ pub mod host {
     /// nothing in the VM changes.
     pub enum Host {
         /// ADR-013's subtraction harness, and the first place it is real: build
-        /// without `fs` and this variant, the primitive that constructs it, and
-        /// the three arms that read it all go. Nothing else in the VM changes,
-        /// which is the claim the feature exists to keep testable.
-        #[cfg(feature = "fs")]
+        /// without `fs` *or* `term` and this variant, the primitives that
+        /// construct it, and the three arms that read it all go. Nothing else in
+        /// the VM changes, which is the claim the feature exists to keep
+        /// testable.
+        ///
+        /// Two capabilities construct it, because ADR-051 makes the terminal a
+        /// descriptor a program opens rather than a second write path beside
+        /// `Vm::emit`. A tty reads and writes like a file and refuses a snapshot
+        /// like one, so it is this variant and not a parallel one.
+        #[cfg(any(feature = "fs", feature = "term"))]
         File(std::fs::File),
         Stdin,
         /// The buffered in-memory host, *not* a file descriptor. ADR-029 needs
@@ -5591,7 +5598,7 @@ pub mod host {
             };
             let mut buf = vec![0u8; n];
             let got = match vm.host_mut(id).ok_or_else(|| not_live(IoOp::Read))? {
-                #[cfg(feature = "fs")]
+                #[cfg(any(feature = "fs", feature = "term"))]
                 Host::File(f) => f.read(&mut buf),
                 #[cfg(feature = "tcp")]
                 Host::Tcp(t) => t.read(&mut buf),
@@ -5616,7 +5623,7 @@ pub mod host {
             let id = handle_arg(&a[0], "io/read-all")?;
             let mut buf = Vec::new();
             let got = match vm.host_mut(id).ok_or_else(|| not_live(IoOp::Read))? {
-                #[cfg(feature = "fs")]
+                #[cfg(any(feature = "fs", feature = "term"))]
                 Host::File(f) => f.read_to_end(&mut buf),
                 #[cfg(feature = "tcp")]
                 Host::Tcp(t) => t.read_to_end(&mut buf),
@@ -5667,7 +5674,7 @@ pub mod host {
                 };
             }
             match vm.host_mut(id).ok_or_else(|| not_live(IoOp::Write))? {
-                #[cfg(feature = "fs")]
+                #[cfg(any(feature = "fs", feature = "term"))]
                 Host::File(f) => f
                     .write_all(&bytes)
                     .map(|()| n)

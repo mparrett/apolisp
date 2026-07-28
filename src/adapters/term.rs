@@ -11,13 +11,38 @@
 //! than one that is smaller, and a feature is supposed to subtract capability,
 //! not change semantics.
 
-use crate::host::{io_fault, misuse};
-use crate::host::{IoKind, IoOp};
+use crate::host::{host_failed, io_fault, misuse};
+use crate::host::{Host, IoKind, IoOp};
 use crate::value::{MapObj, StrObj, Value};
 use crate::vm::Vm;
 use std::rc::Rc;
 
 pub fn install(vm: &mut Vm) {
+    // ADR-051. `io/stdout` is the buffered host — a write there goes into
+    // `Vm::out`, which the `Image` serializes, and nothing reaches the process
+    // until the program ends. That is correct for the round-trip property and
+    // fatal for anything interactive: a pager written against it paints into a
+    // terminal that has already stopped caring
+    // (`docs/notes/the-pager-program.md`).
+    //
+    // So painting is a *descriptor a program opens*, not a second write path
+    // beside `Vm::emit`. The handle is what keeps the oracle honest: it is not
+    // reconstructible, so ADR-043 part 5 refuses a snapshot to any program
+    // holding one, and "output that escaped the buffer is not in the `Image`"
+    // is enforced by machinery ADR-016 already built rather than by a rule
+    // somebody has to remember.
+    //
+    // `/dev/tty` and not stdout, because a program whose stdout is a pipe still
+    // has a controlling terminal, and the pipe is what the transcript wants.
+    vm.native("term/open", 0, false, |vm, _| {
+        std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open("/dev/tty")
+            .map(|f| Value::Handle(vm.open_handle(Host::File(f))))
+            .map_err(|e| host_failed(IoOp::Open, Some("/dev/tty".to_string()), &e))
+    });
+
     vm.native("term/size", 0, false, |_, _| {
         let (w, h) = crossterm::terminal::size()
             .map_err(|e| io_fault(IoOp::Read, kind_of(&e), "the terminal size is unavailable"))?;

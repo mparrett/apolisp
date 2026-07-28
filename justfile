@@ -52,15 +52,22 @@ verify: fmt-check check lint test subtract
 # It is a full `test` and not a `check` on purpose. Compiling proves the cfgs
 # line up; running proves `io/open` degrades to an ordinary unbound global and
 # takes nothing else with it.
-# Three points, not the whole 2^4 lattice: everything off, and `fs` alone. The
-# middle point is the one that catches a `#[cfg]` written as if two features
-# always travel together — with only all-on and all-off, `any(a, b)` and
-# `all(a, b)` are indistinguishable.
+# Four points, not the whole 2^4 lattice: everything off, `fs` alone, and `term`
+# alone. The middle points are the ones that catch a `#[cfg]` written as if two
+# features always travel together — with only all-on and all-off, `any(a, b)`
+# and `all(a, b)` are indistinguishable.
+#
+# `term` alone is here because ADR-051 made it a point that means something.
+# Before it, `Host::File` was `fs`-only and the terminal could read keys and not
+# paint; the variant is now `any(fs, term)`, and this is the only build that
+# compiles that arm without `fs` also supplying it.
 subtract:
     cargo clippy --no-default-features --all-targets -- -D warnings
     cargo test --no-default-features
     cargo clippy --no-default-features --features fs --all-targets -- -D warnings
     cargo test --no-default-features --features fs
+    cargo clippy --no-default-features --features term --all-targets -- -D warnings
+    cargo test --no-default-features --features term
 
 # BUILD.md's ladder: `merge → soak → tag`. Two of the three legs run anywhere;
 # the leak check needs valgrind and says so rather than passing quietly.

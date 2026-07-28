@@ -258,6 +258,7 @@ fn a_feature_removes_its_primitives_and_nothing_else() {
     assert_eq!(is_bound("io/open"), cfg!(feature = "fs"));
     assert_eq!(is_bound("tcp/connect"), cfg!(feature = "tcp"));
     assert_eq!(is_bound("term/read-key"), cfg!(feature = "term"));
+    assert_eq!(is_bound("term/open"), cfg!(feature = "term"));
     assert_eq!(is_bound("json/decode"), cfg!(feature = "json"));
 
     // Never gated, in any build: these are the language, and ADR-013's whole
@@ -313,6 +314,38 @@ fn the_terminal_primitives_exist_and_check_their_arguments() {
     assert!(is_bound("term/read-key"));
     let e = ev("(try (term/read-key :not-a-timeout) (catch e (get e :kind)))");
     assert_eq!(e, ":type");
+}
+
+/// ADR-051's claim, and the one that needed the `Host::File` gate widened: a
+/// program can paint a terminal in a build with `term` and without `fs`.
+///
+/// What is asserted is deliberately not the success case. Whether `/dev/tty`
+/// opens depends on whether the runner has a controlling terminal — it does
+/// under a shell and does not in the container — and a test that asserts one of
+/// those pins the environment rather than the language (BUILD.md, determinism).
+/// The invariant across both is that the capability is *present*: the failure,
+/// when there is one, is an `:io-error` about this machine, never `:unbound`
+/// about this build.
+#[cfg(feature = "term")]
+#[test]
+fn painting_a_terminal_does_not_need_the_fs_feature() {
+    let e = ev("(try (do (term/open) :opened) (catch e (get e :kind)))");
+    assert!(
+        e != ":unbound",
+        "`term/open` should be bound in a `term` build, got {e}"
+    );
+    assert!(
+        e == ":opened" || e.starts_with(':'),
+        "expected a handle or an io-error kind, got {e}"
+    );
+
+    // The point of the widening, stated where it can fail: without `fs` there
+    // is no `io/open`, and painting still has to be reachable.
+    #[cfg(not(feature = "fs"))]
+    {
+        assert!(!is_bound("io/open"));
+        assert!(is_bound("io/write"));
+    }
 }
 
 /// Nothing in the language should be able to tell which adapters exist by any

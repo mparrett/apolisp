@@ -319,10 +319,14 @@ fn the_terminal_primitives_exist_and_check_their_arguments() {
 /// ADR-051's claim, and the one that needed the `Host::File` gate widened: a
 /// program can paint a terminal in a build with `term` and without `fs`.
 ///
-/// What is asserted is deliberately not the success case. Whether `/dev/tty`
-/// opens depends on whether the runner has a controlling terminal — it does
-/// under a shell and does not in the container — and a test that asserts one of
-/// those pins the environment rather than the language (BUILD.md, determinism).
+/// What is asserted is deliberately not the success case. Opening `/dev/tty`
+/// needs a **controlling terminal**, which is not the same as a tty device
+/// existing: the node is present in the container and the open still fails
+/// there with `:other`, exactly as it does from any non-interactive runner.
+/// Under a pty it answers `:opened`. Both were checked. A test that asserts
+/// either one pins the environment rather than the language (BUILD.md,
+/// determinism).
+///
 /// The invariant across both is that the capability is *present*: the failure,
 /// when there is one, is an `:io-error` about this machine, never `:unbound`
 /// about this build.

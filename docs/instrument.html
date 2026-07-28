@@ -1,0 +1,495 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>apolisp — the instrument that can lie</title>
+<meta name="description" content="The last four milestones of a small Lisp VM. The habit of breaking its own tests stopped finding defects and started finding holes — and then found that the instrument itself can report a finding that never happened.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%A7%AA%3C/text%3E%3C/svg%3E">
+<style>
+  :root {
+    color-scheme: light dark;
+
+    --ground:    #edf0f3;
+    --panel:     #f8fafb;
+    --panel-2:   #e2e7ec;
+    --ink:       #14181d;
+    --muted:     #525c68;
+    --faint:     #7f8996;
+    --accent:    #1f5f7a;
+    --accent-w:  #d7e6ed;
+    --dead:      #9c3327;
+    --dead-w:    #f3ddd9;
+    --live:      #14614f;
+    --live-w:    #d6eae4;
+    --hair:      #ccd4db;
+    --hair-2:    #b0bac4;
+
+    --serif: "Charter", "Bitstream Charter", "Iowan Old Style", Georgia, ui-serif, serif;
+    --util:  "Avenir Next", Avenir, Futura, Optima, ui-sans-serif, system-ui, sans-serif;
+    --mono:  ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+
+    --measure: 64ch;
+    --rule: 1px solid var(--hair);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground:   #131619;
+      --panel:    #191d21;
+      --panel-2:  #22272d;
+      --ink:      #e3e7ec;
+      --muted:    #98a2ae;
+      --faint:    #6b7581;
+      --accent:   #6cb6d4;
+      --accent-w: #14313d;
+      --dead:     #e0837a;
+      --dead-w:   #38201d;
+      --live:     #5cc0a8;
+      --live-w:   #123029;
+      --hair:     #2a3037;
+      --hair-2:   #3a424b;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:#131619; --panel:#191d21; --panel-2:#22272d; --ink:#e3e7ec;
+    --muted:#98a2ae; --faint:#6b7581; --accent:#6cb6d4; --accent-w:#14313d;
+    --dead:#e0837a; --dead-w:#38201d; --live:#5cc0a8; --live-w:#123029;
+    --hair:#2a3037; --hair-2:#3a424b;
+  }
+  :root[data-theme="light"] {
+    --ground:#edf0f3; --panel:#f8fafb; --panel-2:#e2e7ec; --ink:#14181d;
+    --muted:#525c68; --faint:#7f8996; --accent:#1f5f7a; --accent-w:#d7e6ed;
+    --dead:#9c3327; --dead-w:#f3ddd9; --live:#14614f; --live-w:#d6eae4;
+    --hair:#ccd4db; --hair-2:#b0bac4;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--serif);
+    font-size: 1.0625rem;
+    line-height: 1.62;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  .wrap {
+    max-width: calc(var(--measure) + 4rem);
+    margin: 0 auto;
+    padding: 3.5rem 2rem 6rem;
+  }
+
+  header { border-bottom: var(--rule); padding-bottom: 2rem; margin-bottom: 2.5rem; }
+
+  h1 {
+    font-size: clamp(1.9rem, 5.2vw, 2.7rem);
+    line-height: 1.12;
+    letter-spacing: -0.018em;
+    margin: 0 0 0.9rem;
+    font-weight: 600;
+  }
+
+  .dek {
+    font-size: 1.15rem;
+    line-height: 1.5;
+    color: var(--muted);
+    margin: 0 0 1.4rem;
+  }
+
+  .byline {
+    font-family: var(--util);
+    font-size: 0.775rem;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--faint);
+    margin: 0;
+    /* The spans have no whitespace between them, so without this the whole
+       line is one unbreakable run and the page scrolls sideways on a phone. */
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+  }
+  .byline span { white-space: nowrap; }
+  .byline .sep { margin: 0 0.55rem; opacity: 0.5; }
+
+  section { margin: 0 0 3rem; }
+
+  .eyebrow {
+    display: block;
+    font-family: var(--util);
+    font-size: 0.7rem;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 0.5rem;
+  }
+
+  h2 {
+    font-size: clamp(1.3rem, 3.4vw, 1.6rem);
+    line-height: 1.22;
+    letter-spacing: -0.012em;
+    margin: 0 0 1rem;
+    font-weight: 600;
+  }
+
+  h3 {
+    font-family: var(--util);
+    font-size: 0.95rem;
+    letter-spacing: 0.01em;
+    margin: 1.8rem 0 0.6rem;
+    font-weight: 600;
+  }
+
+  p { margin: 0 0 1.05rem; max-width: var(--measure); }
+
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+  code {
+    font-family: var(--mono);
+    font-size: 0.86em;
+    background: var(--panel-2);
+    padding: 0.08em 0.32em;
+    border-radius: 3px;
+  }
+
+  pre {
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    line-height: 1.55;
+    background: var(--panel);
+    border: var(--rule);
+    border-left: 3px solid var(--hair-2);
+    border-radius: 4px;
+    padding: 0.95rem 1.1rem;
+    overflow-x: auto;
+    margin: 0 0 1.2rem;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; }
+  pre .hi { color: var(--dead); font-style: normal; }
+  pre .dim { color: var(--faint); }
+
+  .note {
+    border: var(--rule);
+    border-left: 3px solid var(--hair-2);
+    background: var(--panel);
+    border-radius: 4px;
+    padding: 1rem 1.15rem 0.4rem;
+    margin: 0 0 1.3rem;
+    max-width: var(--measure);
+  }
+  .note p { font-size: 0.965rem; }
+  .note .tag {
+    display: block;
+    font-family: var(--util);
+    font-size: 0.7rem;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+  }
+  .note.found { border-left-color: var(--dead); background: var(--dead-w); }
+  .note.found .tag { color: var(--dead); }
+  .note.clean { border-left-color: var(--live); background: var(--live-w); }
+  .note.clean .tag { color: var(--live); }
+
+  .tablewrap { overflow-x: auto; margin: 0 0 1.4rem; }
+  table {
+    border-collapse: collapse;
+    font-family: var(--util);
+    font-size: 0.87rem;
+    width: 100%;
+    min-width: 30rem;
+  }
+  th, td { text-align: left; padding: 0.5rem 0.85rem 0.5rem 0; border-bottom: var(--rule); vertical-align: top; }
+  th {
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--faint);
+    font-weight: 600;
+    border-bottom: 1px solid var(--hair-2);
+  }
+  td.v { white-space: nowrap; font-weight: 600; }
+  td.v.survived { color: var(--dead); }
+  td.v.died { color: var(--live); }
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+    gap: 1px;
+    background: var(--hair);
+    border: var(--rule);
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 0 0 1.5rem;
+  }
+  .stat { background: var(--panel); padding: 0.85rem 0.95rem; }
+  .stat b {
+    display: block;
+    font-family: var(--util);
+    font-size: 1.35rem;
+    letter-spacing: -0.02em;
+    font-weight: 600;
+    line-height: 1.1;
+  }
+  .stat span {
+    font-family: var(--util);
+    font-size: 0.68rem;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+
+  blockquote {
+    margin: 0 0 1.2rem;
+    padding-left: 1.1rem;
+    border-left: 2px solid var(--accent);
+    color: var(--muted);
+    font-style: italic;
+    max-width: var(--measure);
+  }
+  blockquote p { margin-bottom: 0; }
+
+  ul { max-width: var(--measure); padding-left: 1.15rem; margin: 0 0 1.1rem; }
+  li { margin-bottom: 0.45rem; }
+
+  hr { border: 0; border-top: var(--rule); margin: 2.5rem 0; }
+
+  footer {
+    border-top: var(--rule);
+    padding-top: 1.6rem;
+    color: var(--faint);
+    font-family: var(--util);
+    font-size: 0.8rem;
+    line-height: 1.6;
+  }
+  footer p { max-width: var(--measure); }
+</style></head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>The instrument that can lie</h1>
+  <p class="dek">The last four milestones of a small Lisp VM. The habit of breaking its own tests on purpose kept working, and then changed character: it stopped finding defects and started finding <em>holes</em> — code that was correct and untested. Then it found something worse, which is that a mutation run can report a result that never happened.</p>
+  <p class="byline">
+    <span>apolisp</span><span class="sep">/</span><span>Rust; zero dependencies in the language</span><span class="sep">/</span><span>10 of 10 milestones</span><span class="sep">/</span><span>45 decision records</span>
+  </p>
+</header>
+
+<section>
+  <span class="eyebrow">Previously</span>
+  <h2>Where this left off</h2>
+
+  <p>apolisp is a small Lisp in the Clojure dialect with its own VM, in Rust, for one user. The binding constraint is that the core stays holdable at once — a context-window budget of about 7,000 lines — which makes a test suite that merely <em>exists</em> too expensive. Every test has to be doing identifiable work, and the way that gets checked is to break the code on purpose and see whether anything notices.</p>
+
+  <p><a href="oracle.html">Chapter one</a> ran that habit over the first three milestones and found three distinct kinds of failure. <a href="limits.html">Chapter two</a> ran it over the next three and found three more, two of which a mutation check could not have answered at all. It ended on an admission: the property the entire design exists for — that a running computation is data you can suspend, move, and resume — was still an aspiration rather than a fact.</p>
+
+  <p>This chapter is the remaining four milestones. The aspiration became a property, and the first thing that property did was demonstrate its own blind spot.</p>
+</section>
+
+<section>
+  <span class="eyebrow">Round seven · milestone 7</span>
+  <h2>Code written because the gap was anticipated, untested for exactly that reason</h2>
+
+  <p>Milestone 7 is the host handle table: opening files, generational handles so a stale one is an error rather than a silent alias, and <code>with-open</code> as a macro over <code>try</code>/<code>finally</code>. Seven mutants, predictions written first. Two survived, and both were predicted — which is worth stating plainly, because predicting a survivor is not a win. It means the hole was visible from the armchair and the suite still had it.</p>
+
+  <p>The first one had the shape everything after it would repeat:</p>
+
+  <div class="note found">
+    <span class="tag">The read path could ignore the generation entirely</span>
+    <p>Every test stayed green. The suite checked <code>close</code> on a stale handle and <code>open?</code> on one — both of which go through a different accessor from the one every actual read and write uses.</p>
+  </div>
+
+  <p>So the aliasing bug the generation exists to catch was covered on the rare path and open on the common one. Nothing was wrong with the code. What was wrong was the belief that the corpus was checking it.</p>
+
+  <p>The second survivor is the more instructive, because it is a test that could not fail against the shape it was written to forbid. The error record for an I/O failure carries a <code>:path</code> key <em>only</em> when the operation names one, so a failure with no path has four keys rather than five with a nil in it. The assertion for that read:</p>
+
+<pre><code><span class="dim">;; the test, as written</span>
+(is (= nil (get read-failure :path)))
+
+<span class="dim">;; the mutation: emit `:path nil` on every fault</span>
+<span class="dim">;; result: passes. `get` answers nil for an absent key</span>
+<span class="dim">;; and for a key present with a nil value.</span>
+</code></pre>
+
+  <p>Fixed with <code>contains?</code>, plus a <code>count</code> on both shapes so the key set is pinned as a whole rather than one key at a time. This is chapter one&rsquo;s dead-test pattern arriving in a language feature rather than in a span invariant, which suggests it is a property of writing assertions rather than of any one subsystem.</p>
+
+  <p>Before any of that, though, the milestone produced a design error the suite caught on its first run — and the interesting part is where it <em>wasn&rsquo;t</em>. The plan said to pre-register what would break. I predicted the four-path cleanup matrix, because that is what the previous milestone&rsquo;s <code>finally</code> tests exist to catch. Those passed immediately. What broke was simpler and I had it wrong in the design:</p>
+
+<pre><code><span class="dim">;; wrong: bump the generation when the slot is released</span>
+if e.host.take().is_some() {
+    e.generation += 1;              <span class="dim">// the id that just closed it is now stale</span>
+    self.free_handles.push(id.0);
+}
+</code></pre>
+
+  <p>Closing twice is what a correct <code>with-open</code> does when the body closed explicitly. Bumping at release makes the second close report the aliasing error instead of being a no-op, so idempotent close and stale detection were mutually exclusive. The bump belongs at <em>reuse</em>. Obvious in retrospect, invisible while writing it, and caught by a test suite written in the language itself the first time it ran.</p>
+</section>
+
+<section>
+  <span class="eyebrow">Milestone 8</span>
+  <h2>The claim that was an aspiration for eight milestones</h2>
+
+  <p>The whole design rests on the Rust stack being empty at every instruction boundary — no host recursion, explicit frames, all mutable state owned by the VM — so that execution state is plain data. Milestone 8 is where that stops being a design and becomes a test: run a program to fuel exhaustion at an instruction boundary, take an image, rebuild a <em>fresh</em> VM from it, resume, and compare the entire transcript against an uninterrupted run.</p>
+
+  <p>Two forms, and the second is a different claim from the first. Cut at every instruction boundary and round-trip once, over nine programs each carrying a distinct piece of state. Then cut at every boundary and round-trip <em>repeatedly</em> to the end — because a field restored to a plausible default survives one trip and drifts over fifty.</p>
+
+  <p>One prediction from the decision record was refuted before the code was finished. Preserving structural sharing means an object can name an id it has not reached yet, so the entry said the decoder would need two passes. It does not:</p>
+
+<pre><code><span class="dim">;; encode children before pushing their parent, and every id</span>
+<span class="dim">;; an object names is lower than its own. The table comes out</span>
+<span class="dim">;; topologically ordered; the decoder is one forward loop.</span>
+fn obj(&amp;mut self, addr: usize, build: impl FnOnce(&amp;mut Encoder) -&gt; Obj) -&gt; Ref {
+    if let Some(&amp;id) = self.seen.get(&amp;addr) { return Ref::Obj(id); }
+    let o = build(self);                    <span class="dim">// children first</span>
+    let id = self.objects.len() as u32;
+    self.objects.push(o);
+    ...
+}
+</code></pre>
+
+  <p>That is available only because the object graph is acyclic — and it is acyclic because the one thing that can form a cycle, a mutable cell, is an arena id rather than a pointer. A decision made three milestones earlier for a different reason paid for a simplification here. The cost clause was corrected in errata; the decision stood.</p>
+
+  <h3>What the strongest property in the project cannot see</h3>
+
+  <p>Ten mutants against the snapshot. Four survived. The property — every instruction boundary, nine programs, two forms — caught <em>none</em> of them.</p>
+
+  <div class="note found">
+    <span class="tag">Four fields could be dropped from the image with the suite green</span>
+    <p>The gensym counter. The handle free list. The handle generations. The sign of a negative zero.</p>
+  </div>
+
+  <p>Every one is a field the encoding handles correctly and the corpus never populated. <code>gensym</code> is a primitive, so the counter is live at run time and not only during expansion — but no program in the list called it, and a resume that restarted it would reissue a name it had already handed out. The two handle fields were carried <em>deliberately</em>, for a scenario I reasoned about while writing them: open a file, close it, snapshot, open another. The second open reuses the freed slot under a bumped generation and that id reaches the transcript. The test used one <code>with-open</code>, so no slot was ever reused.</p>
+
+  <p>Code written because the gap was anticipated, sitting untested for exactly the reason it was written.</p>
+
+  <p>And negative zero, which had already bitten this project once — an earlier miscompilation had <code>-0.0</code> and <code>0.0</code> sharing a constant-pool entry — was absent from the snapshot corpus. The fix computes it rather than writing the literal, and checks it through <code>(/ 1.0 z)</code>, where the sign is the difference between <code>##-Inf</code> and <code>##Inf</code>. A test that merely printed <code>z</code> passes against an encoder that stores an <code>f64</code> instead of its bits.</p>
+
+  <p>The general statement is now recorded next to the property itself: <strong>a round-trip property tests the encoding of whatever its corpus constructs, and nothing about what it does not.</strong> Adding state to the VM means adding a program that creates it. The property will not ask.</p>
+
+  <h3>A decision that silently disabled another one</h3>
+
+  <p>The snapshot rules say an image is refused while a host handle is live — adapter checkpointing is deferred, so a live resource is a refusal and not a best effort. Milestone 7 had made <code>io/stdin</code> and <code>io/stdout</code> permanent entries in the handle table.</p>
+
+  <div class="note found">
+    <span class="tag">The open-handle count was never zero, so every snapshot would be refused</span>
+    <p>Milestone 7 made milestone 8&rsquo;s exit condition unreachable. Nothing failed, because nothing had yet asked.</p>
+  </div>
+
+  <p>The fix was already written down — the snapshot entry says caches and registry entries are &ldquo;declared either reconstructible or excluded&rdquo; — but it had been written about caches, not about handles. The two standard streams are recreated at the same ids in any build, so restoring them is restoring rather than inventing. A file is not, and never becomes one by that argument.</p>
+
+  <p>What is worth keeping is not the fix. It is that two entries, each careful on its own, combined into a dead exit condition that no test could report because the milestone that would ask had not been built yet.</p>
+</section>
+
+<section>
+  <span class="eyebrow">Milestone 9</span>
+  <h2>A question answered by removing its condition</h2>
+
+  <p>A closure names its function prototype by a bare index into the chunk it was compiled in, so a closure means nothing outside that chunk. That is fine for a file and fatal for a REPL, where every input is its own compilation and a function defined on one line has to be callable on the next. The open question proposed the general fix: a VM-owned registry of chunks, with each closure carrying a chunk id.</p>
+
+  <p>Reading the code changed the answer. A registry means a closure&rsquo;s chunk id has to <em>resolve</em> after an image is restored, so the snapshot would have to serialize every chunk — instructions, constants, spans — or take a registry from its caller. The cheaper reframing removes the condition instead:</p>
+
+<pre><code><span class="dim">;; one chunk per session; each input appends to it</span>
+chunk.protos:
+  [0] &lt;top of input 1&gt;
+  [1] f              <span class="dim">← index never moves, so this stays valid</span>
+  [2] &lt;top of input 2&gt;
+  [3] g
+</code></pre>
+
+  <p>Existing indices never move, so no closure ever leaves its chunk and the question stops arising. The value representation, the closure representation, the dispatch loop, and the image are all untouched. The registry stays available for the thing that would actually force it, which is migrating an image to code assembled differently — and that is already out of scope.</p>
+
+  <p>The rest of the milestone came from one sentence: <strong>a REPL session is one compilation unit.</strong> Macros persist across inputs, the gensym counter runs monotonically to the end of the session, and the reader configuration is the session&rsquo;s to change. Three subsystems, one rule. The gensym half is the load-bearing one — a counter that restarted per input could hand input 2 a name input 1 had already used, and a fresh symbol that is not fresh is the only thing gensym may not produce.</p>
+
+  <h3>Then the instrument reported something that never happened</h3>
+
+  <p>Twelve mutants. One real survivor — the prompt printed a thrown value but dropped its <em>suppressed</em> chain, so a cleanup that throws while unwinding reported the winner and lost the original, which is usually the failure worth reading.</p>
+
+  <p>Two of the twelve did not apply at all.</p>
+
+<pre><code><span class="dim">;; the substitution, under single quotes</span>
+perl -0pi -e 's/println!\("--- suppressed\\\\n\{\}"/.../'
+
+<span class="dim">;; the shell passes \\\\n through unchanged.</span>
+<span class="dim">;; perl reads it as: two literal backslashes, then n.</span>
+<span class="dim">;; The file has one. No match. Nothing edited.</span>
+<span class="dim">;; The suite ran green — which is exactly what a</span>
+<span class="dim">;; SURVIVING mutant looks like.</span>
+</code></pre>
+
+  <div class="note found">
+    <span class="tag">A mutation that never happened is indistinguishable from one that survived</span>
+    <p>And the wrong reading is the flattering one: &ldquo;it survived&rdquo; is a finding, &ldquo;it never happened&rdquo; is a wasted run being recorded as a finding.</p>
+  </div>
+
+  <p>Nothing about the output distinguishes the two cases. This was caught only because that particular mutant had been <em>predicted</em> to survive for a specific reason, and checking the reason meant opening the file. Which means the prediction discipline — kept for three chapters because refutations are the interesting part — turned out to be load-bearing for something else entirely: it is the only reason a false result got questioned.</p>
+
+  <p>Every mutation note in this project before that point was produced with unchecked substitutions. Their survivor counts should be read with that caveat, and the correction is recorded rather than the notes quietly rewritten. The rule now is that a mutation asserts the old text was present before writing the new, and it argues for a specific shape of tool: deleting a <em>named line</em> fails loudly when the line has moved. A pattern-matching script fails silently.</p>
+
+  <p>One mutant that round turned out not to be expressible at all. The function deciding whether a REPL line is incomplete takes a string and nothing else — it builds its own throwaway symbol table internally — so making it pollute the session&rsquo;s table is a change to the signature rather than to a line. That is the best outcome a mutation pass can have, and it arrived by accident: the parameter had been dropped for an unrelated reason.</p>
+</section>
+
+<section>
+  <span class="eyebrow">Milestone 10</span>
+  <h2>Honouring a deferral, and finding a redundancy</h2>
+
+  <p>The last milestone is host adapters — terminal, TCP, JSON — and it is the first that lives outside the line budget, on the principle that substantial host capability is a Rust library behind the handle table rather than a language subsystem. That principle had cost nothing while it described an empty set. The moment it describes real files it becomes a way to move lines out of a budget by moving them into a directory, so the budget test now excludes the directory and <em>prints what it excluded</em>, with per-file counts, on every run.</p>
+
+  <p>TCP is in this milestone for one reason. Three error kinds — <code>:timeout</code>, <code>:would-block</code>, <code>:connection-reset</code> — had been named two milestones earlier and deliberately left out, on the grounds that a kind nobody can raise is a guess with a colon in front of it. A file can produce none of them. An entry that defers three kinds and then never adds them has not been careful, it has been lucky.</p>
+
+  <p>The first prediction was refuted immediately. Setting a read deadline and letting it expire does not raise <code>:timeout</code>:</p>
+
+<pre><code><span class="dim">;; Rust documents a read deadline as WouldBlock *or* TimedOut,</span>
+<span class="dim">;; by platform. Unix gives the first, Windows the second.</span>
+(tcp/set-timeout server 30)
+(try (io/read server 4) (catch e (get e :kind)))
+<span class="dim">;; ⇒ :would-block on macOS. :timeout on Windows.</span>
+</code></pre>
+
+  <p>So <code>:timeout</code>&rsquo;s only reliable raiser is a connect with a deadline, and a test pinning one kind would pass on the machine that wrote it and fail on the other. The test accepts both and the trap list says why.</p>
+
+  <p>Nine mutants, nine correct predictions, three survivors — and one of them is a different kind of finding from everything in these three chapters:</p>
+
+  <div class="note found">
+    <span class="tag">The key sort in the JSON decoder was unreachable</span>
+    <p>Deleting it left the whole suite green — not because nothing tested the order, but because the library underneath had already sorted. Its default map is a <code>BTreeMap</code>.</p>
+  </div>
+
+  <p>Two mechanisms enforcing one rule, which is chapter one&rsquo;s finding in a new place, and it gets that finding&rsquo;s answer: delete the redundancy rather than add a test. A test written to pin the order would have passed against a version with the sort removed <em>and</em> against one with the library&rsquo;s guarantee removed, which means it would have been measuring nothing. What replaces the line is a comment naming the dependency, because the guarantee is now someone else&rsquo;s — enabling one Cargo feature on that library swaps the map for an insertion-ordered one and every golden holding a decoded object moves.</p>
+
+  <p>The other two survivors were ordinary holes: <code>:connection-reset</code> could be mapped to the catch-all with everything green, which would have honoured the letter of the deferral and not the point, since it is the kind a program most wants to retry on. And a socket error could drop the address it was for, naming the failure but not the thing that failed.</p>
+
+  <p>This milestone also ends the project&rsquo;s zero-dependency property, and it ends asymmetrically enough to be worth stating precisely rather than quietly dropping. Two dependencies, both in the adapters, both declined for the language: <code>cargo tree --no-default-features</code> is still an empty tree. The claim did not become prose — it became a narrower claim that is still mechanically checkable.</p>
+</section>
+
+<section>
+  <span class="eyebrow">Where it ended</span>
+  <h2>Ten of ten</h2>
+
+  <div class="stats">
+    <div class="stat"><b>6,064</b><span>core lines / ~7,500</span></div>
+    <div class="stat"><b>414</b><span>adapter lines, outside it</span></div>
+    <div class="stat"><b>108</b><span>tests, three feature builds</span></div>
+    <div class="stat"><b>45</b><span>decision records</span></div>
+    <div class="stat"><b>15</b><span>errata</span></div>
+    <div class="stat"><b>10</b><span>mutation passes</span></div>
+  </div>
+
+  <p>The build order is finished, and the property chapter two ended on is a property now: fuel suspension, an image with structural sharing preserved, resume into a fresh VM, transcripts compared with emitted effects included. The subtraction claim is also a fact rather than a feeling — the gate builds and tests three points of the feature lattice, so &ldquo;cutting a host capability leaves the language alone&rdquo; is something that compiles and runs rather than something the decision log asserts.</p>
+
+  <p>What changed across these four milestones is the character of what the instrument finds. Chapters one and two found defects: a dead test, a rule enforced twice, a corpus that could not distinguish right from plausibly wrong. This chapter found almost no defects at all. Every survivor was code that was correct and untested — a field the encoder handled properly and no program created, a path the generation check covered and nothing walked, an error kind classified correctly and never provoked.</p>
+
+  <p>That is a harder thing to fix, because no amount of strengthening a property addresses it. The property was strengthened — every instruction boundary, two forms, nine programs — and it still saw nothing, because a property only sees the state its inputs create. The lever is the corpus, and the only reliable way found to discover what the corpus is missing is to break the code and watch what stays green.</p>
+
+  <p>Which is why the milestone-9 result is the one worth carrying forward. The instrument that answers &ldquo;what is my test suite not checking&rdquo; can itself return a confident, well-formatted, entirely fictional answer, and nothing in the output says which. It was caught by a habit kept for a different reason — writing down what should happen before running it, because refutations are the interesting part. The prediction was not what found the bug in the code. It was what found the bug in the method.</p>
+</section>
+
+<footer>
+  <p>apolisp is a personal project with one user and no stability promise. Its decision log is append-only; corrections go in errata rather than over the original, which is how a paragraph that was reviewed, committed, and wrong gets fixed without erasing that it was believed. Every mutation pass quoted here is recorded in <code>docs/notes/</code> with its predictions, its commit, and whether it was refuted — including the two that turned out not to have run.</p>
+</footer>
+
+</div>
+</body>
+</html>

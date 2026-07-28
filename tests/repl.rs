@@ -167,6 +167,26 @@ fn an_input_that_does_not_build_leaves_the_session_alone() {
     assert!(eval(&mut s, ")").starts_with("error"));
     assert!(eval(&mut s, "(let [x] x)").starts_with("error"));
     assert_eq!(eval(&mut s, "a"), "1");
+
+    // Those two fail in the reader and in resolution, both *before* any proto
+    // is appended. ADR-047 added a refusal that happens during lowering, after
+    // protos are already in the chunk — so this is the same invariant one stage
+    // further down, and the first version of it that could actually renumber
+    // anything.
+    //
+    // Checked with a closure rather than a global: a global is a name in a
+    // table, but a closure names its proto by *index* into the session's shared
+    // chunk (ADR-044), so it is the thing a half-appended compile would break.
+    eval(&mut s, "(def double (fn [x] (* x 2)))");
+    assert!(eval(&mut s, "(loop [i 0] (+ 1 (recur (+ i 1))))").starts_with("error"));
+    assert_eq!(eval(&mut s, "(double 21)"), "42");
+    assert_eq!(
+        eval(
+            &mut s,
+            "(loop [i 0] (if (= i 3) (double i) (recur (+ i 1))))"
+        ),
+        "6"
+    );
 }
 
 // --- What the prompt has to decide ------------------------------------------------

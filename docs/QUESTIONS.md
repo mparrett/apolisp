@@ -81,13 +81,35 @@ ADR-028 rule 2: a `recur` inside a `try` with a `finally` is not a tail call, so
 the macro has to either reject that shape or accept the frame.
 
 **The need is now demonstrated; the attempt is still owed.** The first real
-program written in the language (`notes/first-programs.md`) is twelve top-level
-definitions, and four of them exist *only* because there is no looping form —
+program written in the language (`notes/first-programs.md`) is seventeen top-level
+definitions, and five of them exist *only* because there is no looping form —
 every iteration becomes a named function with an accumulator parameter threaded
-by hand, and none of those four functions is about the problem being solved.
+by hand, and none of those five functions is about the problem being solved.
 That is the evidence this entry was waiting for that the absence costs
-something. It says nothing yet about macro versus special form, which still
-needs someone to try writing the macro.
+something.
+
+**The attempt is now done too** (`notes/loop-recur-attempt.md`). Eight prelude
+lines, no tree walk: `loop` names its function and `recur` calls that name, so
+nesting falls out of lexical shadowing rather than being implemented. Constant
+space at 200,000 iterations, arity checked, `try`/`finally` accepting the frame
+per ADR-028 rule 2, and Life drops from 17 definitions to 12.
+
+**It fails on diagnostics, and only on diagnostics.** Errors name
+`recur-target`, an identifier the user never wrote; a non-tail `recur` is
+silently accepted and grows the stack where Clojure rejects it at compile time;
+and a user binding called `recur-target` is captured without a word. All three
+are fixed by having `loop` walk its body — which requires knowing tail position
+for `if`, `do`, `let`, `try` and `fn`, **which is what the compiler already
+is**. Writing it again in the prelude puts "tail position" in two places with no
+test that they agree, and the drift shows up as a `recur` the macro accepted and
+the compiler did not make a tail call: a silent stack leak in the construct
+people use to avoid one.
+
+So the question is no longer whether a macro suffices for the semantics — it
+does, completely — but whether the diagnostics are worth a fourteenth core form
+in `compile`, already the largest layer at 942 lines. Given that `ETHOS.md` puts
+error quality outside the priority ranking, that is a real decision and not a
+formality.
 
 ## Before milestone 9 — REPL
 
@@ -113,7 +135,7 @@ wants a function there.
 **Something now does.** Writing `map` per file had not hurt because nothing
 outside the test suite had been written, and a suite that exercises the VM calls
 primitives directly and never needs `map` twice. Two programs later, six of
-Life's twelve definitions are standard library rebuilt from scratch
+Life's seventeen definitions are standard library rebuilt from scratch
 (`notes/first-programs.md`). The cost was invisible from inside the tests by
 construction.
 
@@ -128,8 +150,8 @@ no compatibility contract can still acquire decisions nobody agreed to.
 
 Two programs were written to make this concrete rather than theoretical
 (`notes/first-programs.md`). Both worked on the first run. What they found was
-not a missing capability but a missing *surface*: six of Life's twelve
-definitions are standard library rebuilt by hand, four of them exist only
+not a missing capability but a missing *surface*: six of Life's seventeen
+definitions are standard library rebuilt by hand, five of them exist only
 because there is no looping form (Q5), and two findings were not ergonomics at
 all — `io/read` is a short read that no program can frame a protocol on
 (`TRAPS.md`), and there is no string→number conversion anywhere except

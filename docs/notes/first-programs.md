@@ -28,7 +28,7 @@ would stop you writing the same six functions first.
 
 ## What had to be built first
 
-Life is twelve top-level definitions. Six of them are standard library:
+Life is seventeen top-level definitions. Six of them are standard library:
 
 | Written by hand | Would have been |
 |---|---|
@@ -41,7 +41,7 @@ Life is twelve top-level definitions. Six of them are standard library:
 
 **The single biggest gap is `loop`/`recur`.** There is no looping form at all,
 so every iteration becomes a *named top-level function with an accumulator
-parameter threaded by hand*. Four of Life's twelve definitions exist only
+parameter threaded by hand*. Five of Life's seventeen definitions exist only
 because of this, and none of them is about Life. It is also why the program
 reads as flat and repetitive rather than wrong: the shape is fine, there is
 just far too much of it.

@@ -79,6 +79,10 @@ is guaranteed not to be in when the bytes are sent.
 
 ## The escape hatch, and what it costs
 
+*(Ratified by **ADR-051**, which makes this `(term/open)` and moves it off the
+`fs` feature. The paragraphs below are what the program found, in the spelling
+it found it in.)*
+
 `io/write` takes a different path for `Host::File` than for `Host::Stdout` —
 files get `write_all` on the real descriptor, and only stdout goes through
 `vm.emit`. So opening the terminal *as a file* bypasses the buffer entirely:
@@ -129,6 +133,15 @@ handle table doing its job, but it means the terminal workload and constraint #2
 do not currently meet anywhere.
 
 That is a decision, not a fix, and it is not in `ADR.md`. Filed as **Q33**.
+
+*(Decided by **ADR-051**, and the reading above is the part that turned out to
+matter. The `Image` serializes `Vm::out`, so buffered output is resumable
+machine state rather than a test fixture — which means the invariant is "if
+output escaped the buffer, refuse the snapshot", and routing painting through a
+handle is the only shape that enforces it without anyone having to remember. A
+painting program being non-snapshottable is therefore the design and not the
+concession it reads as here. The general case — incremental output to a pipe —
+is what stayed open.)*
 
 ## The smaller ones
 

@@ -191,7 +191,28 @@ open-ended: one opcode, and a frame that can grow.
 measure first is whether it wants dynamic arity or just a fold.
 
 **Q33 — How does a program paint a terminal?** *(Filed 2026-07-28 from
-`notes/the-pager-program.md`, which is the program that wanted it.)*
+`notes/the-pager-program.md`, which is the program that wanted it. **The
+terminal half is answered by ADR-051**; what remains open is the general case,
+below.)*
+
+**Answered for the terminal, 2026-07-28: shape 1, the workaround ratified.**
+`(term/open)` returns a handle on `/dev/tty` and painting is `io/write` to it.
+The argument that decided it is that the `Image` serializes `Vm::out`, so
+buffered output is resumable machine state and the invariant that has to hold is
+*if output escaped the buffer, refuse the snapshot* — which a handle enforces via
+machinery ADR-016 already built, and which shape 3 would have broken silently.
+Painting is now `term`'s capability rather than `fs`'s, and `just subtract`
+gained `term` alone as a fourth point.
+
+**Still open: `io/stdout` is all-or-nothing.** A program that wants incremental
+output to a *pipe* — a progress line, a log, anything long-running that is not a
+terminal — has no answer at all, and `/dev/tty` is not one. That is shape 4
+below, it reaches ADR-016, and it has to supersede `io/close`'s reasoning that
+dropping the descriptor is what flushes it. Nothing has asked yet. The rule that
+produced ADR-046 through ADR-051 applies: wait for the program.
+
+The original statement of the question follows.
+
 
 `io/stdout` is buffered until the program ends, so an interactive program
 written against it paints into a terminal that has stopped caring. The workaround

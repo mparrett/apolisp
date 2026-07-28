@@ -79,15 +79,21 @@ a blank screen and then painted all five frames at once, after quitting
 the asymmetry to hold on to: `term/read-key` really does block on the real tty.
 
 The buffer is not a defect — it is ADR-029's oracle, and emitted effects being
-captured rather than escaping is what makes constraint #2 a property. But it
-means the only way to paint a terminal today is `(io/open "/dev/tty" :write)`,
-which takes the `Host::File` path and writes live. That is the **`fs` feature**,
-so a build with `term` and without `fs` can read keys and cannot paint. Q33.
+captured rather than escaping is what makes constraint #2 a property. **Paint
+with `(term/open)` instead** (ADR-051): it returns a handle on `/dev/tty`, and
+`io/write` to a handle takes the `Host::File` path and reaches the terminal
+immediately.
 
-Two consequences that look like separate bugs. Line endings written for raw mode
-come out wrong, because the flush happens after the `finally` has restored the
-mode and the tty applies `ONLCR` to them. And a program using the `/dev/tty`
-workaround holds a live handle, so ADR-043 part 5 refuses it a snapshot.
+That a painting program then **cannot be snapshotted** is intended, not a
+side effect — the handle is not reconstructible, so ADR-043 part 5 refuses the
+capture, which is what keeps "output that escaped the buffer is not in the
+`Image`" true. `io/stdout` is still buffered and still has no flush point, so
+incremental output to a *pipe* has no answer (Q33).
+
+Line endings are the tell if this is got wrong. A program that writes `\r\n` for
+raw mode and paints via `io/stdout` gets `\r\r\n`, because the flush happens
+after the `finally` has already restored the mode and the tty applies `ONLCR`.
+Correct bytes, wrong mode, and nothing reports it.
 
 **A `recur` from a `catch` is allowed here, and is not in Clojure.** This VM
 pops a handler record when it dispatches to it, so a catch body runs with no

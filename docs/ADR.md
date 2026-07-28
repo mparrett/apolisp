@@ -2865,6 +2865,101 @@ rather than code-point order.
 
 ---
 
+### ADR-051 — How a program paints a terminal
+
+*(New, 2026-07-28. Adds `term/open`. Prompted by
+`notes/the-pager-program.md`. Narrows Q33 to the general case and leaves it
+open. Widens ADR-045 part 4's lattice by one point.)*
+
+**Decision.** Three parts.
+
+**1. A program paints a terminal by opening it as a handle.** `(term/open)`
+returns a read/write handle on `/dev/tty`, and painting is `io/write` to that
+handle — the same primitive a file and a socket use.
+
+`io/stdout` is not that path and does not become one. It is the buffered host: a
+write goes to `Vm::emit`, into `Vm::out`, and nothing reaches the process until
+the program ends.
+
+**2. A program that paints a terminal cannot be snapshotted, and that is the
+point rather than a limitation.** The handle is not reconstructible, so ADR-043
+part 5 makes `capture` refuse while it is open, with no new code and no new
+decision.
+
+This is the part worth being explicit about, because it is what makes the choice
+between the shapes. ADR-029 requires emitted effects to be **part of the
+serialization comparison rather than escaping it**, and the `Image` serializes
+`Vm::out` — buffered output is resumable machine state, not a test fixture. Any
+path that writes to a real descriptor produces bytes the `Image` cannot carry,
+so the invariant that has to hold is *if output escaped the buffer, refuse the
+snapshot*. Routing painting through a handle makes the handle table enforce that
+invariant, using machinery ADR-016 already built. Every other shape has to
+re-derive the refusal by hand.
+
+**3. Painting is `term`'s capability, not `fs`'s.** `Host::File` is now
+`any(feature = "fs", feature = "term")`, and `just subtract` gains `term` alone
+as a fourth lattice point.
+
+Before this, the only spelling was `(io/open "/dev/tty" :write)`, which is `fs` —
+so a build with `term` and without `fs` could read keys and could not paint. A
+half-present capability that no build compiles and no test runs is the shape
+ADR-046 already recorded once, and one instance was an accident.
+
+A tty is `Host::File` and not a parallel variant, because it reads and writes
+like a file and refuses a snapshot like one. A `Host::Term` would be three new
+arms restating all three behaviours.
+
+**Why `/dev/tty` and not stdout.** A program whose stdout is a pipe still has a
+controlling terminal, and the pipe is what the `.out` transcript wants. Opening
+the terminal by name keeps those two things separate, which is what lets a
+painting program still have a golden.
+
+**Cost.** Adapters go from 414 to 439 lines outside the budget. Core goes from
+6,749 to 6,756 of 7,500 — the terminal is an adapter, but the `Host::File` gate
+and the comment explaining why two capabilities construct one variant are in
+`host`, and they count. `just subtract` runs six cargo invocations instead of
+four. The
+`#[cfg]` on `Host::File` now names two features, which is one more place to be
+wrong — mitigated by the new lattice point, which fails to compile if the gate
+narrows again (verified by reverting it: six errors in the `term`-only build).
+
+The real cost is that `/dev/tty` is Unix. This has no Windows story and does not
+pretend to; ADR-045 already delegates terminal portability to `crossterm` for
+input, and the output half now has a boundary `crossterm` is not behind.
+
+**Rejected.** *A `term/write` native writing straight to the descriptor.* It is
+the symmetric-looking answer and it silently breaks the oracle: it does not go
+through the handle table, so `capture` would accept a program that had already
+painted, the painted bytes would be absent from the `Image`, and a resumed run
+would diverge from an uninterrupted one. The round-trip property would not
+notice, because its corpus does not paint terminals — which is milestone 8's
+documented blind spot, re-created on purpose.
+
+*An unbuffered stdout mode selected by the driver.* It makes `Vm::out`
+sometimes-machine-state and sometimes-not with `capture` unable to tell which,
+and it makes `.out` depend on flush timing — which is `main.rs`'s own argument
+against giving the CLI a fuel flag.
+
+*Making `term` depend on `fs` in `Cargo.toml`.* Cheapest, and it contradicts
+ADR-045 part 4: one Cargo feature per capability, so that cutting one cuts one.
+
+**Open.** The general case, still **Q33**: `io/stdout` remains all-or-nothing,
+and a program that wants incremental output to a *pipe* has no answer at all.
+The shape for that is a real stream with an explicit flush point, which reaches
+ADR-016 and has to supersede `io/close`'s reasoning that dropping the descriptor
+is what flushes it. Deferred rather than decided — nothing has asked, and the
+terminal case that had asked is answered here.
+
+Also open, and independent of all of this: **`term/raw-mode` mutates
+process-global state that the `Image` does not carry and that `capture` does not
+refuse on.** A terminal program holding no other handle can be captured
+mid-session and resumed in a fresh process with the mode wrong. The transcript
+would match, because output is buffered, so the round-trip property cannot see
+it. ADR-045 already notes raw mode outlives a failed program; this is the same
+fact reaching serialization.
+
+---
+
 ## Errata
 
 Factual corrections to entries whose **decision still stands**. A wrong reason is

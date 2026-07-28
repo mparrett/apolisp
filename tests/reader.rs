@@ -272,6 +272,186 @@ fn every_syntactic_child_has_an_origin() {
     walk(&forms[0].root, &forms[0].origins);
 }
 
+// --- Property: the reader survives arbitrary input --------------------------
+
+/// xorshift64. Fifteen lines rather than a dependency (ADR-014), seeded from a
+/// constant so the suite reads the same inputs on every run. A fuzzer that
+/// reports a crash nobody can reproduce is worse than no fuzzer, and
+/// determinism is a prerequisite here rather than a preference (BUILD.md).
+struct Rng(u64);
+
+impl Rng {
+    fn next(&mut self) -> u64 {
+        self.0 ^= self.0 << 13;
+        self.0 ^= self.0 >> 7;
+        self.0 ^= self.0 << 17;
+        self.0
+    }
+
+    fn below(&mut self, n: usize) -> usize {
+        (self.next() % n as u64) as usize
+    }
+
+    fn pick<'a, T>(&mut self, xs: &'a [T]) -> &'a T {
+        &xs[self.below(xs.len())]
+    }
+}
+
+/// Chosen to reach the reader's branches rather than to look like programs.
+/// Uniformly random bytes almost never balance a delimiter, so they exercise
+/// the first error path several thousand times and nothing else.
+const FRAGMENTS: &[&str] = &[
+    "(",
+    ")",
+    "[",
+    "]",
+    "{",
+    "}",
+    "'",
+    "`",
+    "~",
+    "~@",
+    ",",
+    ";x\n",
+    " ",
+    "\n",
+    "\t",
+    "\"",
+    "\"a\"",
+    "\"\\n\"",
+    "\"\\q\"",
+    "\"\\",
+    "\\",
+    "1",
+    "-1",
+    "+",
+    "-",
+    "1.5",
+    "1e400",
+    "1e-400",
+    "99999999999999999999",
+    "##Inf",
+    "##-Inf",
+    "##NaN",
+    "##x",
+    "nil",
+    "true",
+    "false",
+    ":k",
+    ":",
+    "::k",
+    "a",
+    "a/b",
+    "/",
+    "#",
+    "@",
+    "^",
+    "é",
+    "🙂",
+    "\u{0}",
+];
+
+/// Single characters for the mutator to splice in. Delimiters and the escape
+/// character dominate on purpose: those are where a mostly-valid program turns
+/// into a parse the reader has never seen.
+const PUNCT: &[char] = &[
+    '(', ')', '[', ']', '{', '}', '"', '\\', ';', '~', '`', '\'', ':', '#', '-', '.', 'e', '0',
+    'é', '🙂',
+];
+
+fn soup(rng: &mut Rng) -> String {
+    let n = 1 + rng.below(24);
+    (0..n).map(|_| *rng.pick(FRAGMENTS)).collect()
+}
+
+/// Corpus mutation, which is where a structured reader actually breaks: the
+/// input stays mostly well-formed, so it gets deep into a parse before the
+/// damage matters.
+///
+/// Edits `char`s and not bytes. The reader takes `&str`, so a byte-level edit
+/// could only ever produce input it does not receive — the driver rejects
+/// invalid UTF-8 before this layer sees it.
+fn mutate(rng: &mut Rng, src: &str) -> String {
+    let mut cs: Vec<char> = src.chars().collect();
+    for _ in 0..1 + rng.below(6) {
+        if cs.is_empty() {
+            break;
+        }
+        let i = rng.below(cs.len());
+        match rng.below(4) {
+            0 => {
+                cs.remove(i);
+            }
+            1 => cs.insert(i, *rng.pick(PUNCT)),
+            2 => cs[i] = *rng.pick(PUNCT),
+            _ => cs.insert(i, cs[i]),
+        }
+    }
+    cs.into_iter().collect()
+}
+
+/// Three claims, and the third is free.
+///
+/// Whatever the reader accepts must satisfy the invariants the corpus does —
+/// well-formed origins, and a round trip that preserves the data. Whatever it
+/// rejects must produce a *renderable* error: `read` renders on the way to
+/// returning `Err`, and a span outside the source or off a character boundary
+/// panics the renderer rather than failing a comparison. That is the check
+/// `a_multibyte_escape_is_an_error_not_a_panic` makes for one input, applied
+/// to every input here.
+fn assert_reader_survives(src: &str, label: &str) {
+    // A panic is the finding, and a fuzzer that reports one without naming the
+    // input has reported almost nothing. The seeds are fixed, so a failure is
+    // reproducible by re-running — but only once you know to add a print, and
+    // that is friction on exactly the day nobody wants any.
+    let Ok(outcome) = std::panic::catch_unwind(|| read(src)) else {
+        panic!("{label}: the reader panicked on {src:?}");
+    };
+    let Ok((forms, _)) = outcome else { return };
+
+    let mut problems = Vec::new();
+    for f in &forms {
+        value::check_origins(&f.root, &f.origins, src, &mut problems);
+    }
+    assert!(
+        problems.is_empty(),
+        "{label}: span invariants violated on {src:?}:\n  {}",
+        problems.join("\n  ")
+    );
+    assert_round_trips(src, label);
+}
+
+/// The soak's reader-fuzzing leg (BUILD.md), promoted into the suite because a
+/// soak that only ever runs before a tag is a soak that runs once.
+///
+/// `APOLISP_FUZZ_ROUNDS` cranks it. The default is what a commit gate should
+/// pay for; a soak passes a much larger number and the seeds keep the first
+/// rounds identical, so a longer run is a superset and never a different test.
+#[test]
+fn the_reader_survives_arbitrary_input() {
+    let rounds: usize = std::env::var("APOLISP_FUZZ_ROUNDS")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(2_000);
+
+    let mut rng = Rng(0x9E37_79B9_7F4A_7C15);
+    for i in 0..rounds {
+        assert_reader_survives(&soup(&mut rng), &format!("soup #{i}"));
+    }
+
+    let corpus: Vec<String> = corpus_files()
+        .iter()
+        .map(|p| std::fs::read_to_string(p).unwrap())
+        .collect();
+    assert!(!corpus.is_empty(), "no corpus to mutate");
+
+    let mut rng = Rng(0xD1B5_4A32_D192_ED03);
+    for i in 0..rounds {
+        let src = mutate(&mut rng, &corpus[i % corpus.len()]);
+        assert_reader_survives(&src, &format!("mutant #{i}"));
+    }
+}
+
 // --- Golden snapshots -------------------------------------------------------
 
 /// Rung 3 (BUILD.md). One phase per file; milestone 1 owns `.forms`.

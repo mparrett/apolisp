@@ -207,6 +207,19 @@ writing the new. Milestone 9 lost two of twelve mutants this way and only
 noticed because one of them had been *predicted* to survive, so checking the
 prediction meant opening the file (`notes/milestone-9-mutants.md`).
 
+**And check that it reached the binary.** There is a second way to get the same
+wrong answer, and the rule above does not catch it: the mutant is in the source,
+`grep` confirms it, the build recompiles, and the optimizer deletes it. A
+`Box` allocated, never read and never freed is unobservable, so LLVM is entitled
+to remove it — 150,000 injected leaks produced a run where allocations and frees
+still matched (`notes/soak-leak-check.md`). Anything mutated under `--release` is
+exposed, which makes the soak exactly where this lives. The vulnerable shape is a
+mutant that adds work with no observable effect; one that changes an observable
+result is safe. **Read the counters, not just the verdict** — allocation totals,
+instruction counts, a transcript. A verdict alone cannot distinguish "nothing
+leaked" from "nothing happened", and the flattering reading is still the wrong
+one.
+
 When a pass outgrows a commit message it goes in `notes/`, one file per
 milestone, named `milestone-N-<topic>.md`. A pass belongs to the milestone whose
 code it mutated rather than to the session that ran it — milestone 3's was filed
@@ -237,7 +250,32 @@ in-language suite green → serialization round-trip green → merge → soak �
 ```
 
 **Merge ≠ release.** The soak is where leak checks, reader fuzzing, and
-release-build divergence testing happen.
+release-build divergence testing happen. It is `just soak` — two legs anywhere,
+and `just soak-linux` for all three, because the leak check needs valgrind. It
+was a word in this document until it was written; the leg that needed a tool
+was the leg that kept it hypothetical.
+
+- **Release-build divergence.** `cargo test --release`. The goldens run the
+  *binary*, so under `--release` they pin the release artifact rather than
+  re-running library code. Nothing has diverged: 108 tests, both profiles.
+- **Reader fuzzing.** `the_reader_survives_arbitrary_input` in `tests/reader.rs`,
+  which is in the ordinary suite at a small round count and cranked by
+  `APOLISP_FUZZ_ROUNDS` for the soak. Two generators — token soup and corpus
+  mutation — and three claims: the reader never panics, whatever it accepts
+  round-trips with well-formed origins, and whatever it rejects renders. That
+  last one is free, because rendering an error with a span outside the source or
+  off a character boundary panics rather than returning a wrong answer.
+
+  Corpus mutation is the productive half by a wide margin: 68% of its inputs
+  parse against soup's 13%, so it is what actually reaches the accept-side
+  oracles. Verified non-vacuous by counting, and verified to have teeth by
+  reintroducing the multi-byte escape-span bug the reader's own comment warns
+  about — caught in 246 inputs, with the input named.
+- **Leak checks.** Valgrind over `tests/soak/*.xs`, definite losses only, since
+  Rust's runtime leaves reachable allocations at exit by design. What validates
+  the check is a recorded mutation pass (`notes/soak-leak-check.md`), not a
+  fixture: a leak this language cannot express cannot be provoked by a program
+  written in it.
 
 **The gate also runs on Linux.** `just verify-linux` builds the `Dockerfile` and
 runs exactly `just verify` inside it — exactly, because a container that ran a

@@ -138,6 +138,12 @@ host capability and never language semantics; that is the first place it has
 stopped being true, and `just subtract` cannot see it because nothing in the
 suite parses a number from a string either.
 
+**Answered 2026-07-27: build the standard library** (candidate 2 below). The
+string→number hole is closed by ADR-046, which also records the limit it
+exposed — the subtraction harness can prove a capability is removable and
+cannot notice that a semantic went missing with it. `loop`/`recur` (Q5) and the
+sequence library (Q29) remain.
+
 The candidates, and what each is really a bet on:
 
 1. **Write programs, fix what they break.** The bet is that the test suite has

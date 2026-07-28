@@ -2474,6 +2474,84 @@ needed yet.
 
 ---
 
+### ADR-046 — `parse-number`, and one number grammar
+
+*(New, 2026-07-27. Repairs an ADR-013 violation. Narrows nothing; adds a core
+primitive. Prompted by Q31's probe programs.)*
+
+**Decision.** Four parts.
+
+**1. `parse-number` is a core primitive.** `(parse-number s)` takes a string and
+returns an `Int` or a `Float`.
+
+It exists because the language had **no string-to-number conversion at all**.
+Not an awkward one — none. The prim table converts value→string via `str` and
+never back, so a length header, a config value, a command-line argument and a
+line of user input were all unreachable. Ten milestones did not notice, because
+nothing outside the test suite had been written and a suite that exercises the
+VM builds its numbers as literals.
+
+**2. This repairs ADR-013 rather than extending anything.** The one path that
+worked was `(json/decode "27")`, and `json` is an *optional host adapter*. So
+`--no-default-features` removed the language's only way to read a number out of
+text. ADR-013 says features gate host capability and never language semantics;
+that had quietly stopped being true — not because a feature gated a semantic,
+but because a semantic had no home and was squatting in a feature.
+
+`just subtract` could not catch it and still cannot catch its like. The build
+without `json` was green because nothing in the suite parses a number from a
+string either. **The subtraction harness proves a capability can be removed; it
+cannot notice that a semantic went missing with it.** That is a real limit on
+ADR-013's test, and it took writing a program to see.
+
+**3. It *is* `reader::parse_number`, not a second implementation.** One grammar,
+so a literal and a parsed string cannot drift. Two consequences that make this
+more than tidiness:
+
+- The non-finite spellings **move into** `parse_number`. They were three arms of
+  the reader's token match, ahead of the call, which is exactly why
+  `(parse-number "##Inf")` first answered `nil` while the reader read the same
+  three characters as a float. A shared grammar that the caller can add cases in
+  front of is not shared.
+- `print` and `parse-number` are therefore inverses over every number, non-finite
+  ones included — pinned in `tests/lang/numbers.xs`.
+
+**4. `nil` for a string that is not numeric-looking; a fault for one that is and
+still is not a number.** `"abc"` is `nil`; `"1abc"`, `"1.2.3"`,
+`"99999999999999999999"` and `"1e400"` all raise `:type`, carrying the reader's
+own message.
+
+Two failure modes rather than one is a real cost, taken because error quality
+sits outside the priority ranking in `ETHOS.md`. A `nil` for `"1e400"` tells the
+caller nothing; "overflows to infinity; write `##Inf` to mean it" tells them
+what happened and what to write instead.
+
+**The seam is whitespace, and it is inherent.** `" 27"` is `nil` and `"27 "`
+faults. The asymmetry looks arbitrary and is not: `parse_number` was written to
+take a *token*, and the reader splits on whitespace before ever calling it, so
+the reader cannot reach either case. The prim can, and the rule it applies is
+the function's own — does this start like a number? `" 27"` does not, so it is a
+plain "no". `"27 "` does, so it is a number that turned out not to be one.
+
+**Also corrected: a typo is not an overflow.** `1abc` reported "number `1abc`
+does not fit in a 64-bit integer", which sent a reader looking for a range
+problem in a token containing letters. Both cases reach the same branch —
+numeric enough to commit to, not a number in the end — and are now told apart by
+whether the remaining characters are digits.
+
+**Rejected.** *Returning `nil` for everything*, which is Clojure's
+`parse-long`. Simpler, one failure mode, and it throws away the diagnostics the
+reader already has. *Parsing in the primitive*, which would give the language two
+answers to "what is a number" and no test that they agree. *Trimming
+whitespace*, which would make `parse-number` accept text the reader rejects and
+put the two grammars back out of step in a new place.
+
+**Open.** Whether the inverse property should be a test over generated numbers
+rather than the six cases pinned by hand — the reader fuzzer has the machinery
+and this has not needed it yet.
+
+---
+
 ## Errata
 
 Factual corrections to entries whose **decision still stands**. A wrong reason is

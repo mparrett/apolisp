@@ -22,15 +22,27 @@ the editor has a **golden**.
 --- frame
 hello
 !world
+C-o save  C-x C-c quit  C-g hide
 demo.txt * 2:6
 ```
 
 Nineteen chords replayed through `reduce dispatch`, no terminal anywhere,
 deterministic. The same two functions drive the interactive shell. So the thing
 the prediction called a structural breakdown — an editor cannot be pinned by the
-corpus — is only true of the 62-line shell, and the 227-line core is ordinary
-rung-3 material. legmacs reaches the same place with 19 test files; here it is
-one `.out`.
+corpus — is only true of the 62-line shell, and the core is ordinary rung-3
+material. legmacs reaches the same place with 19 test files; here it is one
+`.out`.
+
+The key hint in that frame came later — on at startup, toggled with `C-g`, the
+change that took the core from 227 lines to 245. It cost one thing worth
+recording. `scroll-to-cursor` and `frame` had each computed the text height as
+`(dec rows)` independently, which is fine while the footer is exactly one line
+tall and wrong the moment it is not: the two disagree and the painted cursor
+lands on the wrong row. Both now ask a single `text-rows`. The duplication was
+invisible until something varied, and what made it a five-minute fix rather than
+a debugging session is that both functions are pure — the golden showed the
+disagreement without a terminal in the loop. The benchmark below predates the
+hint and is unaffected by it.
 
 ## Two gaps that were not predicted
 

@@ -151,6 +151,32 @@ itself; a length spent on subtraction is checked by nothing, and misaligns a
 column by one space per non-ASCII character with no error at all
 (`notes/the-report-program.md`).
 
+**A scalar is not a character, and the scalar surface does not make text editing
+correct.** *(Filed 2026-07-29. An external review of the editor credited the
+scalar representation with preventing exactly the splits it does not prevent,
+which is the reason this is written down: the safe-looking name invites the
+assumption.)* `str-scalars` gives Unicode **scalar values**, so it protects a
+code point and says nothing about a **grapheme cluster** — what a person calls a
+character. Measured against the editor's own `delete-back`:
+
+| input | scalars | one `DEL` gives |
+|---|---:|---|
+| `café` as `e` + U+0301 | 5 | `cafe` — accent gone, **glyph count unchanged** |
+| `👨‍👩‍👧` (ZWJ family) | 5 | `👨‍👩‍` — one glyph became two, trailing ZWJ dangling |
+
+The first is the dangerous one: backspace looks like it did nothing while
+silently changing the letter, so the failure is invisible at the moment it
+happens. And `left` from the end of the family lands at scalar 4 of 5 — inside
+the cluster, a cursor column that renders nowhere.
+
+Nothing in the language is wrong here; scalars are the right primitive and the
+missing layer is segmentation, which would be a dependency (ADR-014) or a table.
+The trap is the *inference*: "we hold scalars, therefore Unicode is handled" is
+false, and it is the kind of false that a reviewer, an author, and a golden all
+accepted at once. Also note the interaction with Q34 — a scalar-indexed slice
+fixes the speed of the character-level path without making any of the above
+correct, so the two are independent and neither implies the other.
+
 **Removing the maximum with `filter` drops duplicates.** The obvious selection
 sort — take the largest, `filter` it out, repeat — removes *every* element equal
 to the largest rather than one of them, so a list with a repeated key comes back

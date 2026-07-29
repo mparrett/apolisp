@@ -267,6 +267,44 @@ environment.** `main.rs` takes a command and a path. The pager pages its own
 source because that is the only file it can name, and every terminal program
 takes an argument.
 
+**Q34 — A scalar-indexed slice, or the safe string path stays quadratic.**
+*(Filed 2026-07-28 from `notes/the-editor-program.md`, with the measurement.)*
+
+ADR-018 and ADR-049 built a string surface that is careful about Unicode:
+`str-slice` takes **byte** indices and raises inside a character, `count` on a
+string is refused, and `str-scalar-len`/`str-scalars` are the character-correct
+way to work. What none of those entries noticed is that the correct path has no
+**native slice**. Character-level surgery has to go `str-scalars` → `take`/`drop`
+→ `scalars-str`, and `take` and `drop` are prelude `conj` loops, so an edit at
+column *c* is O(c²).
+
+Measured on one insert per keystroke, release build:
+
+| line length | scalars `take`/`drop` | native `str-slice` | speedup |
+|---:|---:|---:|---:|
+| 100 | 272.6 µs | 3.74 µs | 73× |
+| 400 | 1,244.2 µs | 3.59 µs | 347× |
+| 1,600 | 12,604.8 µs | 4.34 µs | 2,905× |
+
+The native path is **flat**. The language already contains the fast primitive;
+it is just the one that is byte-indexed, so *fast* and *correct about Unicode*
+are currently different functions.
+
+**The shapes.** A native `str-scalar-slice` taking character indices is the
+direct answer and the largest surface. A `str-scalar-offset` returning the byte
+offset of character *n* is smaller and composes with the `str-slice` that already
+exists — one scan instead of a vector, and it leaves the existing surface alone.
+Making `take`/`drop` native would fix this case and not the general one, and
+ADR-041 part 6 has opinions about natives that call back into the language.
+Fixing Q6/E-11 so `conj` stops copying would fix it everywhere and is much
+larger.
+
+**Not urgent, and not nothing.** No corpus program is long enough to feel it —
+which is exactly why it survived ADR-018, ADR-041 and ADR-049 without comment.
+A program that edits text is the first thing to reach it, and the trap it leaves
+behind is the shape `TRAPS.md` already records once for `str-len`: the surface
+built to keep Unicode honest is the one nobody can afford to use.
+
 ## No milestone — decide when evidence arrives
 
 **Q18 — Mutation checks as an oracle rung.** *(Evidence arrived eight times —

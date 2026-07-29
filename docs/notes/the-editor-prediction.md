@@ -1,5 +1,15 @@
 # The editor, predicted before it is written
 
+> **Scored 2026-07-28 — the editor was built the same day.** Results in
+> `the-editor-program.md`. Short version: the cliff is real and quadratic, and
+> **this file names the wrong cause for it.** Per-keystroke cost does not depend
+> on the buffer at all (8× the lines, 1.12× the cost); it depends on the line
+> length, because the character-safe string surface is built from `conj` loops.
+> Claim 3 — "it will be misdiagnosed" — was held by this document. Two gaps
+> that mattered are absent from it entirely: `concat` returns a list that
+> `assoc` refuses, and the language has no type predicates. Per-claim scoring is
+> at the end of the results note; the text below is unedited.
+
 A pre-registration, filed 2026-07-28. **No editor exists.** This is what is
 expected to happen if one is built, written down first so that the refutations
 are worth something — `BUILD.md` asks for this before a benchmark or a mutation

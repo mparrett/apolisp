@@ -95,6 +95,37 @@ raw mode and paints via `io/stdout` gets `\r\r\n`, because the flush happens
 after the `finally` has already restored the mode and the tty applies `ONLCR`.
 Correct bytes, wrong mode, and nothing reports it.
 
+**`concat` returns a list, and `assoc` refuses one.** So `(assoc (concat a b) i
+v)` throws `:type`, and the throw lands wherever the collection is *next*
+written rather than where the type changed. An editor built this session turned
+a `:lines` vector into a list on Enter and failed on the following keystroke,
+which is one operation away from the cause. Every structural edit needs
+`(vec (concat …))`. The collection surface is not closed under its own
+operations (`notes/the-editor-program.md`).
+
+**There are no type predicates.** No `map?`, `vector?`, `keyword?`, `string?`,
+`nil?`, `type`, `kind-name` — nothing. The only way to ask what a value is, is
+to `try` an operation that fails on the wrong one. Anything dispatching on a
+heterogeneous value has to carry its own tag, e.g. `[:command x]` versus
+`[:prefix x]`. That is better design than type-sniffing anyway, which is why
+this is a trap and not a blocker — but it is worth knowing before designing a
+lookup table whose answer is "a command or another table".
+
+**The character-safe string path is the quadratic one.** `str-slice` is native
+and takes **byte** indices; the character-correct surface is `str-scalars` plus
+`take`/`drop` plus `scalars-str`, and `take`/`drop` are prelude `conj` loops —
+so character-level surgery is quadratic in the column. Measured at one edit per
+keystroke: 3.7 µs via native `str-slice` against 12,605 µs via scalars at a
+1,600-character line, a 2,905× gap, with the native path flat and the safe path
+a curve. Same fault line as the `str-len` entry above, one layer down: ADR-018
+and ADR-049 made the unsafe path quiet, and then made the safe path slow. Q34.
+
+**Anything built with `conj` in a loop is O(n²).** Errata E-11's copy-on-write
+does not pay yet, so `map`, `filter`, `range`, `repeat`, `take`, `drop` and
+`join` are all quadratic in output length — `map` over 8,000 elements is 272 ms
+where 2,000 is 18 ms. This is fine at the sizes the corpus uses and is a wall at
+the sizes a real file has. Q6.
+
 **A `recur` from a `catch` is allowed here, and is not in Clojure.** This VM
 pops a handler record when it dispatches to it, so a catch body runs with no
 open region and the ordinary tail-call rule permits re-entering the loop —

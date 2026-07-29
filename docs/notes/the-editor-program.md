@@ -192,6 +192,22 @@ The fix is one primitive — a scalar-indexed slice, or a scalar→byte offset
 conversion — and it collapses a 2,905× gap. Filed as **Q34** rather than built,
 because a new primitive is a decision.
 
+**Built, 2026-07-29: `str-scalar-slice`, ADR-052.** The slice rather than the
+offset, and the entry had to supersede ADR-049's rejection of the idea — that
+clause read ADR-018's *"No promise of O(1) character indexing"* as a prohibition,
+when it is a declined guarantee, and overlooked ADR-018's own *"separate explicit
+operations for bytes, scalar values, and graphemes."* The primitive is linear and
+says so; O(1) was never what the defect was about.
+
+Typing at 1,600 characters went from 9,684 µs to 4.54 µs, a **2,134×** gap closed,
+and the editor's `scalars-take`/`scalars-drop` stopped existing. The `.out` golden
+did not move, which is the whole claim of an optimisation stated as a diff.
+
+Scored in `str-scalar-slice-prediction.md`, where three of five predictions were
+wrong while the decision held — including a benchmark that took three attempts
+because the *fixture* was the confound both times, the same error this note
+already records from the previous session.
+
 ## What this says about the gap-buffer idea
 
 The pre-registration proposed a line-level gap buffer to dodge the per-keystroke

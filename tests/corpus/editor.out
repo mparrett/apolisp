@@ -2,10 +2,12 @@
 --- frame
 hello
 !world
+z
+longer
 C-o save  C-x C-c quit  C-g hide
-demo.txt * 2:6
+demo.txt * 2:7
 --- lines
-["hello" "!world"]
+["hello" "!world" "z" "longer"]
 quit? true  modified? true
 --- value
 nil

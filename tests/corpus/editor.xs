@@ -53,6 +53,11 @@
   {:lines (if (empty? lines) [""] lines)
    :cursor-row 0
    :cursor-col 0
+   ; The column the user *meant*. Vertical motion through a short line clamps
+   ; `:cursor-col` and would otherwise destroy the intent: down onto a 2-char
+   ; line and down again onto a long one used to leave the cursor at 2. See
+   ; `restates-goal`.
+   :goal-col 0
    :scroll-row 0
    :filename filename
    :modified? false
@@ -69,10 +74,14 @@
 (defn current-line [state] (line-at state (get state :cursor-row)))
 (defn line-len [state row] (str-scalar-len (line-at state row)))
 
-(defn clamp-cursor [state]
-  (let [row (clamp 0 (dec (line-count state)) (get state :cursor-row))
-        col (clamp 0 (line-len state row) (get state :cursor-col))]
-    (assoc state :cursor-row row :cursor-col col)))
+; Vertical motion lands at the goal column, or the end of the target line if it
+; is shorter — so the cursor hugs a short line and springs back on a long one.
+; This replaced a `clamp-cursor` that clamped against `:cursor-col`, which is the
+; value the previous short line had already destroyed.
+(defn move-vert [state row]
+  (assoc state
+         :cursor-row row
+         :cursor-col (min2 (get state :goal-col) (line-len state row))))
 
 (defn touch [state]
   (assoc state :modified? true))
@@ -143,12 +152,12 @@
 
 (defn move-up [state]
   (if (> (get state :cursor-row) 0)
-    (clamp-cursor (assoc state :cursor-row (dec (get state :cursor-row))))
+    (move-vert state (dec (get state :cursor-row)))
     state))
 
 (defn move-down [state]
   (if (< (get state :cursor-row) (dec (line-count state)))
-    (clamp-cursor (assoc state :cursor-row (inc (get state :cursor-row))))
+    (move-vert state (inc (get state :cursor-row)))
     state))
 
 (defn line-start [state] (assoc state :cursor-col 0))
@@ -175,7 +184,21 @@
    "C-o" [:command :save]      "C-g" [:command :toggle-help]
    "C-x" [:prefix {"C-c" [:command :quit] "C-s" [:command :save]}]})
 
-(defn run-command [state c]
+; Which commands restate the goal column. Vertical motion preserves it — that is
+; the whole point — and so does anything that does not move the cursor at all:
+; `C-g` after a `down` onto a short line must not overwrite the goal with the
+; clamped column. Everything expressing a horizontal intent is named here.
+;
+; Named in one place rather than maintained by each command, for the reason
+; `text-rows` exists: a second copy of an invariant is a copy that will disagree.
+(def restates-goal
+  {:move-left true  :move-right true
+   :line-start true :line-end true
+   :newline true    :delete-back true})
+
+(defn restate-goal [state] (assoc state :goal-col (get state :cursor-col)))
+
+(defn apply-command [state c]
   (cond
     (= c :move-left) (move-left state)
     (= c :move-right) (move-right state)
@@ -193,6 +216,10 @@
     (= c :save) (assoc state :save-requested? true)
     true (assoc state :message (str "no command " c))))
 
+(defn run-command [state c]
+  (let [next (apply-command state c)]
+    (if (get restates-goal c) (restate-goal next) next)))
+
 ; A chord is printable when it is exactly one character and not a named key.
 (defn printable? [chord] (= (str-scalar-len chord) 1))
 
@@ -203,8 +230,10 @@
         state (assoc state :message nil :pending nil)]
     (cond
       (= hit nil)
+      ; Typing is a horizontal intent like any other, and it does not go through
+      ; `run-command`, so it restates the goal here.
       (if (and (= pending nil) (printable? chord))
-        (insert-str state chord)
+        (restate-goal (insert-str state chord))
         (assoc state :message (str chord " is undefined")))
       (= (nth hit 0) :prefix) (assoc state :pending (nth hit 1))
       true (run-command state (nth hit 1)))))
@@ -255,13 +284,23 @@
 
 ; --- The session -------------------------------------------------------------
 ;
-; Nineteen chords, chosen so each one reaches a path the others do not: typing,
-; `RET` splitting a line, motion within and between lines, `DEL` deleting back,
-; and `C-x C-c` — the only two-key chord, and the only thing that exercises the
-; pending-prefix branch in `dispatch`.
+; Chosen so each chord reaches a path the others do not: typing, `RET` splitting
+; a line, motion within and between lines, `DEL` deleting back, and `C-x C-c` —
+; the only two-key chord, and the only thing that exercises the pending-prefix
+; branch in `dispatch`.
+;
+; The second half exists for the goal column, and is the reason the buffer ends
+; up with lines of three different lengths. The last two chords walk up from
+; column 6 of "longer", through the one-character line "z" — which clamps the
+; cursor to column 1 — and back onto "!world". The status line then reads 2:7,
+; and would read 2:2 if the goal column were not held. Without those two lines
+; being different lengths the invariant is unpinned, which is the whole failure
+; mode `notes/the-corpus-as-an-oracle.md` is about.
 (def script
   ["h" "e" "l" "l" "o" "RET" "w" "o" "r" "l" "d"
-   "C-a" "!" "up" "C-e" "?" "DEL" "down" "C-x" "C-c"])
+   "C-a" "!" "up" "C-e" "?" "DEL" "down"
+   "C-e" "RET" "z" "RET" "l" "o" "n" "g" "e" "r" "up" "up"
+   "C-x" "C-c"])
 (def final (reduce dispatch (new-state "demo.txt" [""]) script))
 (println "--- frame")
 (println (frame final 32 6))

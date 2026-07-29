@@ -130,9 +130,19 @@ therefore not on the language surface at all — `io/stdout` is buffered until t
 program ends, so the first version painted five frames into a terminal that had
 already stopped caring, and the only way to paint one live is to open
 `/dev/tty` as a file, which is the `fs` feature and which escapes ADR-029's
-round-trip property. That is **Q33**, and it is the first finding from this
-practice that is a question about the *host boundary* rather than a missing
-function.
+round-trip property. That is **Q33**, answered for the terminal by ADR-051, and
+it is the first finding from this practice that is a question about the *host
+boundary* rather than a missing function.
+
+**The next program is pre-registered rather than written**
+(`notes/the-editor-prediction.md`). Three programs in, the interesting result
+has each time been reconstructed afterwards from whatever surprised the person
+typing, which is the weakest form of the evidence this practice runs on. A text
+editor is the obvious next rung of the terminal workload and the first program
+that would be *used* rather than run once, so what it is expected to find is
+written down first — with a number on the one quantitative claim, which is that
+E-11's copy-on-write turns any whole-file pass into the O(n²) **Q6** has named
+since before anything could reach it. Nothing is committed to building it.
 
 The candidates, and what each is really a bet on:
 

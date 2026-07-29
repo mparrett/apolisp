@@ -4918,6 +4918,61 @@ pub mod prim {
             }
             Ok(Value::Str(Rc::new(StrObj(s[from..to].to_string()))))
         });
+        // ADR-052. Scalar indices, because the character-correct path had no
+        // native slice and went through `str-scalars` + `take`/`drop` — prelude
+        // `conj` loops, so quadratic in the column (Q6/E-11).
+        //
+        // One pass, no index built: O(n) in the string, which ADR-018's *declined*
+        // O(1) guarantee permits. A cut cannot split a character here, so the only
+        // failure is an index past the end.
+        vm.native("str-scalar-slice", 3, false, |_, a| {
+            let s = string(&a[0], "str-scalar-slice")?;
+            let (from, to) = (
+                index(&a[1], "str-scalar-slice")?,
+                index(&a[2], "str-scalar-slice")?,
+            );
+            // `from > to` gets no check of its own — the `f <= t` guard below
+            // catches it, with the same message as an out-of-range bound, which
+            // is what `str-slice` does. The guard is not decoration: without it
+            // the ordering is enforced only by the scan breaking at `to` before
+            // it can find `from`, and a mutation check confirmed that reaching
+            // `s[f..t]` backwards *panics* rather than throwing (ADR-039).
+            let (mut b_from, mut b_to) = (None, None);
+            let mut n = 0usize;
+            for (b, _) in s.char_indices() {
+                if n == from {
+                    b_from = Some(b);
+                }
+                if n == to {
+                    b_to = Some(b);
+                    break;
+                }
+                n += 1;
+            }
+            // `n` is `to` if the loop broke and the scalar length if it ran out.
+            // Either bound may legally equal the length, which addresses the end
+            // of the string — `(str-scalar-slice s len len)` is the empty slice.
+            if b_from.is_none() && from == n {
+                b_from = Some(s.len());
+            }
+            if b_to.is_none() && to == n {
+                b_to = Some(s.len());
+            }
+            match (b_from, b_to) {
+                (Some(f), Some(t)) if f <= t => {
+                    Ok(Value::Str(Rc::new(StrObj(s[f..t].to_string()))))
+                }
+                // Recounted rather than reported from `n`, which is the break
+                // position on the `from > to` path and would misstate the length.
+                _ => Err(fault(
+                    Kind::Type,
+                    format!(
+                        "`str-scalar-slice` {from}..{to} of {} scalars",
+                        s.chars().count()
+                    ),
+                )),
+            }
+        });
         // ADR-046. The language had no string-to-number conversion at all, and
         // the only path that worked was `json/decode` — an *optional host
         // adapter*, so `--no-default-features` removed the ability to read a

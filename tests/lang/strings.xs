@@ -42,6 +42,34 @@
 (is (throws? (str-slice "abc" 0 9)))
 (is (throws? (str-slice "abc" 2 1)))
 
+; --- ADR-052: the same slice, in the other unit -------------------------------
+; The pair below is the entry's whole argument: the same cut, one bound in bytes
+; and one in scalars, and neither name lets you guess which.
+(is= "hé" (str-slice "héllo" 0 3))
+(is= "hé" (str-scalar-slice "héllo" 0 2))
+
+(is= "éllo" (str-scalar-slice "héllo" 1 5))
+(is= "héllo" (str-scalar-slice "héllo" 0 5))
+; Either bound may equal the scalar length: that addresses the end of the string.
+(is= "" (str-scalar-slice "héllo" 5 5))
+(is= "" (str-scalar-slice "héllo" 2 2))
+(is= "" (str-scalar-slice "" 0 0))
+; Past the end and backwards are the only two failures — a scalar bound cannot
+; land inside a character, which is the check `str-slice` needs and this does not.
+(is (throws? (str-scalar-slice "abc" 0 4)))
+(is (throws? (str-scalar-slice "abc" 5 6)))
+(is (throws? (str-scalar-slice "abc" 2 1)))
+
+; Multi-byte throughout, so a byte/scalar confusion in the implementation shows
+; up here rather than on the first non-ASCII input a program sees.
+(is= "é" (str-scalar-slice "héllo" 1 2))
+(is= 4 (str-byte-len (str-scalar-slice "hééllo" 1 3)))
+(is= 2 (str-scalar-len (str-scalar-slice "hééllo" 1 3)))
+; A scalar is not a grapheme, and this is the operation that proves it (TRAPS.md):
+; one scalar out of a five-scalar ZWJ family is one member of it.
+(is= 5 (str-scalar-len (scalars-str [128104 8205 128105 8205 128103])))
+(is= 1 (str-scalar-len (str-scalar-slice (scalars-str [128104 8205 128105 8205 128103]) 0 1)))
+
 ; --- text and bytes ----------------------------------------------------------
 (is= 3 (bytes-len (str-bytes "hé")))
 (is= 2 (bytes-len (str-bytes "ab")))

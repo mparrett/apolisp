@@ -12,6 +12,11 @@ Emacs-flavoured editor in let-go, so the architecture is borrowed rather than
 invented: state is one map, every buffer operation is pure `state → state`, a
 chord is a string, the keymap is a nested map, and the loop is a fold.
 
+Sizes and measurements in this note describe the program as it was benchmarked.
+The core has grown twice since — the key hint, then the goal column — and now
+lives in the corpus at `tests/corpus/editor.xs`, which is canonical. The shell
+does not, for the reason the next section gives.
+
 ## The pure core pays for itself immediately
 
 The prediction said testability rather than capability would shape the program.
@@ -92,8 +97,7 @@ signature.
 This is **Q6's O(n²) and errata E-11 reached by measurement** rather than named
 in a document, which is the first time.
 
-**3. Per-keystroke cost does not depend on the buffer at all.** Line fixed at 25
-characters:
+**3. Typing does not depend on the buffer at all.** Line fixed at 25 characters:
 
 | buffer lines | µs/keystroke |
 |---:|---:|
@@ -103,6 +107,29 @@ characters:
 | 2,000 | 138.0 |
 
 Eight times the buffer, 1.12× the cost.
+
+**This measured `insert-str`, and the note originally reported it as
+"per-keystroke".** That generalization was wrong, and an external review caught
+it (`ed-review-2026-07-29`) by pointing out that `split-line` rebuilds the whole
+line array — `(vec (concat before [head] [tail] after))` — which typing never
+touches. Measured afterwards, 200 keystrokes each:
+
+| buffer lines | typing | `RET` |
+|---:|---:|---:|
+| 250 | 0.198 ms | 1.165 ms |
+| 1,000 | 0.227 ms | 13.228 ms |
+| 4,000 | — | did not finish in two minutes |
+
+Four times the buffer costs typing 1.15× and `RET` **11.4×**. They are two
+different cost classes, and at 1,000 lines Enter is roughly sixty times the price
+of a character. The claim "the buffer is free" holds only for the keystroke that
+was actually measured.
+
+Worth separating from the other corrections in this note: claims 1 through 3 of
+the pre-registration were scored against a benchmark, and this one was a benchmark
+scored against a reader. Measuring the wrong operation is not a failure a more
+careful prediction would have caught — nothing in the pre-registration
+distinguished typing from splitting either.
 
 **4. It depends on the line, and superlinearly.** Buffer fixed at 200 lines:
 
@@ -175,3 +202,42 @@ reason to want one at all.
 
 This is the clearest thing the benchmark bought: a plausible optimisation,
 pre-registered, and refuted before anyone spent a day building it.
+
+The external review proposed a **line zipper** — the line split into the
+characters before and after the cursor — arriving independently at the axis the
+benchmark had corrected the pre-registration onto. Two parties reaching the same
+axis separately is the strongest evidence the note has that the axis is right.
+
+It still does not work here, and for a reason worth writing down. The zipper's
+payoff is that inserting becomes a push onto the end of one side, "an $O(1)$
+operation". `conj` is not O(1) in this language — measured, best-of-five, startup
+subtracted:
+
+| n | build | ratio |
+|---:|---:|---:|
+| 1,000 | 2.4 ms | |
+| 2,000 | 11.2 ms | 4.67× |
+| 4,000 | 38.4 ms | 3.43× |
+| 8,000 | 121.1 ms | 3.15× |
+
+Converging on 4.0 per doubling, which is Q6/E-11 again. A zipper built on `conj`
+inherits that curve, so it relocates the cost rather than removing it. **Fixing
+Q6/E-11 is a prerequisite for the zipper, and fixing Q6/E-11 removes most of the
+reason to want one.** The reviewer assumed Clojure's persistent vector; the
+surface is Clojure's, and the complexity behind it is not.
+
+## The goal column, which no amount of benchmarking would have found
+
+The same review found a real defect, and not a performance one. At column 15,
+`down` onto a two-character line and `down` again onto a long one left the cursor
+at column 2: `clamp-cursor` clamped against `:cursor-col`, the value the short
+line had already destroyed. Fixed with a `:goal-col`, and the golden's chord
+script had to grow a second half to reach it — the old nineteen chords never
+crossed lines of differing length.
+
+The interesting part is the detection channel. Nineteen chords through `reduce
+dispatch`, a pty session, a benchmark and a write-up all missed a bug that a
+reader found by knowing what editors do. The golden pins what the program does,
+not what it should do, and no oracle in this project has an opinion about the
+second. That is the standing limit of the whole rung-3 apparatus, stated here
+because this is the first time something walked straight through it.

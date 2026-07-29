@@ -1,4 +1,4 @@
-proto 0  <top>  params 0  slots 198
+proto 0  <top>  params 0  slots 196
   constants
     k0  defn
     k1  cond
@@ -65,232 +65,228 @@ proto 0  <top>  params 0  slots 198
     0009  SETGLOBAL   min2 <- r6             generated 37:1
     0010  CLOSURE     r7 <- proto 5          generated 38:1
     0011  SETGLOBAL   clamp <- r7            generated 38:1
-    0012  CLOSURE     r8 <- proto 6          generated 47:1
-    0013  SETGLOBAL   scalars-take <- r8     generated 47:1
-    0014  CLOSURE     r9 <- proto 7          generated 48:1
-    0015  SETGLOBAL   scalars-drop <- r9     generated 48:1
-    0016  CLOSURE     r10 <- proto 8         generated 52:1
-    0017  SETGLOBAL   new-state <- r10       generated 52:1
-    0018  CLOSURE     r11 <- proto 9         generated 72:1
-    0019  SETGLOBAL   line-count <- r11      generated 72:1
-    0020  CLOSURE     r12 <- proto 10        generated 73:1
-    0021  SETGLOBAL   line-at <- r12         generated 73:1
-    0022  CLOSURE     r13 <- proto 11        generated 74:1
-    0023  SETGLOBAL   current-line <- r13    generated 74:1
-    0024  CLOSURE     r14 <- proto 12        generated 75:1
-    0025  SETGLOBAL   line-len <- r14        generated 75:1
-    0026  CLOSURE     r15 <- proto 13        generated 81:1
-    0027  SETGLOBAL   move-vert <- r15       generated 81:1
-    0028  CLOSURE     r16 <- proto 14        generated 86:1
-    0029  SETGLOBAL   touch <- r16           generated 86:1
-    0030  CLOSURE     r17 <- proto 15        generated 91:1
-    0031  SETGLOBAL   insert-str <- r17      generated 91:1
-    0032  CLOSURE     r18 <- proto 16        generated 100:1
-    0033  SETGLOBAL   split-line <- r18      generated 100:1
-    0034  CLOSURE     r19 <- proto 17        generated 114:1
-    0035  SETGLOBAL   join-prev <- r19       generated 114:1
-    0036  CLOSURE     r20 <- proto 18        generated 124:1
-    0037  SETGLOBAL   delete-back <- r20     generated 124:1
-    0038  CLOSURE     r21 <- proto 19        generated 139:1
-    0039  SETGLOBAL   move-left <- r21       generated 139:1
-    0040  CLOSURE     r22 <- proto 20        generated 146:1
-    0041  SETGLOBAL   move-right <- r22      generated 146:1
-    0042  CLOSURE     r23 <- proto 21        generated 153:1
-    0043  SETGLOBAL   move-up <- r23         generated 153:1
-    0044  CLOSURE     r24 <- proto 22        generated 158:1
-    0045  SETGLOBAL   move-down <- r24       generated 158:1
-    0046  CLOSURE     r25 <- proto 23        generated 163:1
-    0047  SETGLOBAL   line-start <- r25      generated 163:1
-    0048  CLOSURE     r26 <- proto 24        generated 164:1
-    0049  SETGLOBAL   line-end <- r26        generated 164:1
-    0050  GETGLOBAL   r28 <- hash-map        180:3
-    0051  CONST       r29 <- k2              180:4
-    0052  GETGLOBAL   r51 <- vector          180:11
-    0053  CONST       r52 <- k3              180:12
-    0054  CONST       r53 <- k4              180:21
-    0055  CALL        r30 <- r51(2)          180:11
-    0056  CONST       r31 <- k5              180:34
-    0057  GETGLOBAL   r54 <- vector          180:42
-    0058  CONST       r55 <- k3              180:43
-    0059  CONST       r56 <- k6              180:52
-    0060  CALL        r32 <- r54(2)          180:42
-    0061  CONST       r33 <- k7              181:4
-    0062  GETGLOBAL   r57 <- vector          181:9
-    0063  CONST       r58 <- k3              181:10
-    0064  CONST       r59 <- k8              181:19
-    0065  CALL        r34 <- r57(2)          181:9
-    0066  CONST       r35 <- k9              181:34
-    0067  GETGLOBAL   r60 <- vector          181:41
-    0068  CONST       r61 <- k3              181:42
-    0069  CONST       r62 <- k10             181:51
-    0070  CALL        r36 <- r60(2)          181:41
-    0071  CONST       r37 <- k11             182:4
-    0072  GETGLOBAL   r63 <- vector          182:10
-    0073  CONST       r64 <- k3              182:11
-    0074  CONST       r65 <- k12             182:20
-    0075  CALL        r38 <- r63(2)          182:10
-    0076  CONST       r39 <- k13             182:34
-    0077  GETGLOBAL   r66 <- vector          182:40
-    0078  CONST       r67 <- k3              182:41
-    0079  CONST       r68 <- k14             182:50
-    0080  CALL        r40 <- r66(2)          182:40
-    0081  CONST       r41 <- k15             183:4
-    0082  GETGLOBAL   r69 <- vector          183:10
-    0083  CONST       r70 <- k3              183:11
-    0084  CONST       r71 <- k16             183:20
-    0085  CALL        r42 <- r69(2)          183:10
-    0086  CONST       r43 <- k17             183:34
-    0087  GETGLOBAL   r72 <- vector          183:40
-    0088  CONST       r73 <- k3              183:41
-    0089  CONST       r74 <- k18             183:50
-    0090  CALL        r44 <- r72(2)          183:40
-    0091  CONST       r45 <- k19             184:4
-    0092  GETGLOBAL   r75 <- vector          184:10
-    0093  CONST       r76 <- k3              184:11
-    0094  CONST       r77 <- k20             184:20
-    0095  CALL        r46 <- r75(2)          184:10
-    0096  CONST       r47 <- k21             184:32
-    0097  GETGLOBAL   r78 <- vector          184:38
-    0098  CONST       r79 <- k3              184:39
-    0099  CONST       r80 <- k22             184:48
-    0100  CALL        r48 <- r78(2)          184:38
-    0101  CONST       r49 <- k23             185:4
-    0102  GETGLOBAL   r81 <- vector          185:10
-    0103  CONST       r82 <- k24             185:11
-    0104  GETGLOBAL   r84 <- hash-map        185:19
-    0105  CONST       r85 <- k25             185:20
-    0106  GETGLOBAL   r89 <- vector          185:26
-    0107  CONST       r90 <- k3              185:27
-    0108  CONST       r91 <- k26             185:36
-    0109  CALL        r86 <- r89(2)          185:26
-    0110  CONST       r87 <- k27             185:43
-    0111  GETGLOBAL   r92 <- vector          185:49
-    0112  CONST       r93 <- k3              185:50
-    0113  CONST       r94 <- k20             185:59
-    0114  CALL        r88 <- r92(2)          185:49
-    0115  CALL        r83 <- r84(4)          185:19
-    0116  CALL        r50 <- r81(2)          185:10
-    0117  CALL        r27 <- r28(22)         180:3
-    0118  SETGLOBAL   global-keymap <- r27   generated 179:1
-    0119  GETGLOBAL   r96 <- hash-map        195:3
-    0120  CONST       r97 <- k4              195:4
-    0121  CONST       r98 <- k28             195:15
-    0122  CONST       r99 <- k6              195:21
-    0123  CONST       r100 <- k28            195:33
-    0124  CONST       r101 <- k12            196:4
-    0125  CONST       r102 <- k28            196:16
-    0126  CONST       r103 <- k14            196:21
-    0127  CONST       r104 <- k28            196:31
-    0128  CONST       r105 <- k16            197:4
-    0129  CONST       r106 <- k28            197:13
-    0130  CONST       r107 <- k18            197:21
-    0131  CONST       r108 <- k28            197:34
-    0132  CALL        r95 <- r96(12)         195:3
-    0133  SETGLOBAL   restates-goal <- r95   generated 194:1
-    0134  CLOSURE     r109 <- proto 25       generated 199:1
-    0135  SETGLOBAL   restate-goal <- r109   generated 199:1
-    0136  CLOSURE     r110 <- proto 26       generated 201:1
-    0137  SETGLOBAL   apply-command <- r110  generated 201:1
-    0138  CLOSURE     r111 <- proto 27       generated 219:1
-    0139  SETGLOBAL   run-command <- r111    generated 219:1
-    0140  CLOSURE     r112 <- proto 28       generated 224:1
-    0141  SETGLOBAL   printable? <- r112     generated 224:1
-    0142  CLOSURE     r113 <- proto 29       generated 226:1
-    0143  SETGLOBAL   dispatch <- r113       generated 226:1
-    0144  CLOSURE     r114 <- proto 30       generated 247:1
-    0145  SETGLOBAL   clip <- r114           generated 247:1
-    0146  CLOSURE     r115 <- proto 31       generated 251:1
-    0147  SETGLOBAL   text-rows <- r115      generated 251:1
-    0148  CLOSURE     r116 <- proto 32       generated 256:1
-    0149  SETGLOBAL   help-line <- r116      generated 256:1
-    0150  CLOSURE     r117 <- proto 33       generated 259:1
-    0151  SETGLOBAL   scroll-to-cursor <- r117 generated 259:1
-    0152  CLOSURE     r118 <- proto 34       generated 268:1
-    0153  SETGLOBAL   status-line <- r118    generated 268:1
-    0154  CLOSURE     r119 <- proto 35       generated 275:1
-    0155  SETGLOBAL   frame <- r119          generated 275:1
-    0156  GETGLOBAL   r121 <- vector         300:3
-    0157  CONST       r122 <- k29            300:4
-    0158  CONST       r123 <- k30            300:8
-    0159  CONST       r124 <- k31            300:12
-    0160  CONST       r125 <- k31            300:16
-    0161  CONST       r126 <- k32            300:20
-    0162  CONST       r127 <- k15            300:24
-    0163  CONST       r128 <- k33            300:30
-    0164  CONST       r129 <- k32            300:34
-    0165  CONST       r130 <- k34            300:38
-    0166  CONST       r131 <- k31            300:42
-    0167  CONST       r132 <- k35            300:46
-    0168  CONST       r133 <- k11            301:4
-    0169  CONST       r134 <- k36            301:10
-    0170  CONST       r135 <- k7             301:14
-    0171  CONST       r136 <- k13            301:19
-    0172  CONST       r137 <- k37            301:25
-    0173  CONST       r138 <- k17            301:29
-    0174  CONST       r139 <- k9             301:35
-    0175  CONST       r140 <- k13            302:4
-    0176  CONST       r141 <- k15            302:10
-    0177  CONST       r142 <- k38            302:16
-    0178  CONST       r143 <- k15            302:20
-    0179  CONST       r144 <- k31            302:26
-    0180  CONST       r145 <- k32            302:30
-    0181  CONST       r146 <- k39            302:34
-    0182  CONST       r147 <- k40            302:38
-    0183  CONST       r148 <- k30            302:42
-    0184  CONST       r149 <- k34            302:46
-    0185  CONST       r150 <- k7             302:50
-    0186  CONST       r151 <- k7             302:55
-    0187  CONST       r152 <- k23            303:4
-    0188  CONST       r153 <- k25            303:10
-    0189  CALL        r120 <- r121(32)       300:3
-    0190  SETGLOBAL   script <- r120         generated 299:1
-    0191  GETGLOBAL   r155 <- reduce         304:13
-    0192  GETGLOBAL   r156 <- dispatch       304:20
-    0193  GETGLOBAL   r159 <- new-state      304:30
-    0194  CONST       r160 <- k41            304:40
-    0195  GETGLOBAL   r162 <- vector         304:51
-    0196  CONST       r163 <- k42            304:52
-    0197  CALL        r161 <- r162(1)        304:51
-    0198  CALL        r157 <- r159(2)        304:29
-    0199  GETGLOBAL   r158 <- script         304:57
-    0200  CALL        r154 <- r155(3)        304:12
-    0201  SETGLOBAL   final <- r154          generated 304:1
-    0202  GETGLOBAL   r165 <- println        305:2
-    0203  CONST       r166 <- k43            305:10
-    0204  CALL        r164 <- r165(1)        305:1
-    0205  GETGLOBAL   r168 <- println        306:2
-    0206  GETGLOBAL   r170 <- frame          306:11
-    0207  GETGLOBAL   r171 <- final          306:17
-    0208  CONST       r172 <- k44            306:23
-    0209  CONST       r173 <- k45            306:26
-    0210  CALL        r169 <- r170(3)        306:10
-    0211  CALL        r167 <- r168(1)        306:1
-    0212  GETGLOBAL   r175 <- println        307:2
-    0213  CONST       r176 <- k46            307:10
-    0214  CALL        r174 <- r175(1)        307:1
-    0215  GETGLOBAL   r178 <- println        308:2
-    0216  GETGLOBAL   r180 <- str            308:11
-    0217  GETGLOBAL   r182 <- get            308:16
-    0218  GETGLOBAL   r183 <- final          308:20
-    0219  CONST       r184 <- k47            308:26
-    0220  CALL        r181 <- r182(2)        308:15
-    0221  CALL        r179 <- r180(1)        308:10
-    0222  CALL        r177 <- r178(1)        308:1
-    0223  GETGLOBAL   r185 <- println        309:2
-    0224  GETGLOBAL   r187 <- str            309:11
-    0225  CONST       r188 <- k48            309:15
-    0226  GETGLOBAL   r192 <- get            309:25
-    0227  GETGLOBAL   r193 <- final          309:29
-    0228  CONST       r194 <- k49            309:35
-    0229  CALL        r189 <- r192(2)        309:24
-    0230  CONST       r190 <- k50            309:43
-    0231  GETGLOBAL   r195 <- get            309:59
-    0232  GETGLOBAL   r196 <- final          309:63
-    0233  CONST       r197 <- k51            309:69
-    0234  CALL        r191 <- r195(2)        309:58
-    0235  CALL        r186 <- r187(4)        309:10
-    0236  TAILCALL    r185(1)                309:1
-    0237  RETURN      r0                     309:1
+    0012  CLOSURE     r8 <- proto 6          generated 51:1
+    0013  SETGLOBAL   new-state <- r8        generated 51:1
+    0014  CLOSURE     r9 <- proto 7          generated 71:1
+    0015  SETGLOBAL   line-count <- r9       generated 71:1
+    0016  CLOSURE     r10 <- proto 8         generated 72:1
+    0017  SETGLOBAL   line-at <- r10         generated 72:1
+    0018  CLOSURE     r11 <- proto 9         generated 73:1
+    0019  SETGLOBAL   current-line <- r11    generated 73:1
+    0020  CLOSURE     r12 <- proto 10        generated 74:1
+    0021  SETGLOBAL   line-len <- r12        generated 74:1
+    0022  CLOSURE     r13 <- proto 11        generated 80:1
+    0023  SETGLOBAL   move-vert <- r13       generated 80:1
+    0024  CLOSURE     r14 <- proto 12        generated 85:1
+    0025  SETGLOBAL   touch <- r14           generated 85:1
+    0026  CLOSURE     r15 <- proto 13        generated 90:1
+    0027  SETGLOBAL   insert-str <- r15      generated 90:1
+    0028  CLOSURE     r16 <- proto 14        generated 99:1
+    0029  SETGLOBAL   split-line <- r16      generated 99:1
+    0030  CLOSURE     r17 <- proto 15        generated 113:1
+    0031  SETGLOBAL   join-prev <- r17       generated 113:1
+    0032  CLOSURE     r18 <- proto 16        generated 123:1
+    0033  SETGLOBAL   delete-back <- r18     generated 123:1
+    0034  CLOSURE     r19 <- proto 17        generated 138:1
+    0035  SETGLOBAL   move-left <- r19       generated 138:1
+    0036  CLOSURE     r20 <- proto 18        generated 145:1
+    0037  SETGLOBAL   move-right <- r20      generated 145:1
+    0038  CLOSURE     r21 <- proto 19        generated 152:1
+    0039  SETGLOBAL   move-up <- r21         generated 152:1
+    0040  CLOSURE     r22 <- proto 20        generated 157:1
+    0041  SETGLOBAL   move-down <- r22       generated 157:1
+    0042  CLOSURE     r23 <- proto 21        generated 162:1
+    0043  SETGLOBAL   line-start <- r23      generated 162:1
+    0044  CLOSURE     r24 <- proto 22        generated 163:1
+    0045  SETGLOBAL   line-end <- r24        generated 163:1
+    0046  GETGLOBAL   r26 <- hash-map        179:3
+    0047  CONST       r27 <- k2              179:4
+    0048  GETGLOBAL   r49 <- vector          179:11
+    0049  CONST       r50 <- k3              179:12
+    0050  CONST       r51 <- k4              179:21
+    0051  CALL        r28 <- r49(2)          179:11
+    0052  CONST       r29 <- k5              179:34
+    0053  GETGLOBAL   r52 <- vector          179:42
+    0054  CONST       r53 <- k3              179:43
+    0055  CONST       r54 <- k6              179:52
+    0056  CALL        r30 <- r52(2)          179:42
+    0057  CONST       r31 <- k7              180:4
+    0058  GETGLOBAL   r55 <- vector          180:9
+    0059  CONST       r56 <- k3              180:10
+    0060  CONST       r57 <- k8              180:19
+    0061  CALL        r32 <- r55(2)          180:9
+    0062  CONST       r33 <- k9              180:34
+    0063  GETGLOBAL   r58 <- vector          180:41
+    0064  CONST       r59 <- k3              180:42
+    0065  CONST       r60 <- k10             180:51
+    0066  CALL        r34 <- r58(2)          180:41
+    0067  CONST       r35 <- k11             181:4
+    0068  GETGLOBAL   r61 <- vector          181:10
+    0069  CONST       r62 <- k3              181:11
+    0070  CONST       r63 <- k12             181:20
+    0071  CALL        r36 <- r61(2)          181:10
+    0072  CONST       r37 <- k13             181:34
+    0073  GETGLOBAL   r64 <- vector          181:40
+    0074  CONST       r65 <- k3              181:41
+    0075  CONST       r66 <- k14             181:50
+    0076  CALL        r38 <- r64(2)          181:40
+    0077  CONST       r39 <- k15             182:4
+    0078  GETGLOBAL   r67 <- vector          182:10
+    0079  CONST       r68 <- k3              182:11
+    0080  CONST       r69 <- k16             182:20
+    0081  CALL        r40 <- r67(2)          182:10
+    0082  CONST       r41 <- k17             182:34
+    0083  GETGLOBAL   r70 <- vector          182:40
+    0084  CONST       r71 <- k3              182:41
+    0085  CONST       r72 <- k18             182:50
+    0086  CALL        r42 <- r70(2)          182:40
+    0087  CONST       r43 <- k19             183:4
+    0088  GETGLOBAL   r73 <- vector          183:10
+    0089  CONST       r74 <- k3              183:11
+    0090  CONST       r75 <- k20             183:20
+    0091  CALL        r44 <- r73(2)          183:10
+    0092  CONST       r45 <- k21             183:32
+    0093  GETGLOBAL   r76 <- vector          183:38
+    0094  CONST       r77 <- k3              183:39
+    0095  CONST       r78 <- k22             183:48
+    0096  CALL        r46 <- r76(2)          183:38
+    0097  CONST       r47 <- k23             184:4
+    0098  GETGLOBAL   r79 <- vector          184:10
+    0099  CONST       r80 <- k24             184:11
+    0100  GETGLOBAL   r82 <- hash-map        184:19
+    0101  CONST       r83 <- k25             184:20
+    0102  GETGLOBAL   r87 <- vector          184:26
+    0103  CONST       r88 <- k3              184:27
+    0104  CONST       r89 <- k26             184:36
+    0105  CALL        r84 <- r87(2)          184:26
+    0106  CONST       r85 <- k27             184:43
+    0107  GETGLOBAL   r90 <- vector          184:49
+    0108  CONST       r91 <- k3              184:50
+    0109  CONST       r92 <- k20             184:59
+    0110  CALL        r86 <- r90(2)          184:49
+    0111  CALL        r81 <- r82(4)          184:19
+    0112  CALL        r48 <- r79(2)          184:10
+    0113  CALL        r25 <- r26(22)         179:3
+    0114  SETGLOBAL   global-keymap <- r25   generated 178:1
+    0115  GETGLOBAL   r94 <- hash-map        194:3
+    0116  CONST       r95 <- k4              194:4
+    0117  CONST       r96 <- k28             194:15
+    0118  CONST       r97 <- k6              194:21
+    0119  CONST       r98 <- k28             194:33
+    0120  CONST       r99 <- k12             195:4
+    0121  CONST       r100 <- k28            195:16
+    0122  CONST       r101 <- k14            195:21
+    0123  CONST       r102 <- k28            195:31
+    0124  CONST       r103 <- k16            196:4
+    0125  CONST       r104 <- k28            196:13
+    0126  CONST       r105 <- k18            196:21
+    0127  CONST       r106 <- k28            196:34
+    0128  CALL        r93 <- r94(12)         194:3
+    0129  SETGLOBAL   restates-goal <- r93   generated 193:1
+    0130  CLOSURE     r107 <- proto 23       generated 198:1
+    0131  SETGLOBAL   restate-goal <- r107   generated 198:1
+    0132  CLOSURE     r108 <- proto 24       generated 200:1
+    0133  SETGLOBAL   apply-command <- r108  generated 200:1
+    0134  CLOSURE     r109 <- proto 25       generated 218:1
+    0135  SETGLOBAL   run-command <- r109    generated 218:1
+    0136  CLOSURE     r110 <- proto 26       generated 223:1
+    0137  SETGLOBAL   printable? <- r110     generated 223:1
+    0138  CLOSURE     r111 <- proto 27       generated 225:1
+    0139  SETGLOBAL   dispatch <- r111       generated 225:1
+    0140  CLOSURE     r112 <- proto 28       generated 246:1
+    0141  SETGLOBAL   clip <- r112           generated 246:1
+    0142  CLOSURE     r113 <- proto 29       generated 250:1
+    0143  SETGLOBAL   text-rows <- r113      generated 250:1
+    0144  CLOSURE     r114 <- proto 30       generated 255:1
+    0145  SETGLOBAL   help-line <- r114      generated 255:1
+    0146  CLOSURE     r115 <- proto 31       generated 258:1
+    0147  SETGLOBAL   scroll-to-cursor <- r115 generated 258:1
+    0148  CLOSURE     r116 <- proto 32       generated 267:1
+    0149  SETGLOBAL   status-line <- r116    generated 267:1
+    0150  CLOSURE     r117 <- proto 33       generated 274:1
+    0151  SETGLOBAL   frame <- r117          generated 274:1
+    0152  GETGLOBAL   r119 <- vector         299:3
+    0153  CONST       r120 <- k29            299:4
+    0154  CONST       r121 <- k30            299:8
+    0155  CONST       r122 <- k31            299:12
+    0156  CONST       r123 <- k31            299:16
+    0157  CONST       r124 <- k32            299:20
+    0158  CONST       r125 <- k15            299:24
+    0159  CONST       r126 <- k33            299:30
+    0160  CONST       r127 <- k32            299:34
+    0161  CONST       r128 <- k34            299:38
+    0162  CONST       r129 <- k31            299:42
+    0163  CONST       r130 <- k35            299:46
+    0164  CONST       r131 <- k11            300:4
+    0165  CONST       r132 <- k36            300:10
+    0166  CONST       r133 <- k7             300:14
+    0167  CONST       r134 <- k13            300:19
+    0168  CONST       r135 <- k37            300:25
+    0169  CONST       r136 <- k17            300:29
+    0170  CONST       r137 <- k9             300:35
+    0171  CONST       r138 <- k13            301:4
+    0172  CONST       r139 <- k15            301:10
+    0173  CONST       r140 <- k38            301:16
+    0174  CONST       r141 <- k15            301:20
+    0175  CONST       r142 <- k31            301:26
+    0176  CONST       r143 <- k32            301:30
+    0177  CONST       r144 <- k39            301:34
+    0178  CONST       r145 <- k40            301:38
+    0179  CONST       r146 <- k30            301:42
+    0180  CONST       r147 <- k34            301:46
+    0181  CONST       r148 <- k7             301:50
+    0182  CONST       r149 <- k7             301:55
+    0183  CONST       r150 <- k23            302:4
+    0184  CONST       r151 <- k25            302:10
+    0185  CALL        r118 <- r119(32)       299:3
+    0186  SETGLOBAL   script <- r118         generated 298:1
+    0187  GETGLOBAL   r153 <- reduce         303:13
+    0188  GETGLOBAL   r154 <- dispatch       303:20
+    0189  GETGLOBAL   r157 <- new-state      303:30
+    0190  CONST       r158 <- k41            303:40
+    0191  GETGLOBAL   r160 <- vector         303:51
+    0192  CONST       r161 <- k42            303:52
+    0193  CALL        r159 <- r160(1)        303:51
+    0194  CALL        r155 <- r157(2)        303:29
+    0195  GETGLOBAL   r156 <- script         303:57
+    0196  CALL        r152 <- r153(3)        303:12
+    0197  SETGLOBAL   final <- r152          generated 303:1
+    0198  GETGLOBAL   r163 <- println        304:2
+    0199  CONST       r164 <- k43            304:10
+    0200  CALL        r162 <- r163(1)        304:1
+    0201  GETGLOBAL   r166 <- println        305:2
+    0202  GETGLOBAL   r168 <- frame          305:11
+    0203  GETGLOBAL   r169 <- final          305:17
+    0204  CONST       r170 <- k44            305:23
+    0205  CONST       r171 <- k45            305:26
+    0206  CALL        r167 <- r168(3)        305:10
+    0207  CALL        r165 <- r166(1)        305:1
+    0208  GETGLOBAL   r173 <- println        306:2
+    0209  CONST       r174 <- k46            306:10
+    0210  CALL        r172 <- r173(1)        306:1
+    0211  GETGLOBAL   r176 <- println        307:2
+    0212  GETGLOBAL   r178 <- str            307:11
+    0213  GETGLOBAL   r180 <- get            307:16
+    0214  GETGLOBAL   r181 <- final          307:20
+    0215  CONST       r182 <- k47            307:26
+    0216  CALL        r179 <- r180(2)        307:15
+    0217  CALL        r177 <- r178(1)        307:10
+    0218  CALL        r175 <- r176(1)        307:1
+    0219  GETGLOBAL   r183 <- println        308:2
+    0220  GETGLOBAL   r185 <- str            308:11
+    0221  CONST       r186 <- k48            308:15
+    0222  GETGLOBAL   r190 <- get            308:25
+    0223  GETGLOBAL   r191 <- final          308:29
+    0224  CONST       r192 <- k49            308:35
+    0225  CALL        r187 <- r190(2)        308:24
+    0226  CONST       r188 <- k50            308:43
+    0227  GETGLOBAL   r193 <- get            308:59
+    0228  GETGLOBAL   r194 <- final          308:63
+    0229  CONST       r195 <- k51            308:69
+    0230  CALL        r189 <- r193(2)        308:58
+    0231  CALL        r184 <- r185(4)        308:10
+    0232  TAILCALL    r183(1)                308:1
+    0233  RETURN      r0                     308:1
 
 proto 1  inc  params 1  slots 5
   constants
@@ -347,31 +343,7 @@ proto 5  clamp  params 3  slots 10
     0006  TAILCALL    r4(2)                  38:23
     0007  RETURN      r3                     38:23
 
-proto 6  scalars-take  params 2  slots 10
-  code
-    0000  GETGLOBAL   r3 <- scalars-str      47:27
-    0001  GETGLOBAL   r5 <- take             47:40
-    0002  MOVE        r6 <- r0               47:45
-    0003  GETGLOBAL   r8 <- str-scalars      47:48
-    0004  MOVE        r9 <- r1               47:60
-    0005  CALL        r7 <- r8(1)            47:47
-    0006  CALL        r4 <- r5(2)            47:39
-    0007  TAILCALL    r3(1)                  47:26
-    0008  RETURN      r2                     47:26
-
-proto 7  scalars-drop  params 2  slots 10
-  code
-    0000  GETGLOBAL   r3 <- scalars-str      48:27
-    0001  GETGLOBAL   r5 <- drop             48:40
-    0002  MOVE        r6 <- r0               48:45
-    0003  GETGLOBAL   r8 <- str-scalars      48:48
-    0004  MOVE        r9 <- r1               48:60
-    0005  CALL        r7 <- r8(1)            48:47
-    0006  CALL        r4 <- r5(2)            48:39
-    0007  TAILCALL    r3(1)                  48:26
-    0008  RETURN      r2                     48:26
-
-proto 8  new-state  params 2  slots 31
+proto 6  new-state  params 2  slots 31
   constants
     k0  :lines
     k1  ""
@@ -390,303 +362,312 @@ proto 8  new-state  params 2  slots 31
     k14  true
     k15  :quit?
   code
-    0000  GETGLOBAL   r3 <- hash-map         53:3
-    0001  CONST       r4 <- k0               53:4
-    0002  GETGLOBAL   r27 <- empty?          53:16
-    0003  MOVE        r28 <- r1              53:23
-    0004  CALL        r26 <- r27(1)          53:15
-    0005  JUMPUNLESS  r26, 0010              53:11
-    0006  GETGLOBAL   r29 <- vector          53:30
-    0007  CONST       r30 <- k1              53:31
-    0008  CALL        r5 <- r29(1)           53:30
-    0009  JUMP        0011                   53:11
-    0010  MOVE        r5 <- r1               53:35
-    0011  CONST       r6 <- k2               54:4
-    0012  CONST       r7 <- k3               54:16
-    0013  CONST       r8 <- k4               55:4
-    0014  CONST       r9 <- k3               55:16
-    0015  CONST       r10 <- k5              60:4
-    0016  CONST       r11 <- k3              60:14
-    0017  CONST       r12 <- k6              61:4
-    0018  CONST       r13 <- k3              61:16
-    0019  CONST       r14 <- k7              62:4
-    0020  MOVE        r15 <- r0              62:14
-    0021  CONST       r16 <- k8              63:4
-    0022  CONST       r17 <- k9              63:15
-    0023  CONST       r18 <- k10             64:4
-    0024  CONST       r19 <- k11             64:13
-    0025  CONST       r20 <- k12             65:4
-    0026  CONST       r21 <- k11             65:13
-    0027  CONST       r22 <- k13             69:4
-    0028  CONST       r23 <- k14             69:11
-    0029  CONST       r24 <- k15             70:4
-    0030  CONST       r25 <- k9              70:11
-    0031  TAILCALL    r3(22)                 53:3
-    0032  RETURN      r2                     53:3
+    0000  GETGLOBAL   r3 <- hash-map         52:3
+    0001  CONST       r4 <- k0               52:4
+    0002  GETGLOBAL   r27 <- empty?          52:16
+    0003  MOVE        r28 <- r1              52:23
+    0004  CALL        r26 <- r27(1)          52:15
+    0005  JUMPUNLESS  r26, 0010              52:11
+    0006  GETGLOBAL   r29 <- vector          52:30
+    0007  CONST       r30 <- k1              52:31
+    0008  CALL        r5 <- r29(1)           52:30
+    0009  JUMP        0011                   52:11
+    0010  MOVE        r5 <- r1               52:35
+    0011  CONST       r6 <- k2               53:4
+    0012  CONST       r7 <- k3               53:16
+    0013  CONST       r8 <- k4               54:4
+    0014  CONST       r9 <- k3               54:16
+    0015  CONST       r10 <- k5              59:4
+    0016  CONST       r11 <- k3              59:14
+    0017  CONST       r12 <- k6              60:4
+    0018  CONST       r13 <- k3              60:16
+    0019  CONST       r14 <- k7              61:4
+    0020  MOVE        r15 <- r0              61:14
+    0021  CONST       r16 <- k8              62:4
+    0022  CONST       r17 <- k9              62:15
+    0023  CONST       r18 <- k10             63:4
+    0024  CONST       r19 <- k11             63:13
+    0025  CONST       r20 <- k12             64:4
+    0026  CONST       r21 <- k11             64:13
+    0027  CONST       r22 <- k13             68:4
+    0028  CONST       r23 <- k14             68:11
+    0029  CONST       r24 <- k15             69:4
+    0030  CONST       r25 <- k9              69:11
+    0031  TAILCALL    r3(22)                 52:3
+    0032  RETURN      r2                     52:3
 
-proto 9  line-count  params 1  slots 7
+proto 7  line-count  params 1  slots 7
   constants
     k0  :lines
   code
-    0000  GETGLOBAL   r2 <- count            72:27
-    0001  GETGLOBAL   r4 <- get              72:34
-    0002  MOVE        r5 <- r0               72:38
-    0003  CONST       r6 <- k0               72:44
-    0004  CALL        r3 <- r4(2)            72:33
-    0005  TAILCALL    r2(1)                  72:26
-    0006  RETURN      r1                     72:26
+    0000  GETGLOBAL   r2 <- count            71:27
+    0001  GETGLOBAL   r4 <- get              71:34
+    0002  MOVE        r5 <- r0               71:38
+    0003  CONST       r6 <- k0               71:44
+    0004  CALL        r3 <- r4(2)            71:33
+    0005  TAILCALL    r2(1)                  71:26
+    0006  RETURN      r1                     71:26
 
-proto 10  line-at  params 2  slots 9
+proto 8  line-at  params 2  slots 9
   constants
     k0  :lines
   code
-    0000  GETGLOBAL   r3 <- nth              73:28
-    0001  GETGLOBAL   r6 <- get              73:33
-    0002  MOVE        r7 <- r0               73:37
-    0003  CONST       r8 <- k0               73:43
-    0004  CALL        r4 <- r6(2)            73:32
-    0005  MOVE        r5 <- r1               73:51
-    0006  TAILCALL    r3(2)                  73:27
-    0007  RETURN      r2                     73:27
+    0000  GETGLOBAL   r3 <- nth              72:28
+    0001  GETGLOBAL   r6 <- get              72:33
+    0002  MOVE        r7 <- r0               72:37
+    0003  CONST       r8 <- k0               72:43
+    0004  CALL        r4 <- r6(2)            72:32
+    0005  MOVE        r5 <- r1               72:51
+    0006  TAILCALL    r3(2)                  72:27
+    0007  RETURN      r2                     72:27
 
-proto 11  current-line  params 1  slots 8
+proto 9  current-line  params 1  slots 8
   constants
     k0  :cursor-row
   code
-    0000  GETGLOBAL   r2 <- line-at          74:29
-    0001  MOVE        r3 <- r0               74:37
-    0002  GETGLOBAL   r5 <- get              74:44
-    0003  MOVE        r6 <- r0               74:48
-    0004  CONST       r7 <- k0               74:54
-    0005  CALL        r4 <- r5(2)            74:43
-    0006  TAILCALL    r2(2)                  74:28
-    0007  RETURN      r1                     74:28
+    0000  GETGLOBAL   r2 <- line-at          73:29
+    0001  MOVE        r3 <- r0               73:37
+    0002  GETGLOBAL   r5 <- get              73:44
+    0003  MOVE        r6 <- r0               73:48
+    0004  CONST       r7 <- k0               73:54
+    0005  CALL        r4 <- r5(2)            73:43
+    0006  TAILCALL    r2(2)                  73:28
+    0007  RETURN      r1                     73:28
 
-proto 12  line-len  params 2  slots 8
+proto 10  line-len  params 2  slots 8
   code
-    0000  GETGLOBAL   r3 <- str-scalar-len   75:29
-    0001  GETGLOBAL   r5 <- line-at          75:45
-    0002  MOVE        r6 <- r0               75:53
-    0003  MOVE        r7 <- r1               75:59
-    0004  CALL        r4 <- r5(2)            75:44
-    0005  TAILCALL    r3(1)                  75:28
-    0006  RETURN      r2                     75:28
+    0000  GETGLOBAL   r3 <- str-scalar-len   74:29
+    0001  GETGLOBAL   r5 <- line-at          74:45
+    0002  MOVE        r6 <- r0               74:53
+    0003  MOVE        r7 <- r1               74:59
+    0004  CALL        r4 <- r5(2)            74:44
+    0005  TAILCALL    r3(1)                  74:28
+    0006  RETURN      r2                     74:28
 
-proto 13  move-vert  params 2  slots 18
+proto 11  move-vert  params 2  slots 18
   constants
     k0  :cursor-row
     k1  :cursor-col
     k2  :goal-col
   code
-    0000  GETGLOBAL   r3 <- assoc            82:4
-    0001  MOVE        r4 <- r0               82:10
-    0002  CONST       r5 <- k0               83:10
-    0003  MOVE        r6 <- r1               83:22
-    0004  CONST       r7 <- k1               84:10
-    0005  GETGLOBAL   r9 <- min2             84:23
-    0006  GETGLOBAL   r12 <- get             84:29
-    0007  MOVE        r13 <- r0              84:33
-    0008  CONST       r14 <- k2              84:39
-    0009  CALL        r10 <- r12(2)          84:28
-    0010  GETGLOBAL   r15 <- line-len        84:51
-    0011  MOVE        r16 <- r0              84:60
-    0012  MOVE        r17 <- r1              84:66
-    0013  CALL        r11 <- r15(2)          84:50
-    0014  CALL        r8 <- r9(2)            84:22
-    0015  TAILCALL    r3(5)                  82:3
-    0016  RETURN      r2                     82:3
+    0000  GETGLOBAL   r3 <- assoc            81:4
+    0001  MOVE        r4 <- r0               81:10
+    0002  CONST       r5 <- k0               82:10
+    0003  MOVE        r6 <- r1               82:22
+    0004  CONST       r7 <- k1               83:10
+    0005  GETGLOBAL   r9 <- min2             83:23
+    0006  GETGLOBAL   r12 <- get             83:29
+    0007  MOVE        r13 <- r0              83:33
+    0008  CONST       r14 <- k2              83:39
+    0009  CALL        r10 <- r12(2)          83:28
+    0010  GETGLOBAL   r15 <- line-len        83:51
+    0011  MOVE        r16 <- r0              83:60
+    0012  MOVE        r17 <- r1              83:66
+    0013  CALL        r11 <- r15(2)          83:50
+    0014  CALL        r8 <- r9(2)            83:22
+    0015  TAILCALL    r3(5)                  81:3
+    0016  RETURN      r2                     81:3
 
-proto 14  touch  params 1  slots 6
+proto 12  touch  params 1  slots 6
   constants
     k0  :modified?
     k1  true
   code
-    0000  GETGLOBAL   r2 <- assoc            87:4
-    0001  MOVE        r3 <- r0               87:10
-    0002  CONST       r4 <- k0               87:16
-    0003  CONST       r5 <- k1               87:27
-    0004  TAILCALL    r2(3)                  87:3
-    0005  RETURN      r1                     87:3
+    0000  GETGLOBAL   r2 <- assoc            86:4
+    0001  MOVE        r3 <- r0               86:10
+    0002  CONST       r4 <- k0               86:16
+    0003  CONST       r5 <- k1               86:27
+    0004  TAILCALL    r2(3)                  86:3
+    0005  RETURN      r1                     86:3
 
-proto 15  insert-str  params 2  slots 45
+proto 13  insert-str  params 2  slots 49
   constants
     k0  :cursor-row
     k1  :cursor-col
-    k2  :lines
+    k2  0
+    k3  :lines
   code
-    0000  GETGLOBAL   r4 <- get              92:14
-    0001  MOVE        r5 <- r0               92:18
-    0002  CONST       r6 <- k0               92:24
-    0003  CALL        r3 <- r4(2)            92:13
-    0004  GETGLOBAL   r8 <- get              93:14
-    0005  MOVE        r9 <- r0               93:18
-    0006  CONST       r10 <- k1              93:24
-    0007  CALL        r7 <- r8(2)            93:13
-    0008  GETGLOBAL   r12 <- current-line    94:15
-    0009  MOVE        r13 <- r0              94:28
-    0010  CALL        r11 <- r12(1)          94:14
-    0011  GETGLOBAL   r15 <- str             95:15
-    0012  GETGLOBAL   r19 <- scalars-take    95:20
-    0013  MOVE        r20 <- r7              95:33
-    0014  MOVE        r21 <- r11             95:37
-    0015  CALL        r16 <- r19(2)          95:19
-    0016  MOVE        r17 <- r1              95:43
-    0017  GETGLOBAL   r22 <- scalars-drop    95:46
-    0018  MOVE        r23 <- r7              95:59
-    0019  MOVE        r24 <- r11             95:63
-    0020  CALL        r18 <- r22(2)          95:45
-    0021  CALL        r14 <- r15(3)          95:14
-    0022  GETGLOBAL   r25 <- touch           96:6
-    0023  GETGLOBAL   r27 <- assoc           96:13
-    0024  MOVE        r28 <- r0              96:19
-    0025  CONST       r29 <- k2              97:19
-    0026  GETGLOBAL   r33 <- assoc           97:27
-    0027  GETGLOBAL   r37 <- get             97:34
-    0028  MOVE        r38 <- r0              97:38
-    0029  CONST       r39 <- k2              97:44
-    0030  CALL        r34 <- r37(2)          97:33
-    0031  MOVE        r35 <- r3              97:52
-    0032  MOVE        r36 <- r14             97:56
-    0033  CALL        r30 <- r33(3)          97:26
-    0034  CONST       r31 <- k1              98:19
-    0035  GETGLOBAL   r40 <- +               98:32
-    0036  MOVE        r41 <- r7              98:34
-    0037  GETGLOBAL   r43 <- str-scalar-len  98:39
-    0038  MOVE        r44 <- r1              98:54
-    0039  CALL        r42 <- r43(1)          98:38
-    0040  CALL        r32 <- r40(2)          98:31
-    0041  CALL        r26 <- r27(5)          96:12
-    0042  TAILCALL    r25(1)                 96:5
-    0043  RETURN      r2                     92:3
+    0000  GETGLOBAL   r4 <- get              91:14
+    0001  MOVE        r5 <- r0               91:18
+    0002  CONST       r6 <- k0               91:24
+    0003  CALL        r3 <- r4(2)            91:13
+    0004  GETGLOBAL   r8 <- get              92:14
+    0005  MOVE        r9 <- r0               92:18
+    0006  CONST       r10 <- k1              92:24
+    0007  CALL        r7 <- r8(2)            92:13
+    0008  GETGLOBAL   r12 <- current-line    93:15
+    0009  MOVE        r13 <- r0              93:28
+    0010  CALL        r11 <- r12(1)          93:14
+    0011  GETGLOBAL   r15 <- str             94:15
+    0012  GETGLOBAL   r19 <- str-scalar-slice 94:20
+    0013  MOVE        r20 <- r11             94:37
+    0014  CONST       r21 <- k2              94:42
+    0015  MOVE        r22 <- r7              94:44
+    0016  CALL        r16 <- r19(3)          94:19
+    0017  MOVE        r17 <- r1              94:49
+    0018  GETGLOBAL   r23 <- str-scalar-slice 94:52
+    0019  MOVE        r24 <- r11             94:69
+    0020  MOVE        r25 <- r7              94:74
+    0021  GETGLOBAL   r27 <- str-scalar-len  94:79
+    0022  MOVE        r28 <- r11             94:94
+    0023  CALL        r26 <- r27(1)          94:78
+    0024  CALL        r18 <- r23(3)          94:51
+    0025  CALL        r14 <- r15(3)          94:14
+    0026  GETGLOBAL   r29 <- touch           95:6
+    0027  GETGLOBAL   r31 <- assoc           95:13
+    0028  MOVE        r32 <- r0              95:19
+    0029  CONST       r33 <- k3              96:19
+    0030  GETGLOBAL   r37 <- assoc           96:27
+    0031  GETGLOBAL   r41 <- get             96:34
+    0032  MOVE        r42 <- r0              96:38
+    0033  CONST       r43 <- k3              96:44
+    0034  CALL        r38 <- r41(2)          96:33
+    0035  MOVE        r39 <- r3              96:52
+    0036  MOVE        r40 <- r14             96:56
+    0037  CALL        r34 <- r37(3)          96:26
+    0038  CONST       r35 <- k1              97:19
+    0039  GETGLOBAL   r44 <- +               97:32
+    0040  MOVE        r45 <- r7              97:34
+    0041  GETGLOBAL   r47 <- str-scalar-len  97:39
+    0042  MOVE        r48 <- r1              97:54
+    0043  CALL        r46 <- r47(1)          97:38
+    0044  CALL        r36 <- r44(2)          97:31
+    0045  CALL        r30 <- r31(5)          95:12
+    0046  TAILCALL    r29(1)                 95:5
+    0047  RETURN      r2                     91:3
 
-proto 16  split-line  params 1  slots 58
+proto 14  split-line  params 1  slots 62
   constants
     k0  :cursor-row
     k1  :cursor-col
     k2  :lines
     k3  0
   code
-    0000  GETGLOBAL   r3 <- get              101:14
-    0001  MOVE        r4 <- r0               101:18
-    0002  CONST       r5 <- k0               101:24
-    0003  CALL        r2 <- r3(2)            101:13
-    0004  GETGLOBAL   r7 <- get              102:14
-    0005  MOVE        r8 <- r0               102:18
-    0006  CONST       r9 <- k1               102:24
-    0007  CALL        r6 <- r7(2)            102:13
-    0008  GETGLOBAL   r11 <- current-line    103:15
-    0009  MOVE        r12 <- r0              103:28
-    0010  CALL        r10 <- r11(1)          103:14
-    0011  GETGLOBAL   r14 <- get             104:16
-    0012  MOVE        r15 <- r0              104:20
-    0013  CONST       r16 <- k2              104:26
-    0014  CALL        r13 <- r14(2)          104:15
-    0015  GETGLOBAL   r18 <- take            105:17
-    0016  MOVE        r19 <- r2              105:22
-    0017  MOVE        r20 <- r13             105:26
-    0018  CALL        r17 <- r18(2)          105:16
-    0019  GETGLOBAL   r22 <- drop            106:16
-    0020  GETGLOBAL   r25 <- inc             106:22
-    0021  MOVE        r26 <- r2              106:26
-    0022  CALL        r23 <- r25(1)          106:21
-    0023  MOVE        r24 <- r13             106:31
-    0024  CALL        r21 <- r22(2)          106:15
-    0025  GETGLOBAL   r28 <- scalars-take    107:15
-    0026  MOVE        r29 <- r6              107:28
-    0027  MOVE        r30 <- r10             107:32
-    0028  CALL        r27 <- r28(2)          107:14
-    0029  GETGLOBAL   r32 <- scalars-drop    108:15
-    0030  MOVE        r33 <- r6              108:28
-    0031  MOVE        r34 <- r10             108:32
-    0032  CALL        r31 <- r32(2)          108:14
-    0033  GETGLOBAL   r35 <- touch           109:6
-    0034  GETGLOBAL   r37 <- assoc           109:13
-    0035  MOVE        r38 <- r0              109:19
-    0036  CONST       r39 <- k2              110:19
-    0037  GETGLOBAL   r45 <- vec             110:27
-    0038  GETGLOBAL   r47 <- concat          110:32
-    0039  MOVE        r48 <- r17             110:39
-    0040  GETGLOBAL   r52 <- vector          110:46
-    0041  MOVE        r53 <- r27             110:47
-    0042  CALL        r49 <- r52(1)          110:46
-    0043  GETGLOBAL   r54 <- vector          110:53
-    0044  MOVE        r55 <- r31             110:54
-    0045  CALL        r50 <- r54(1)          110:53
-    0046  MOVE        r51 <- r21             110:60
-    0047  CALL        r46 <- r47(4)          110:31
-    0048  CALL        r40 <- r45(1)          110:26
-    0049  CONST       r41 <- k0              111:19
-    0050  GETGLOBAL   r56 <- inc             111:32
-    0051  MOVE        r57 <- r2              111:36
-    0052  CALL        r42 <- r56(1)          111:31
-    0053  CONST       r43 <- k1              112:19
-    0054  CONST       r44 <- k3              112:31
-    0055  CALL        r36 <- r37(7)          109:12
-    0056  TAILCALL    r35(1)                 109:5
-    0057  RETURN      r1                     101:3
+    0000  GETGLOBAL   r3 <- get              100:14
+    0001  MOVE        r4 <- r0               100:18
+    0002  CONST       r5 <- k0               100:24
+    0003  CALL        r2 <- r3(2)            100:13
+    0004  GETGLOBAL   r7 <- get              101:14
+    0005  MOVE        r8 <- r0               101:18
+    0006  CONST       r9 <- k1               101:24
+    0007  CALL        r6 <- r7(2)            101:13
+    0008  GETGLOBAL   r11 <- current-line    102:15
+    0009  MOVE        r12 <- r0              102:28
+    0010  CALL        r10 <- r11(1)          102:14
+    0011  GETGLOBAL   r14 <- get             103:16
+    0012  MOVE        r15 <- r0              103:20
+    0013  CONST       r16 <- k2              103:26
+    0014  CALL        r13 <- r14(2)          103:15
+    0015  GETGLOBAL   r18 <- take            104:17
+    0016  MOVE        r19 <- r2              104:22
+    0017  MOVE        r20 <- r13             104:26
+    0018  CALL        r17 <- r18(2)          104:16
+    0019  GETGLOBAL   r22 <- drop            105:16
+    0020  GETGLOBAL   r25 <- inc             105:22
+    0021  MOVE        r26 <- r2              105:26
+    0022  CALL        r23 <- r25(1)          105:21
+    0023  MOVE        r24 <- r13             105:31
+    0024  CALL        r21 <- r22(2)          105:15
+    0025  GETGLOBAL   r28 <- str-scalar-slice 106:15
+    0026  MOVE        r29 <- r10             106:32
+    0027  CONST       r30 <- k3              106:37
+    0028  MOVE        r31 <- r6              106:39
+    0029  CALL        r27 <- r28(3)          106:14
+    0030  GETGLOBAL   r33 <- str-scalar-slice 107:15
+    0031  MOVE        r34 <- r10             107:32
+    0032  MOVE        r35 <- r6              107:37
+    0033  GETGLOBAL   r37 <- str-scalar-len  107:42
+    0034  MOVE        r38 <- r10             107:57
+    0035  CALL        r36 <- r37(1)          107:41
+    0036  CALL        r32 <- r33(3)          107:14
+    0037  GETGLOBAL   r39 <- touch           108:6
+    0038  GETGLOBAL   r41 <- assoc           108:13
+    0039  MOVE        r42 <- r0              108:19
+    0040  CONST       r43 <- k2              109:19
+    0041  GETGLOBAL   r49 <- vec             109:27
+    0042  GETGLOBAL   r51 <- concat          109:32
+    0043  MOVE        r52 <- r17             109:39
+    0044  GETGLOBAL   r56 <- vector          109:46
+    0045  MOVE        r57 <- r27             109:47
+    0046  CALL        r53 <- r56(1)          109:46
+    0047  GETGLOBAL   r58 <- vector          109:53
+    0048  MOVE        r59 <- r32             109:54
+    0049  CALL        r54 <- r58(1)          109:53
+    0050  MOVE        r55 <- r21             109:60
+    0051  CALL        r50 <- r51(4)          109:31
+    0052  CALL        r44 <- r49(1)          109:26
+    0053  CONST       r45 <- k0              110:19
+    0054  GETGLOBAL   r60 <- inc             110:32
+    0055  MOVE        r61 <- r2              110:36
+    0056  CALL        r46 <- r60(1)          110:31
+    0057  CONST       r47 <- k1              111:19
+    0058  CONST       r48 <- k3              111:31
+    0059  CALL        r40 <- r41(7)          108:12
+    0060  TAILCALL    r39(1)                 108:5
+    0061  RETURN      r1                     100:3
 
-proto 17  join-prev  params 1  slots 54
+proto 15  join-prev  params 1  slots 54
   constants
     k0  :cursor-row
     k1  :lines
     k2  :cursor-col
   code
-    0000  GETGLOBAL   r3 <- get              115:14
-    0001  MOVE        r4 <- r0               115:18
-    0002  CONST       r5 <- k0               115:24
-    0003  CALL        r2 <- r3(2)            115:13
-    0004  GETGLOBAL   r7 <- get              116:16
-    0005  MOVE        r8 <- r0               116:20
-    0006  CONST       r9 <- k1               116:26
-    0007  CALL        r6 <- r7(2)            116:15
-    0008  GETGLOBAL   r11 <- line-at         117:15
-    0009  MOVE        r12 <- r0              117:23
-    0010  GETGLOBAL   r14 <- dec             117:30
-    0011  MOVE        r15 <- r2              117:34
-    0012  CALL        r13 <- r14(1)          117:29
-    0013  CALL        r10 <- r11(2)          117:14
-    0014  GETGLOBAL   r17 <- str             118:17
-    0015  MOVE        r18 <- r10             118:21
-    0016  GETGLOBAL   r20 <- current-line    118:27
-    0017  MOVE        r21 <- r0              118:40
-    0018  CALL        r19 <- r20(1)          118:26
-    0019  CALL        r16 <- r17(2)          118:16
-    0020  GETGLOBAL   r22 <- touch           119:6
-    0021  GETGLOBAL   r24 <- assoc           119:13
-    0022  MOVE        r25 <- r0              119:19
-    0023  CONST       r26 <- k1              120:19
-    0024  GETGLOBAL   r32 <- vec             120:27
-    0025  GETGLOBAL   r34 <- concat          120:32
-    0026  GETGLOBAL   r38 <- take            120:40
-    0027  GETGLOBAL   r41 <- dec             120:46
-    0028  MOVE        r42 <- r2              120:50
-    0029  CALL        r39 <- r41(1)          120:45
-    0030  MOVE        r40 <- r6              120:55
-    0031  CALL        r35 <- r38(2)          120:39
-    0032  GETGLOBAL   r43 <- vector          120:62
-    0033  MOVE        r44 <- r16             120:63
-    0034  CALL        r36 <- r43(1)          120:62
-    0035  GETGLOBAL   r45 <- drop            120:72
-    0036  GETGLOBAL   r48 <- inc             120:78
-    0037  MOVE        r49 <- r2              120:82
-    0038  CALL        r46 <- r48(1)          120:77
-    0039  MOVE        r47 <- r6              120:87
-    0040  CALL        r37 <- r45(2)          120:71
-    0041  CALL        r33 <- r34(3)          120:31
-    0042  CALL        r27 <- r32(1)          120:26
-    0043  CONST       r28 <- k0              121:19
-    0044  GETGLOBAL   r50 <- dec             121:32
-    0045  MOVE        r51 <- r2              121:36
-    0046  CALL        r29 <- r50(1)          121:31
-    0047  CONST       r30 <- k2              122:19
-    0048  GETGLOBAL   r52 <- str-scalar-len  122:32
-    0049  MOVE        r53 <- r10             122:47
-    0050  CALL        r31 <- r52(1)          122:31
-    0051  CALL        r23 <- r24(7)          119:12
-    0052  TAILCALL    r22(1)                 119:5
-    0053  RETURN      r1                     115:3
+    0000  GETGLOBAL   r3 <- get              114:14
+    0001  MOVE        r4 <- r0               114:18
+    0002  CONST       r5 <- k0               114:24
+    0003  CALL        r2 <- r3(2)            114:13
+    0004  GETGLOBAL   r7 <- get              115:16
+    0005  MOVE        r8 <- r0               115:20
+    0006  CONST       r9 <- k1               115:26
+    0007  CALL        r6 <- r7(2)            115:15
+    0008  GETGLOBAL   r11 <- line-at         116:15
+    0009  MOVE        r12 <- r0              116:23
+    0010  GETGLOBAL   r14 <- dec             116:30
+    0011  MOVE        r15 <- r2              116:34
+    0012  CALL        r13 <- r14(1)          116:29
+    0013  CALL        r10 <- r11(2)          116:14
+    0014  GETGLOBAL   r17 <- str             117:17
+    0015  MOVE        r18 <- r10             117:21
+    0016  GETGLOBAL   r20 <- current-line    117:27
+    0017  MOVE        r21 <- r0              117:40
+    0018  CALL        r19 <- r20(1)          117:26
+    0019  CALL        r16 <- r17(2)          117:16
+    0020  GETGLOBAL   r22 <- touch           118:6
+    0021  GETGLOBAL   r24 <- assoc           118:13
+    0022  MOVE        r25 <- r0              118:19
+    0023  CONST       r26 <- k1              119:19
+    0024  GETGLOBAL   r32 <- vec             119:27
+    0025  GETGLOBAL   r34 <- concat          119:32
+    0026  GETGLOBAL   r38 <- take            119:40
+    0027  GETGLOBAL   r41 <- dec             119:46
+    0028  MOVE        r42 <- r2              119:50
+    0029  CALL        r39 <- r41(1)          119:45
+    0030  MOVE        r40 <- r6              119:55
+    0031  CALL        r35 <- r38(2)          119:39
+    0032  GETGLOBAL   r43 <- vector          119:62
+    0033  MOVE        r44 <- r16             119:63
+    0034  CALL        r36 <- r43(1)          119:62
+    0035  GETGLOBAL   r45 <- drop            119:72
+    0036  GETGLOBAL   r48 <- inc             119:78
+    0037  MOVE        r49 <- r2              119:82
+    0038  CALL        r46 <- r48(1)          119:77
+    0039  MOVE        r47 <- r6              119:87
+    0040  CALL        r37 <- r45(2)          119:71
+    0041  CALL        r33 <- r34(3)          119:31
+    0042  CALL        r27 <- r32(1)          119:26
+    0043  CONST       r28 <- k0              120:19
+    0044  GETGLOBAL   r50 <- dec             120:32
+    0045  MOVE        r51 <- r2              120:36
+    0046  CALL        r29 <- r50(1)          120:31
+    0047  CONST       r30 <- k2              121:19
+    0048  GETGLOBAL   r52 <- str-scalar-len  121:32
+    0049  MOVE        r53 <- r10             121:47
+    0050  CALL        r31 <- r52(1)          121:31
+    0051  CALL        r23 <- r24(7)          118:12
+    0052  TAILCALL    r22(1)                 118:5
+    0053  RETURN      r1                     114:3
 
-proto 18  delete-back  params 1  slots 53
+proto 16  delete-back  params 1  slots 57
   constants
     k0  :cursor-row
     k1  :cursor-col
@@ -695,70 +676,74 @@ proto 18  delete-back  params 1  slots 53
     k4  true
     k5  nil
   code
-    0000  GETGLOBAL   r3 <- get              125:14
-    0001  MOVE        r4 <- r0               125:18
-    0002  CONST       r5 <- k0               125:24
-    0003  CALL        r2 <- r3(2)            125:13
-    0004  GETGLOBAL   r7 <- get              126:14
-    0005  MOVE        r8 <- r0               126:18
-    0006  CONST       r9 <- k1               126:24
-    0007  CALL        r6 <- r7(2)            126:13
-    0008  GETGLOBAL   r11 <- >               128:8
-    0009  MOVE        r12 <- r6              128:10
-    0010  CONST       r13 <- k2              128:14
-    0011  CALL        r10 <- r11(2)          128:7
-    0012  JUMPUNLESS  r10, 0047              generated 127:5
-    0013  GETGLOBAL   r15 <- current-line    129:19
-    0014  MOVE        r16 <- r0              129:32
-    0015  CALL        r14 <- r15(1)          129:18
-    0016  GETGLOBAL   r18 <- str             130:19
-    0017  GETGLOBAL   r21 <- scalars-take    130:24
-    0018  GETGLOBAL   r24 <- dec             130:38
-    0019  MOVE        r25 <- r6              130:42
-    0020  CALL        r22 <- r24(1)          130:37
-    0021  MOVE        r23 <- r14             130:47
-    0022  CALL        r19 <- r21(2)          130:23
-    0023  GETGLOBAL   r26 <- scalars-drop    130:54
-    0024  MOVE        r27 <- r6              130:67
-    0025  MOVE        r28 <- r14             130:71
-    0026  CALL        r20 <- r26(2)          130:53
-    0027  CALL        r17 <- r18(2)          130:18
-    0028  GETGLOBAL   r29 <- touch           131:10
-    0029  GETGLOBAL   r31 <- assoc           131:17
-    0030  MOVE        r32 <- r0              131:23
-    0031  CONST       r33 <- k3              132:23
-    0032  GETGLOBAL   r37 <- assoc           132:31
-    0033  GETGLOBAL   r41 <- get             132:38
-    0034  MOVE        r42 <- r0              132:42
-    0035  CONST       r43 <- k3              132:48
-    0036  CALL        r38 <- r41(2)          132:37
-    0037  MOVE        r39 <- r2              132:56
-    0038  MOVE        r40 <- r17             132:60
-    0039  CALL        r34 <- r37(3)          132:30
-    0040  CONST       r35 <- k1              133:23
-    0041  GETGLOBAL   r44 <- dec             133:36
-    0042  MOVE        r45 <- r6              133:40
-    0043  CALL        r36 <- r44(1)          133:35
-    0044  CALL        r30 <- r31(5)          131:16
-    0045  TAILCALL    r29(1)                 131:9
-    0046  JUMP        0061                   generated 127:5
-    0047  GETGLOBAL   r47 <- >               134:8
-    0048  MOVE        r48 <- r2              134:10
-    0049  CONST       r49 <- k2              134:14
-    0050  CALL        r46 <- r47(2)          134:7
-    0051  JUMPUNLESS  r46, 0056              generated 127:5
-    0052  GETGLOBAL   r50 <- join-prev       134:18
-    0053  MOVE        r51 <- r0              134:28
-    0054  TAILCALL    r50(1)                 134:17
-    0055  JUMP        0061                   generated 127:5
-    0056  CONST       r52 <- k4              generated 127:5
-    0057  JUMPUNLESS  r52, 0060              generated 127:5
-    0058  MOVE        r1 <- r0               generated 127:5
-    0059  JUMP        0061                   generated 127:5
-    0060  CONST       r1 <- k5               generated 127:5
-    0061  RETURN      r1                     125:3
+    0000  GETGLOBAL   r3 <- get              124:14
+    0001  MOVE        r4 <- r0               124:18
+    0002  CONST       r5 <- k0               124:24
+    0003  CALL        r2 <- r3(2)            124:13
+    0004  GETGLOBAL   r7 <- get              125:14
+    0005  MOVE        r8 <- r0               125:18
+    0006  CONST       r9 <- k1               125:24
+    0007  CALL        r6 <- r7(2)            125:13
+    0008  GETGLOBAL   r11 <- >               127:8
+    0009  MOVE        r12 <- r6              127:10
+    0010  CONST       r13 <- k2              127:14
+    0011  CALL        r10 <- r11(2)          127:7
+    0012  JUMPUNLESS  r10, 0051              generated 126:5
+    0013  GETGLOBAL   r15 <- current-line    128:19
+    0014  MOVE        r16 <- r0              128:32
+    0015  CALL        r14 <- r15(1)          128:18
+    0016  GETGLOBAL   r18 <- str             129:19
+    0017  GETGLOBAL   r21 <- str-scalar-slice 129:24
+    0018  MOVE        r22 <- r14             129:41
+    0019  CONST       r23 <- k2              129:46
+    0020  GETGLOBAL   r25 <- dec             129:49
+    0021  MOVE        r26 <- r6              129:53
+    0022  CALL        r24 <- r25(1)          129:48
+    0023  CALL        r19 <- r21(3)          129:23
+    0024  GETGLOBAL   r27 <- str-scalar-slice 129:60
+    0025  MOVE        r28 <- r14             129:77
+    0026  MOVE        r29 <- r6              129:82
+    0027  GETGLOBAL   r31 <- str-scalar-len  129:87
+    0028  MOVE        r32 <- r14             129:102
+    0029  CALL        r30 <- r31(1)          129:86
+    0030  CALL        r20 <- r27(3)          129:59
+    0031  CALL        r17 <- r18(2)          129:18
+    0032  GETGLOBAL   r33 <- touch           130:10
+    0033  GETGLOBAL   r35 <- assoc           130:17
+    0034  MOVE        r36 <- r0              130:23
+    0035  CONST       r37 <- k3              131:23
+    0036  GETGLOBAL   r41 <- assoc           131:31
+    0037  GETGLOBAL   r45 <- get             131:38
+    0038  MOVE        r46 <- r0              131:42
+    0039  CONST       r47 <- k3              131:48
+    0040  CALL        r42 <- r45(2)          131:37
+    0041  MOVE        r43 <- r2              131:56
+    0042  MOVE        r44 <- r17             131:60
+    0043  CALL        r38 <- r41(3)          131:30
+    0044  CONST       r39 <- k1              132:23
+    0045  GETGLOBAL   r48 <- dec             132:36
+    0046  MOVE        r49 <- r6              132:40
+    0047  CALL        r40 <- r48(1)          132:35
+    0048  CALL        r34 <- r35(5)          130:16
+    0049  TAILCALL    r33(1)                 130:9
+    0050  JUMP        0065                   generated 126:5
+    0051  GETGLOBAL   r51 <- >               133:8
+    0052  MOVE        r52 <- r2              133:10
+    0053  CONST       r53 <- k2              133:14
+    0054  CALL        r50 <- r51(2)          133:7
+    0055  JUMPUNLESS  r50, 0060              generated 126:5
+    0056  GETGLOBAL   r54 <- join-prev       133:18
+    0057  MOVE        r55 <- r0              133:28
+    0058  TAILCALL    r54(1)                 133:17
+    0059  JUMP        0065                   generated 126:5
+    0060  CONST       r56 <- k4              generated 126:5
+    0061  JUMPUNLESS  r56, 0064              generated 126:5
+    0062  MOVE        r1 <- r0               generated 126:5
+    0063  JUMP        0065                   generated 126:5
+    0064  CONST       r1 <- k5               generated 126:5
+    0065  RETURN      r1                     124:3
 
-proto 19  move-left  params 1  slots 38
+proto 17  move-left  params 1  slots 38
   constants
     k0  :cursor-col
     k1  :cursor-row
@@ -766,55 +751,55 @@ proto 19  move-left  params 1  slots 38
     k3  true
     k4  nil
   code
-    0000  GETGLOBAL   r3 <- get              140:14
-    0001  MOVE        r4 <- r0               140:18
-    0002  CONST       r5 <- k0               140:24
-    0003  CALL        r2 <- r3(2)            140:13
-    0004  GETGLOBAL   r7 <- get              140:42
-    0005  MOVE        r8 <- r0               140:46
-    0006  CONST       r9 <- k1               140:52
-    0007  CALL        r6 <- r7(2)            140:41
-    0008  GETGLOBAL   r11 <- >               142:8
-    0009  MOVE        r12 <- r2              142:10
-    0010  CONST       r13 <- k2              142:14
-    0011  CALL        r10 <- r11(2)          142:7
-    0012  JUMPUNLESS  r10, 0021              generated 141:5
-    0013  GETGLOBAL   r14 <- assoc           142:18
-    0014  MOVE        r15 <- r0              142:24
-    0015  CONST       r16 <- k0              142:30
-    0016  GETGLOBAL   r18 <- dec             142:43
-    0017  MOVE        r19 <- r2              142:47
-    0018  CALL        r17 <- r18(1)          142:42
-    0019  TAILCALL    r14(3)                 142:17
-    0020  JUMP        0046                   generated 141:5
-    0021  GETGLOBAL   r21 <- >               143:8
-    0022  MOVE        r22 <- r6              143:10
-    0023  CONST       r23 <- k2              143:14
-    0024  CALL        r20 <- r21(2)          143:7
-    0025  JUMPUNLESS  r20, 0041              generated 141:5
-    0026  GETGLOBAL   r24 <- assoc           143:18
-    0027  MOVE        r25 <- r0              143:24
-    0028  CONST       r26 <- k1              143:30
-    0029  GETGLOBAL   r30 <- dec             143:43
-    0030  MOVE        r31 <- r6              143:47
-    0031  CALL        r27 <- r30(1)          143:42
-    0032  CONST       r28 <- k0              143:52
-    0033  GETGLOBAL   r32 <- line-len        143:65
-    0034  MOVE        r33 <- r0              143:74
-    0035  GETGLOBAL   r35 <- dec             143:81
-    0036  MOVE        r36 <- r6              143:85
-    0037  CALL        r34 <- r35(1)          143:80
-    0038  CALL        r29 <- r32(2)          143:64
-    0039  TAILCALL    r24(5)                 143:17
-    0040  JUMP        0046                   generated 141:5
-    0041  CONST       r37 <- k3              generated 141:5
-    0042  JUMPUNLESS  r37, 0045              generated 141:5
-    0043  MOVE        r1 <- r0               generated 141:5
-    0044  JUMP        0046                   generated 141:5
-    0045  CONST       r1 <- k4               generated 141:5
-    0046  RETURN      r1                     140:3
+    0000  GETGLOBAL   r3 <- get              139:14
+    0001  MOVE        r4 <- r0               139:18
+    0002  CONST       r5 <- k0               139:24
+    0003  CALL        r2 <- r3(2)            139:13
+    0004  GETGLOBAL   r7 <- get              139:42
+    0005  MOVE        r8 <- r0               139:46
+    0006  CONST       r9 <- k1               139:52
+    0007  CALL        r6 <- r7(2)            139:41
+    0008  GETGLOBAL   r11 <- >               141:8
+    0009  MOVE        r12 <- r2              141:10
+    0010  CONST       r13 <- k2              141:14
+    0011  CALL        r10 <- r11(2)          141:7
+    0012  JUMPUNLESS  r10, 0021              generated 140:5
+    0013  GETGLOBAL   r14 <- assoc           141:18
+    0014  MOVE        r15 <- r0              141:24
+    0015  CONST       r16 <- k0              141:30
+    0016  GETGLOBAL   r18 <- dec             141:43
+    0017  MOVE        r19 <- r2              141:47
+    0018  CALL        r17 <- r18(1)          141:42
+    0019  TAILCALL    r14(3)                 141:17
+    0020  JUMP        0046                   generated 140:5
+    0021  GETGLOBAL   r21 <- >               142:8
+    0022  MOVE        r22 <- r6              142:10
+    0023  CONST       r23 <- k2              142:14
+    0024  CALL        r20 <- r21(2)          142:7
+    0025  JUMPUNLESS  r20, 0041              generated 140:5
+    0026  GETGLOBAL   r24 <- assoc           142:18
+    0027  MOVE        r25 <- r0              142:24
+    0028  CONST       r26 <- k1              142:30
+    0029  GETGLOBAL   r30 <- dec             142:43
+    0030  MOVE        r31 <- r6              142:47
+    0031  CALL        r27 <- r30(1)          142:42
+    0032  CONST       r28 <- k0              142:52
+    0033  GETGLOBAL   r32 <- line-len        142:65
+    0034  MOVE        r33 <- r0              142:74
+    0035  GETGLOBAL   r35 <- dec             142:81
+    0036  MOVE        r36 <- r6              142:85
+    0037  CALL        r34 <- r35(1)          142:80
+    0038  CALL        r29 <- r32(2)          142:64
+    0039  TAILCALL    r24(5)                 142:17
+    0040  JUMP        0046                   generated 140:5
+    0041  CONST       r37 <- k3              generated 140:5
+    0042  JUMPUNLESS  r37, 0045              generated 140:5
+    0043  MOVE        r1 <- r0               generated 140:5
+    0044  JUMP        0046                   generated 140:5
+    0045  CONST       r1 <- k4               generated 140:5
+    0046  RETURN      r1                     139:3
 
-proto 20  move-right  params 1  slots 40
+proto 18  move-right  params 1  slots 40
   constants
     k0  :cursor-col
     k1  :cursor-row
@@ -822,157 +807,157 @@ proto 20  move-right  params 1  slots 40
     k3  true
     k4  nil
   code
-    0000  GETGLOBAL   r3 <- get              147:14
-    0001  MOVE        r4 <- r0               147:18
-    0002  CONST       r5 <- k0               147:24
-    0003  CALL        r2 <- r3(2)            147:13
-    0004  GETGLOBAL   r7 <- get              147:42
-    0005  MOVE        r8 <- r0               147:46
-    0006  CONST       r9 <- k1               147:52
-    0007  CALL        r6 <- r7(2)            147:41
-    0008  GETGLOBAL   r11 <- <               149:8
-    0009  MOVE        r12 <- r2              149:10
-    0010  GETGLOBAL   r14 <- line-len        149:15
-    0011  MOVE        r15 <- r0              149:24
-    0012  MOVE        r16 <- r6              149:30
-    0013  CALL        r13 <- r14(2)          149:14
-    0014  CALL        r10 <- r11(2)          149:7
-    0015  JUMPUNLESS  r10, 0024              generated 148:5
-    0016  GETGLOBAL   r17 <- assoc           149:37
-    0017  MOVE        r18 <- r0              149:43
-    0018  CONST       r19 <- k0              149:49
-    0019  GETGLOBAL   r21 <- inc             149:62
-    0020  MOVE        r22 <- r2              149:66
-    0021  CALL        r20 <- r21(1)          149:61
-    0022  TAILCALL    r17(3)                 149:36
-    0023  JUMP        0048                   generated 148:5
-    0024  GETGLOBAL   r24 <- <               150:8
-    0025  MOVE        r25 <- r6              150:10
-    0026  GETGLOBAL   r27 <- dec             150:15
-    0027  GETGLOBAL   r29 <- line-count      150:20
-    0028  MOVE        r30 <- r0              150:31
-    0029  CALL        r28 <- r29(1)          150:19
-    0030  CALL        r26 <- r27(1)          150:14
-    0031  CALL        r23 <- r24(2)          150:7
-    0032  JUMPUNLESS  r23, 0043              generated 148:5
-    0033  GETGLOBAL   r31 <- assoc           150:41
-    0034  MOVE        r32 <- r0              150:47
-    0035  CONST       r33 <- k1              150:53
-    0036  GETGLOBAL   r37 <- inc             150:66
-    0037  MOVE        r38 <- r6              150:70
-    0038  CALL        r34 <- r37(1)          150:65
-    0039  CONST       r35 <- k0              150:75
-    0040  CONST       r36 <- k2              150:87
-    0041  TAILCALL    r31(5)                 150:40
-    0042  JUMP        0048                   generated 148:5
-    0043  CONST       r39 <- k3              generated 148:5
-    0044  JUMPUNLESS  r39, 0047              generated 148:5
-    0045  MOVE        r1 <- r0               generated 148:5
-    0046  JUMP        0048                   generated 148:5
-    0047  CONST       r1 <- k4               generated 148:5
-    0048  RETURN      r1                     147:3
+    0000  GETGLOBAL   r3 <- get              146:14
+    0001  MOVE        r4 <- r0               146:18
+    0002  CONST       r5 <- k0               146:24
+    0003  CALL        r2 <- r3(2)            146:13
+    0004  GETGLOBAL   r7 <- get              146:42
+    0005  MOVE        r8 <- r0               146:46
+    0006  CONST       r9 <- k1               146:52
+    0007  CALL        r6 <- r7(2)            146:41
+    0008  GETGLOBAL   r11 <- <               148:8
+    0009  MOVE        r12 <- r2              148:10
+    0010  GETGLOBAL   r14 <- line-len        148:15
+    0011  MOVE        r15 <- r0              148:24
+    0012  MOVE        r16 <- r6              148:30
+    0013  CALL        r13 <- r14(2)          148:14
+    0014  CALL        r10 <- r11(2)          148:7
+    0015  JUMPUNLESS  r10, 0024              generated 147:5
+    0016  GETGLOBAL   r17 <- assoc           148:37
+    0017  MOVE        r18 <- r0              148:43
+    0018  CONST       r19 <- k0              148:49
+    0019  GETGLOBAL   r21 <- inc             148:62
+    0020  MOVE        r22 <- r2              148:66
+    0021  CALL        r20 <- r21(1)          148:61
+    0022  TAILCALL    r17(3)                 148:36
+    0023  JUMP        0048                   generated 147:5
+    0024  GETGLOBAL   r24 <- <               149:8
+    0025  MOVE        r25 <- r6              149:10
+    0026  GETGLOBAL   r27 <- dec             149:15
+    0027  GETGLOBAL   r29 <- line-count      149:20
+    0028  MOVE        r30 <- r0              149:31
+    0029  CALL        r28 <- r29(1)          149:19
+    0030  CALL        r26 <- r27(1)          149:14
+    0031  CALL        r23 <- r24(2)          149:7
+    0032  JUMPUNLESS  r23, 0043              generated 147:5
+    0033  GETGLOBAL   r31 <- assoc           149:41
+    0034  MOVE        r32 <- r0              149:47
+    0035  CONST       r33 <- k1              149:53
+    0036  GETGLOBAL   r37 <- inc             149:66
+    0037  MOVE        r38 <- r6              149:70
+    0038  CALL        r34 <- r37(1)          149:65
+    0039  CONST       r35 <- k0              149:75
+    0040  CONST       r36 <- k2              149:87
+    0041  TAILCALL    r31(5)                 149:40
+    0042  JUMP        0048                   generated 147:5
+    0043  CONST       r39 <- k3              generated 147:5
+    0044  JUMPUNLESS  r39, 0047              generated 147:5
+    0045  MOVE        r1 <- r0               generated 147:5
+    0046  JUMP        0048                   generated 147:5
+    0047  CONST       r1 <- k4               generated 147:5
+    0048  RETURN      r1                     146:3
 
-proto 21  move-up  params 1  slots 17
+proto 19  move-up  params 1  slots 17
   constants
     k0  :cursor-row
     k1  0
   code
-    0000  GETGLOBAL   r3 <- >                154:8
-    0001  GETGLOBAL   r6 <- get              154:11
-    0002  MOVE        r7 <- r0               154:15
-    0003  CONST       r8 <- k0               154:21
-    0004  CALL        r4 <- r6(2)            154:10
-    0005  CONST       r5 <- k1               154:34
-    0006  CALL        r2 <- r3(2)            154:7
-    0007  JUMPUNLESS  r2, 0018               154:3
-    0008  GETGLOBAL   r9 <- move-vert        155:6
-    0009  MOVE        r10 <- r0              155:16
-    0010  GETGLOBAL   r12 <- dec             155:23
-    0011  GETGLOBAL   r14 <- get             155:28
-    0012  MOVE        r15 <- r0              155:32
-    0013  CONST       r16 <- k0              155:38
-    0014  CALL        r13 <- r14(2)          155:27
-    0015  CALL        r11 <- r12(1)          155:22
-    0016  TAILCALL    r9(2)                  155:5
-    0017  JUMP        0019                   154:3
-    0018  MOVE        r1 <- r0               156:5
-    0019  RETURN      r1                     154:3
+    0000  GETGLOBAL   r3 <- >                153:8
+    0001  GETGLOBAL   r6 <- get              153:11
+    0002  MOVE        r7 <- r0               153:15
+    0003  CONST       r8 <- k0               153:21
+    0004  CALL        r4 <- r6(2)            153:10
+    0005  CONST       r5 <- k1               153:34
+    0006  CALL        r2 <- r3(2)            153:7
+    0007  JUMPUNLESS  r2, 0018               153:3
+    0008  GETGLOBAL   r9 <- move-vert        154:6
+    0009  MOVE        r10 <- r0              154:16
+    0010  GETGLOBAL   r12 <- dec             154:23
+    0011  GETGLOBAL   r14 <- get             154:28
+    0012  MOVE        r15 <- r0              154:32
+    0013  CONST       r16 <- k0              154:38
+    0014  CALL        r13 <- r14(2)          154:27
+    0015  CALL        r11 <- r12(1)          154:22
+    0016  TAILCALL    r9(2)                  154:5
+    0017  JUMP        0019                   153:3
+    0018  MOVE        r1 <- r0               155:5
+    0019  RETURN      r1                     153:3
 
-proto 22  move-down  params 1  slots 21
+proto 20  move-down  params 1  slots 21
   constants
     k0  :cursor-row
   code
-    0000  GETGLOBAL   r3 <- <                159:8
-    0001  GETGLOBAL   r6 <- get              159:11
-    0002  MOVE        r7 <- r0               159:15
-    0003  CONST       r8 <- k0               159:21
-    0004  CALL        r4 <- r6(2)            159:10
-    0005  GETGLOBAL   r9 <- dec              159:35
-    0006  GETGLOBAL   r11 <- line-count      159:40
-    0007  MOVE        r12 <- r0              159:51
-    0008  CALL        r10 <- r11(1)          159:39
-    0009  CALL        r5 <- r9(1)            159:34
-    0010  CALL        r2 <- r3(2)            159:7
-    0011  JUMPUNLESS  r2, 0022               159:3
-    0012  GETGLOBAL   r13 <- move-vert       160:6
-    0013  MOVE        r14 <- r0              160:16
-    0014  GETGLOBAL   r16 <- inc             160:23
-    0015  GETGLOBAL   r18 <- get             160:28
-    0016  MOVE        r19 <- r0              160:32
-    0017  CONST       r20 <- k0              160:38
-    0018  CALL        r17 <- r18(2)          160:27
-    0019  CALL        r15 <- r16(1)          160:22
-    0020  TAILCALL    r13(2)                 160:5
-    0021  JUMP        0023                   159:3
-    0022  MOVE        r1 <- r0               161:5
-    0023  RETURN      r1                     159:3
+    0000  GETGLOBAL   r3 <- <                158:8
+    0001  GETGLOBAL   r6 <- get              158:11
+    0002  MOVE        r7 <- r0               158:15
+    0003  CONST       r8 <- k0               158:21
+    0004  CALL        r4 <- r6(2)            158:10
+    0005  GETGLOBAL   r9 <- dec              158:35
+    0006  GETGLOBAL   r11 <- line-count      158:40
+    0007  MOVE        r12 <- r0              158:51
+    0008  CALL        r10 <- r11(1)          158:39
+    0009  CALL        r5 <- r9(1)            158:34
+    0010  CALL        r2 <- r3(2)            158:7
+    0011  JUMPUNLESS  r2, 0022               158:3
+    0012  GETGLOBAL   r13 <- move-vert       159:6
+    0013  MOVE        r14 <- r0              159:16
+    0014  GETGLOBAL   r16 <- inc             159:23
+    0015  GETGLOBAL   r18 <- get             159:28
+    0016  MOVE        r19 <- r0              159:32
+    0017  CONST       r20 <- k0              159:38
+    0018  CALL        r17 <- r18(2)          159:27
+    0019  CALL        r15 <- r16(1)          159:22
+    0020  TAILCALL    r13(2)                 159:5
+    0021  JUMP        0023                   158:3
+    0022  MOVE        r1 <- r0               160:5
+    0023  RETURN      r1                     158:3
 
-proto 23  line-start  params 1  slots 6
+proto 21  line-start  params 1  slots 6
   constants
     k0  :cursor-col
     k1  0
   code
-    0000  GETGLOBAL   r2 <- assoc            163:27
-    0001  MOVE        r3 <- r0               163:33
-    0002  CONST       r4 <- k0               163:39
-    0003  CONST       r5 <- k1               163:51
-    0004  TAILCALL    r2(3)                  163:26
-    0005  RETURN      r1                     163:26
+    0000  GETGLOBAL   r2 <- assoc            162:27
+    0001  MOVE        r3 <- r0               162:33
+    0002  CONST       r4 <- k0               162:39
+    0003  CONST       r5 <- k1               162:51
+    0004  TAILCALL    r2(3)                  162:26
+    0005  RETURN      r1                     162:26
 
-proto 24  line-end  params 1  slots 12
+proto 22  line-end  params 1  slots 12
   constants
     k0  :cursor-col
     k1  :cursor-row
   code
-    0000  GETGLOBAL   r2 <- assoc            164:25
-    0001  MOVE        r3 <- r0               164:31
-    0002  CONST       r4 <- k0               164:37
-    0003  GETGLOBAL   r6 <- line-len         164:50
-    0004  MOVE        r7 <- r0               164:59
-    0005  GETGLOBAL   r9 <- get              164:66
-    0006  MOVE        r10 <- r0              164:70
-    0007  CONST       r11 <- k1              164:76
-    0008  CALL        r8 <- r9(2)            164:65
-    0009  CALL        r5 <- r6(2)            164:49
-    0010  TAILCALL    r2(3)                  164:24
-    0011  RETURN      r1                     164:24
+    0000  GETGLOBAL   r2 <- assoc            163:25
+    0001  MOVE        r3 <- r0               163:31
+    0002  CONST       r4 <- k0               163:37
+    0003  GETGLOBAL   r6 <- line-len         163:50
+    0004  MOVE        r7 <- r0               163:59
+    0005  GETGLOBAL   r9 <- get              163:66
+    0006  MOVE        r10 <- r0              163:70
+    0007  CONST       r11 <- k1              163:76
+    0008  CALL        r8 <- r9(2)            163:65
+    0009  CALL        r5 <- r6(2)            163:49
+    0010  TAILCALL    r2(3)                  163:24
+    0011  RETURN      r1                     163:24
 
-proto 25  restate-goal  params 1  slots 9
+proto 23  restate-goal  params 1  slots 9
   constants
     k0  :goal-col
     k1  :cursor-col
   code
-    0000  GETGLOBAL   r2 <- assoc            199:29
-    0001  MOVE        r3 <- r0               199:35
-    0002  CONST       r4 <- k0               199:41
-    0003  GETGLOBAL   r6 <- get              199:52
-    0004  MOVE        r7 <- r0               199:56
-    0005  CONST       r8 <- k1               199:62
-    0006  CALL        r5 <- r6(2)            199:51
-    0007  TAILCALL    r2(3)                  199:28
-    0008  RETURN      r1                     199:28
+    0000  GETGLOBAL   r2 <- assoc            198:29
+    0001  MOVE        r3 <- r0               198:35
+    0002  CONST       r4 <- k0               198:41
+    0003  GETGLOBAL   r6 <- get              198:52
+    0004  MOVE        r7 <- r0               198:56
+    0005  CONST       r8 <- k1               198:62
+    0006  CALL        r5 <- r6(2)            198:51
+    0007  TAILCALL    r2(3)                  198:28
+    0008  RETURN      r1                     198:28
 
-proto 26  apply-command  params 2  slots 88
+proto 24  apply-command  params 2  slots 88
   constants
     k0  :move-left
     k1  :move-right
@@ -993,161 +978,161 @@ proto 26  apply-command  params 2  slots 88
     k16  "no command "
     k17  nil
   code
-    0000  GETGLOBAL   r4 <- =                203:6
-    0001  MOVE        r5 <- r1               203:8
-    0002  CONST       r6 <- k0               203:10
-    0003  CALL        r3 <- r4(2)            203:5
-    0004  JUMPUNLESS  r3, 0009               generated 202:3
-    0005  GETGLOBAL   r7 <- move-left        203:23
-    0006  MOVE        r8 <- r0               203:33
-    0007  TAILCALL    r7(1)                  203:22
-    0008  JUMP        0122                   generated 202:3
-    0009  GETGLOBAL   r10 <- =               204:6
-    0010  MOVE        r11 <- r1              204:8
-    0011  CONST       r12 <- k1              204:10
-    0012  CALL        r9 <- r10(2)           204:5
-    0013  JUMPUNLESS  r9, 0018               generated 202:3
-    0014  GETGLOBAL   r13 <- move-right      204:24
-    0015  MOVE        r14 <- r0              204:35
-    0016  TAILCALL    r13(1)                 204:23
-    0017  JUMP        0122                   generated 202:3
-    0018  GETGLOBAL   r16 <- =               205:6
-    0019  MOVE        r17 <- r1              205:8
-    0020  CONST       r18 <- k2              205:10
-    0021  CALL        r15 <- r16(2)          205:5
-    0022  JUMPUNLESS  r15, 0027              generated 202:3
-    0023  GETGLOBAL   r19 <- move-up         205:21
-    0024  MOVE        r20 <- r0              205:29
-    0025  TAILCALL    r19(1)                 205:20
-    0026  JUMP        0122                   generated 202:3
-    0027  GETGLOBAL   r22 <- =               206:6
-    0028  MOVE        r23 <- r1              206:8
-    0029  CONST       r24 <- k3              206:10
-    0030  CALL        r21 <- r22(2)          206:5
-    0031  JUMPUNLESS  r21, 0036              generated 202:3
-    0032  GETGLOBAL   r25 <- move-down       206:23
-    0033  MOVE        r26 <- r0              206:33
-    0034  TAILCALL    r25(1)                 206:22
-    0035  JUMP        0122                   generated 202:3
-    0036  GETGLOBAL   r28 <- =               207:6
-    0037  MOVE        r29 <- r1              207:8
-    0038  CONST       r30 <- k4              207:10
-    0039  CALL        r27 <- r28(2)          207:5
-    0040  JUMPUNLESS  r27, 0045              generated 202:3
-    0041  GETGLOBAL   r31 <- line-start      207:24
-    0042  MOVE        r32 <- r0              207:35
-    0043  TAILCALL    r31(1)                 207:23
-    0044  JUMP        0122                   generated 202:3
-    0045  GETGLOBAL   r34 <- =               208:6
-    0046  MOVE        r35 <- r1              208:8
-    0047  CONST       r36 <- k5              208:10
-    0048  CALL        r33 <- r34(2)          208:5
-    0049  JUMPUNLESS  r33, 0054              generated 202:3
-    0050  GETGLOBAL   r37 <- line-end        208:22
-    0051  MOVE        r38 <- r0              208:31
-    0052  TAILCALL    r37(1)                 208:21
-    0053  JUMP        0122                   generated 202:3
-    0054  GETGLOBAL   r40 <- =               209:6
-    0055  MOVE        r41 <- r1              209:8
-    0056  CONST       r42 <- k6              209:10
-    0057  CALL        r39 <- r40(2)          209:5
-    0058  JUMPUNLESS  r39, 0063              generated 202:3
-    0059  GETGLOBAL   r43 <- split-line      209:21
-    0060  MOVE        r44 <- r0              209:32
-    0061  TAILCALL    r43(1)                 209:20
-    0062  JUMP        0122                   generated 202:3
-    0063  GETGLOBAL   r46 <- =               210:6
-    0064  MOVE        r47 <- r1              210:8
-    0065  CONST       r48 <- k7              210:10
-    0066  CALL        r45 <- r46(2)          210:5
-    0067  JUMPUNLESS  r45, 0072              generated 202:3
-    0068  GETGLOBAL   r49 <- delete-back     210:25
-    0069  MOVE        r50 <- r0              210:37
-    0070  TAILCALL    r49(1)                 210:24
-    0071  JUMP        0122                   generated 202:3
-    0072  GETGLOBAL   r52 <- =               211:6
-    0073  MOVE        r53 <- r1              211:8
-    0074  CONST       r54 <- k8              211:10
-    0075  CALL        r51 <- r52(2)          211:5
-    0076  JUMPUNLESS  r51, 0083              generated 202:3
-    0077  GETGLOBAL   r55 <- assoc           211:18
-    0078  MOVE        r56 <- r0              211:24
-    0079  CONST       r57 <- k9              211:30
-    0080  CONST       r58 <- k10             211:37
-    0081  TAILCALL    r55(3)                 211:17
-    0082  JUMP        0122                   generated 202:3
-    0083  GETGLOBAL   r60 <- =               212:6
-    0084  MOVE        r61 <- r1              212:8
-    0085  CONST       r62 <- k11             212:10
-    0086  CALL        r59 <- r60(2)          212:5
-    0087  JUMPUNLESS  r59, 0099              generated 202:3
-    0088  GETGLOBAL   r63 <- assoc           212:25
-    0089  MOVE        r64 <- r0              212:31
-    0090  CONST       r65 <- k12             212:37
-    0091  GETGLOBAL   r67 <- not             212:45
-    0092  GETGLOBAL   r69 <- get             212:50
-    0093  MOVE        r70 <- r0              212:54
-    0094  CONST       r71 <- k12             212:60
-    0095  CALL        r68 <- r69(2)          212:49
-    0096  CALL        r66 <- r67(1)          212:44
-    0097  TAILCALL    r63(3)                 212:24
-    0098  JUMP        0122                   generated 202:3
-    0099  GETGLOBAL   r73 <- =               216:6
-    0100  MOVE        r74 <- r1              216:8
-    0101  CONST       r75 <- k13             216:10
-    0102  CALL        r72 <- r73(2)          216:5
-    0103  JUMPUNLESS  r72, 0110              generated 202:3
-    0104  GETGLOBAL   r76 <- assoc           216:18
-    0105  MOVE        r77 <- r0              216:24
-    0106  CONST       r78 <- k14             216:30
-    0107  CONST       r79 <- k10             216:47
-    0108  TAILCALL    r76(3)                 216:17
-    0109  JUMP        0122                   generated 202:3
-    0110  CONST       r80 <- k10             generated 202:3
-    0111  JUMPUNLESS  r80, 0121              generated 202:3
-    0112  GETGLOBAL   r81 <- assoc           217:11
-    0113  MOVE        r82 <- r0              217:17
-    0114  CONST       r83 <- k15             217:23
-    0115  GETGLOBAL   r85 <- str             217:33
-    0116  CONST       r86 <- k16             217:37
-    0117  MOVE        r87 <- r1              217:51
-    0118  CALL        r84 <- r85(2)          217:32
-    0119  TAILCALL    r81(3)                 217:10
-    0120  JUMP        0122                   generated 202:3
-    0121  CONST       r2 <- k17              generated 202:3
-    0122  RETURN      r2                     generated 202:3
+    0000  GETGLOBAL   r4 <- =                202:6
+    0001  MOVE        r5 <- r1               202:8
+    0002  CONST       r6 <- k0               202:10
+    0003  CALL        r3 <- r4(2)            202:5
+    0004  JUMPUNLESS  r3, 0009               generated 201:3
+    0005  GETGLOBAL   r7 <- move-left        202:23
+    0006  MOVE        r8 <- r0               202:33
+    0007  TAILCALL    r7(1)                  202:22
+    0008  JUMP        0122                   generated 201:3
+    0009  GETGLOBAL   r10 <- =               203:6
+    0010  MOVE        r11 <- r1              203:8
+    0011  CONST       r12 <- k1              203:10
+    0012  CALL        r9 <- r10(2)           203:5
+    0013  JUMPUNLESS  r9, 0018               generated 201:3
+    0014  GETGLOBAL   r13 <- move-right      203:24
+    0015  MOVE        r14 <- r0              203:35
+    0016  TAILCALL    r13(1)                 203:23
+    0017  JUMP        0122                   generated 201:3
+    0018  GETGLOBAL   r16 <- =               204:6
+    0019  MOVE        r17 <- r1              204:8
+    0020  CONST       r18 <- k2              204:10
+    0021  CALL        r15 <- r16(2)          204:5
+    0022  JUMPUNLESS  r15, 0027              generated 201:3
+    0023  GETGLOBAL   r19 <- move-up         204:21
+    0024  MOVE        r20 <- r0              204:29
+    0025  TAILCALL    r19(1)                 204:20
+    0026  JUMP        0122                   generated 201:3
+    0027  GETGLOBAL   r22 <- =               205:6
+    0028  MOVE        r23 <- r1              205:8
+    0029  CONST       r24 <- k3              205:10
+    0030  CALL        r21 <- r22(2)          205:5
+    0031  JUMPUNLESS  r21, 0036              generated 201:3
+    0032  GETGLOBAL   r25 <- move-down       205:23
+    0033  MOVE        r26 <- r0              205:33
+    0034  TAILCALL    r25(1)                 205:22
+    0035  JUMP        0122                   generated 201:3
+    0036  GETGLOBAL   r28 <- =               206:6
+    0037  MOVE        r29 <- r1              206:8
+    0038  CONST       r30 <- k4              206:10
+    0039  CALL        r27 <- r28(2)          206:5
+    0040  JUMPUNLESS  r27, 0045              generated 201:3
+    0041  GETGLOBAL   r31 <- line-start      206:24
+    0042  MOVE        r32 <- r0              206:35
+    0043  TAILCALL    r31(1)                 206:23
+    0044  JUMP        0122                   generated 201:3
+    0045  GETGLOBAL   r34 <- =               207:6
+    0046  MOVE        r35 <- r1              207:8
+    0047  CONST       r36 <- k5              207:10
+    0048  CALL        r33 <- r34(2)          207:5
+    0049  JUMPUNLESS  r33, 0054              generated 201:3
+    0050  GETGLOBAL   r37 <- line-end        207:22
+    0051  MOVE        r38 <- r0              207:31
+    0052  TAILCALL    r37(1)                 207:21
+    0053  JUMP        0122                   generated 201:3
+    0054  GETGLOBAL   r40 <- =               208:6
+    0055  MOVE        r41 <- r1              208:8
+    0056  CONST       r42 <- k6              208:10
+    0057  CALL        r39 <- r40(2)          208:5
+    0058  JUMPUNLESS  r39, 0063              generated 201:3
+    0059  GETGLOBAL   r43 <- split-line      208:21
+    0060  MOVE        r44 <- r0              208:32
+    0061  TAILCALL    r43(1)                 208:20
+    0062  JUMP        0122                   generated 201:3
+    0063  GETGLOBAL   r46 <- =               209:6
+    0064  MOVE        r47 <- r1              209:8
+    0065  CONST       r48 <- k7              209:10
+    0066  CALL        r45 <- r46(2)          209:5
+    0067  JUMPUNLESS  r45, 0072              generated 201:3
+    0068  GETGLOBAL   r49 <- delete-back     209:25
+    0069  MOVE        r50 <- r0              209:37
+    0070  TAILCALL    r49(1)                 209:24
+    0071  JUMP        0122                   generated 201:3
+    0072  GETGLOBAL   r52 <- =               210:6
+    0073  MOVE        r53 <- r1              210:8
+    0074  CONST       r54 <- k8              210:10
+    0075  CALL        r51 <- r52(2)          210:5
+    0076  JUMPUNLESS  r51, 0083              generated 201:3
+    0077  GETGLOBAL   r55 <- assoc           210:18
+    0078  MOVE        r56 <- r0              210:24
+    0079  CONST       r57 <- k9              210:30
+    0080  CONST       r58 <- k10             210:37
+    0081  TAILCALL    r55(3)                 210:17
+    0082  JUMP        0122                   generated 201:3
+    0083  GETGLOBAL   r60 <- =               211:6
+    0084  MOVE        r61 <- r1              211:8
+    0085  CONST       r62 <- k11             211:10
+    0086  CALL        r59 <- r60(2)          211:5
+    0087  JUMPUNLESS  r59, 0099              generated 201:3
+    0088  GETGLOBAL   r63 <- assoc           211:25
+    0089  MOVE        r64 <- r0              211:31
+    0090  CONST       r65 <- k12             211:37
+    0091  GETGLOBAL   r67 <- not             211:45
+    0092  GETGLOBAL   r69 <- get             211:50
+    0093  MOVE        r70 <- r0              211:54
+    0094  CONST       r71 <- k12             211:60
+    0095  CALL        r68 <- r69(2)          211:49
+    0096  CALL        r66 <- r67(1)          211:44
+    0097  TAILCALL    r63(3)                 211:24
+    0098  JUMP        0122                   generated 201:3
+    0099  GETGLOBAL   r73 <- =               215:6
+    0100  MOVE        r74 <- r1              215:8
+    0101  CONST       r75 <- k13             215:10
+    0102  CALL        r72 <- r73(2)          215:5
+    0103  JUMPUNLESS  r72, 0110              generated 201:3
+    0104  GETGLOBAL   r76 <- assoc           215:18
+    0105  MOVE        r77 <- r0              215:24
+    0106  CONST       r78 <- k14             215:30
+    0107  CONST       r79 <- k10             215:47
+    0108  TAILCALL    r76(3)                 215:17
+    0109  JUMP        0122                   generated 201:3
+    0110  CONST       r80 <- k10             generated 201:3
+    0111  JUMPUNLESS  r80, 0121              generated 201:3
+    0112  GETGLOBAL   r81 <- assoc           216:11
+    0113  MOVE        r82 <- r0              216:17
+    0114  CONST       r83 <- k15             216:23
+    0115  GETGLOBAL   r85 <- str             216:33
+    0116  CONST       r86 <- k16             216:37
+    0117  MOVE        r87 <- r1              216:51
+    0118  CALL        r84 <- r85(2)          216:32
+    0119  TAILCALL    r81(3)                 216:10
+    0120  JUMP        0122                   generated 201:3
+    0121  CONST       r2 <- k17              generated 201:3
+    0122  RETURN      r2                     generated 201:3
 
-proto 27  run-command  params 2  slots 13
+proto 25  run-command  params 2  slots 13
   code
-    0000  GETGLOBAL   r4 <- apply-command    220:15
-    0001  MOVE        r5 <- r0               220:29
-    0002  MOVE        r6 <- r1               220:35
-    0003  CALL        r3 <- r4(2)            220:14
-    0004  GETGLOBAL   r8 <- get              221:10
-    0005  GETGLOBAL   r9 <- restates-goal    221:14
-    0006  MOVE        r10 <- r1              221:28
-    0007  CALL        r7 <- r8(2)            221:9
-    0008  JUMPUNLESS  r7, 0013               221:5
-    0009  GETGLOBAL   r11 <- restate-goal    221:32
-    0010  MOVE        r12 <- r3              221:45
-    0011  TAILCALL    r11(1)                 221:31
-    0012  JUMP        0014                   221:5
-    0013  MOVE        r2 <- r3               221:51
-    0014  RETURN      r2                     220:3
+    0000  GETGLOBAL   r4 <- apply-command    219:15
+    0001  MOVE        r5 <- r0               219:29
+    0002  MOVE        r6 <- r1               219:35
+    0003  CALL        r3 <- r4(2)            219:14
+    0004  GETGLOBAL   r8 <- get              220:10
+    0005  GETGLOBAL   r9 <- restates-goal    220:14
+    0006  MOVE        r10 <- r1              220:28
+    0007  CALL        r7 <- r8(2)            220:9
+    0008  JUMPUNLESS  r7, 0013               220:5
+    0009  GETGLOBAL   r11 <- restate-goal    220:32
+    0010  MOVE        r12 <- r3              220:45
+    0011  TAILCALL    r11(1)                 220:31
+    0012  JUMP        0014                   220:5
+    0013  MOVE        r2 <- r3               220:51
+    0014  RETURN      r2                     219:3
 
-proto 28  printable?  params 1  slots 7
+proto 26  printable?  params 1  slots 7
   constants
     k0  1
   code
-    0000  GETGLOBAL   r2 <- =                224:27
-    0001  GETGLOBAL   r5 <- str-scalar-len   224:30
-    0002  MOVE        r6 <- r0               224:45
-    0003  CALL        r3 <- r5(1)            224:29
-    0004  CONST       r4 <- k0               224:52
-    0005  TAILCALL    r2(2)                  224:26
-    0006  RETURN      r1                     224:26
+    0000  GETGLOBAL   r2 <- =                223:27
+    0001  GETGLOBAL   r5 <- str-scalar-len   223:30
+    0002  MOVE        r6 <- r0               223:45
+    0003  CALL        r3 <- r5(1)            223:29
+    0004  CONST       r4 <- k0               223:52
+    0005  TAILCALL    r2(2)                  223:26
+    0006  RETURN      r1                     223:26
 
-proto 29  dispatch  params 2  slots 68
+proto 27  dispatch  params 2  slots 68
   constants
     k0  :pending
     k1  nil
@@ -1158,196 +1143,199 @@ proto 29  dispatch  params 2  slots 68
     k6  1
     k7  true
   code
-    0000  GETGLOBAL   r4 <- get              227:18
-    0001  MOVE        r5 <- r0               227:22
-    0002  CONST       r6 <- k0               227:28
-    0003  CALL        r3 <- r4(2)            227:17
-    0004  GETGLOBAL   r9 <- =                228:20
-    0005  MOVE        r10 <- r3              228:22
-    0006  CONST       r11 <- k1              228:30
-    0007  CALL        r8 <- r9(2)            228:19
-    0008  JUMPUNLESS  r8, 0011               228:15
-    0009  GETGLOBAL   r7 <- global-keymap    228:35
-    0010  JUMP        0012                   228:15
-    0011  MOVE        r7 <- r3               228:49
-    0012  GETGLOBAL   r13 <- get             229:14
-    0013  MOVE        r14 <- r7              229:18
-    0014  MOVE        r15 <- r1              229:24
-    0015  CALL        r12 <- r13(2)          229:13
-    0016  GETGLOBAL   r17 <- assoc           230:16
-    0017  MOVE        r18 <- r0              230:22
-    0018  CONST       r19 <- k2              230:28
-    0019  CONST       r20 <- k1              230:37
-    0020  CONST       r21 <- k0              230:41
-    0021  CONST       r22 <- k1              230:50
-    0022  CALL        r16 <- r17(5)          230:15
-    0023  GETGLOBAL   r24 <- =               232:8
-    0024  MOVE        r25 <- r12             232:10
-    0025  CONST       r26 <- k1              232:14
-    0026  CALL        r23 <- r24(2)          232:7
-    0027  JUMPUNLESS  r23, 0056              generated 231:5
-    0028  GETGLOBAL   r29 <- =               235:17
-    0029  MOVE        r30 <- r3              235:19
-    0030  CONST       r31 <- k1              235:27
-    0031  CALL        r28 <- r29(2)          235:16
-    0032  MOVE        r32 <- r28             generated 235:11
-    0033  JUMPUNLESS  r32, 0038              generated 235:11
-    0034  GETGLOBAL   r33 <- printable?      235:33
-    0035  MOVE        r34 <- r1              235:44
-    0036  CALL        r27 <- r33(1)          235:32
-    0037  JUMP        0039                   generated 235:11
-    0038  MOVE        r27 <- r28             generated 235:11
-    0039  JUMPUNLESS  r27, 0047              235:7
-    0040  GETGLOBAL   r35 <- restate-goal    236:10
-    0041  GETGLOBAL   r37 <- insert-str      236:24
-    0042  MOVE        r38 <- r16             236:35
-    0043  MOVE        r39 <- r1              236:41
-    0044  CALL        r36 <- r37(2)          236:23
-    0045  TAILCALL    r35(1)                 236:9
-    0046  JUMP        0055                   235:7
-    0047  GETGLOBAL   r40 <- assoc           237:10
-    0048  MOVE        r41 <- r16             237:16
-    0049  CONST       r42 <- k2              237:22
-    0050  GETGLOBAL   r44 <- str             237:32
-    0051  MOVE        r45 <- r1              237:36
-    0052  CONST       r46 <- k3              237:42
-    0053  CALL        r43 <- r44(2)          237:31
-    0054  TAILCALL    r40(3)                 237:9
-    0055  JUMP        0084                   generated 231:5
-    0056  GETGLOBAL   r48 <- =               238:8
-    0057  GETGLOBAL   r51 <- nth             238:11
-    0058  MOVE        r52 <- r12             238:15
-    0059  CONST       r53 <- k4              238:19
-    0060  CALL        r49 <- r51(2)          238:10
-    0061  CONST       r50 <- k5              238:22
-    0062  CALL        r47 <- r48(2)          238:7
-    0063  JUMPUNLESS  r47, 0073              generated 231:5
-    0064  GETGLOBAL   r54 <- assoc           238:32
-    0065  MOVE        r55 <- r16             238:38
-    0066  CONST       r56 <- k0              238:44
-    0067  GETGLOBAL   r58 <- nth             238:54
-    0068  MOVE        r59 <- r12             238:58
-    0069  CONST       r60 <- k6              238:62
-    0070  CALL        r57 <- r58(2)          238:53
-    0071  TAILCALL    r54(3)                 238:31
-    0072  JUMP        0084                   generated 231:5
-    0073  CONST       r61 <- k7              generated 231:5
-    0074  JUMPUNLESS  r61, 0083              generated 231:5
-    0075  GETGLOBAL   r62 <- run-command     239:13
-    0076  MOVE        r63 <- r16             239:25
-    0077  GETGLOBAL   r65 <- nth             239:32
-    0078  MOVE        r66 <- r12             239:36
-    0079  CONST       r67 <- k6              239:40
-    0080  CALL        r64 <- r65(2)          239:31
-    0081  TAILCALL    r62(2)                 239:12
-    0082  JUMP        0084                   generated 231:5
-    0083  CONST       r2 <- k1               generated 231:5
-    0084  RETURN      r2                     227:3
+    0000  GETGLOBAL   r4 <- get              226:18
+    0001  MOVE        r5 <- r0               226:22
+    0002  CONST       r6 <- k0               226:28
+    0003  CALL        r3 <- r4(2)            226:17
+    0004  GETGLOBAL   r9 <- =                227:20
+    0005  MOVE        r10 <- r3              227:22
+    0006  CONST       r11 <- k1              227:30
+    0007  CALL        r8 <- r9(2)            227:19
+    0008  JUMPUNLESS  r8, 0011               227:15
+    0009  GETGLOBAL   r7 <- global-keymap    227:35
+    0010  JUMP        0012                   227:15
+    0011  MOVE        r7 <- r3               227:49
+    0012  GETGLOBAL   r13 <- get             228:14
+    0013  MOVE        r14 <- r7              228:18
+    0014  MOVE        r15 <- r1              228:24
+    0015  CALL        r12 <- r13(2)          228:13
+    0016  GETGLOBAL   r17 <- assoc           229:16
+    0017  MOVE        r18 <- r0              229:22
+    0018  CONST       r19 <- k2              229:28
+    0019  CONST       r20 <- k1              229:37
+    0020  CONST       r21 <- k0              229:41
+    0021  CONST       r22 <- k1              229:50
+    0022  CALL        r16 <- r17(5)          229:15
+    0023  GETGLOBAL   r24 <- =               231:8
+    0024  MOVE        r25 <- r12             231:10
+    0025  CONST       r26 <- k1              231:14
+    0026  CALL        r23 <- r24(2)          231:7
+    0027  JUMPUNLESS  r23, 0056              generated 230:5
+    0028  GETGLOBAL   r29 <- =               234:17
+    0029  MOVE        r30 <- r3              234:19
+    0030  CONST       r31 <- k1              234:27
+    0031  CALL        r28 <- r29(2)          234:16
+    0032  MOVE        r32 <- r28             generated 234:11
+    0033  JUMPUNLESS  r32, 0038              generated 234:11
+    0034  GETGLOBAL   r33 <- printable?      234:33
+    0035  MOVE        r34 <- r1              234:44
+    0036  CALL        r27 <- r33(1)          234:32
+    0037  JUMP        0039                   generated 234:11
+    0038  MOVE        r27 <- r28             generated 234:11
+    0039  JUMPUNLESS  r27, 0047              234:7
+    0040  GETGLOBAL   r35 <- restate-goal    235:10
+    0041  GETGLOBAL   r37 <- insert-str      235:24
+    0042  MOVE        r38 <- r16             235:35
+    0043  MOVE        r39 <- r1              235:41
+    0044  CALL        r36 <- r37(2)          235:23
+    0045  TAILCALL    r35(1)                 235:9
+    0046  JUMP        0055                   234:7
+    0047  GETGLOBAL   r40 <- assoc           236:10
+    0048  MOVE        r41 <- r16             236:16
+    0049  CONST       r42 <- k2              236:22
+    0050  GETGLOBAL   r44 <- str             236:32
+    0051  MOVE        r45 <- r1              236:36
+    0052  CONST       r46 <- k3              236:42
+    0053  CALL        r43 <- r44(2)          236:31
+    0054  TAILCALL    r40(3)                 236:9
+    0055  JUMP        0084                   generated 230:5
+    0056  GETGLOBAL   r48 <- =               237:8
+    0057  GETGLOBAL   r51 <- nth             237:11
+    0058  MOVE        r52 <- r12             237:15
+    0059  CONST       r53 <- k4              237:19
+    0060  CALL        r49 <- r51(2)          237:10
+    0061  CONST       r50 <- k5              237:22
+    0062  CALL        r47 <- r48(2)          237:7
+    0063  JUMPUNLESS  r47, 0073              generated 230:5
+    0064  GETGLOBAL   r54 <- assoc           237:32
+    0065  MOVE        r55 <- r16             237:38
+    0066  CONST       r56 <- k0              237:44
+    0067  GETGLOBAL   r58 <- nth             237:54
+    0068  MOVE        r59 <- r12             237:58
+    0069  CONST       r60 <- k6              237:62
+    0070  CALL        r57 <- r58(2)          237:53
+    0071  TAILCALL    r54(3)                 237:31
+    0072  JUMP        0084                   generated 230:5
+    0073  CONST       r61 <- k7              generated 230:5
+    0074  JUMPUNLESS  r61, 0083              generated 230:5
+    0075  GETGLOBAL   r62 <- run-command     238:13
+    0076  MOVE        r63 <- r16             238:25
+    0077  GETGLOBAL   r65 <- nth             238:32
+    0078  MOVE        r66 <- r12             238:36
+    0079  CONST       r67 <- k6              238:40
+    0080  CALL        r64 <- r65(2)          238:31
+    0081  TAILCALL    r62(2)                 238:12
+    0082  JUMP        0084                   generated 230:5
+    0083  CONST       r2 <- k1               generated 230:5
+    0084  RETURN      r2                     226:3
 
-proto 30  clip  params 2  slots 12
+proto 28  clip  params 2  slots 13
+  constants
+    k0  0
   code
-    0000  GETGLOBAL   r4 <- <=               247:23
-    0001  GETGLOBAL   r7 <- str-scalar-len   247:27
-    0002  MOVE        r8 <- r1               247:42
-    0003  CALL        r5 <- r7(1)            247:26
-    0004  MOVE        r6 <- r0               247:45
-    0005  CALL        r3 <- r4(2)            247:22
-    0006  JUMPUNLESS  r3, 0009               247:18
-    0007  MOVE        r2 <- r1               247:48
-    0008  JUMP        0013                   247:18
-    0009  GETGLOBAL   r9 <- scalars-take     247:51
-    0010  MOVE        r10 <- r0              247:64
-    0011  MOVE        r11 <- r1              247:66
-    0012  TAILCALL    r9(2)                  247:50
-    0013  RETURN      r2                     247:18
+    0000  GETGLOBAL   r4 <- <=               246:23
+    0001  GETGLOBAL   r7 <- str-scalar-len   246:27
+    0002  MOVE        r8 <- r1               246:42
+    0003  CALL        r5 <- r7(1)            246:26
+    0004  MOVE        r6 <- r0               246:45
+    0005  CALL        r3 <- r4(2)            246:22
+    0006  JUMPUNLESS  r3, 0009               246:18
+    0007  MOVE        r2 <- r1               246:48
+    0008  JUMP        0014                   246:18
+    0009  GETGLOBAL   r9 <- str-scalar-slice 246:51
+    0010  MOVE        r10 <- r1              246:68
+    0011  CONST       r11 <- k0              246:70
+    0012  MOVE        r12 <- r0              246:72
+    0013  TAILCALL    r9(3)                  246:50
+    0014  RETURN      r2                     246:18
 
-proto 31  text-rows  params 2  slots 12
+proto 29  text-rows  params 2  slots 12
   constants
     k0  :help?
     k1  2
   code
-    0000  GETGLOBAL   r4 <- get              252:8
-    0001  MOVE        r5 <- r0               252:12
-    0002  CONST       r6 <- k0               252:18
-    0003  CALL        r3 <- r4(2)            252:7
-    0004  JUMPUNLESS  r3, 0010               252:3
-    0005  GETGLOBAL   r7 <- -                252:27
-    0006  MOVE        r8 <- r1               252:29
-    0007  CONST       r9 <- k1               252:34
-    0008  TAILCALL    r7(2)                  252:26
-    0009  JUMP        0013                   252:3
-    0010  GETGLOBAL   r10 <- dec             252:38
-    0011  MOVE        r11 <- r1              252:42
-    0012  TAILCALL    r10(1)                 252:37
-    0013  RETURN      r2                     252:3
+    0000  GETGLOBAL   r4 <- get              251:8
+    0001  MOVE        r5 <- r0               251:12
+    0002  CONST       r6 <- k0               251:18
+    0003  CALL        r3 <- r4(2)            251:7
+    0004  JUMPUNLESS  r3, 0010               251:3
+    0005  GETGLOBAL   r7 <- -                251:27
+    0006  MOVE        r8 <- r1               251:29
+    0007  CONST       r9 <- k1               251:34
+    0008  TAILCALL    r7(2)                  251:26
+    0009  JUMP        0013                   251:3
+    0010  GETGLOBAL   r10 <- dec             251:38
+    0011  MOVE        r11 <- r1              251:42
+    0012  TAILCALL    r10(1)                 251:37
+    0013  RETURN      r2                     251:3
 
-proto 32  help-line  params 2  slots 6
+proto 30  help-line  params 2  slots 6
   constants
     k0  "C-o save  C-x C-c quit  C-g hide"
   code
-    0000  GETGLOBAL   r3 <- clip             257:4
-    0001  MOVE        r4 <- r1               257:9
-    0002  CONST       r5 <- k0               257:14
-    0003  TAILCALL    r3(2)                  257:3
-    0004  RETURN      r2                     257:3
+    0000  GETGLOBAL   r3 <- clip             256:4
+    0001  MOVE        r4 <- r1               256:9
+    0002  CONST       r5 <- k0               256:14
+    0003  TAILCALL    r3(2)                  256:3
+    0004  RETURN      r2                     256:3
 
-proto 33  scroll-to-cursor  params 2  slots 40
+proto 31  scroll-to-cursor  params 2  slots 40
   constants
     k0  :cursor-row
     k1  :scroll-row
     k2  true
     k3  nil
   code
-    0000  GETGLOBAL   r4 <- get              260:14
-    0001  MOVE        r5 <- r0               260:18
-    0002  CONST       r6 <- k0               260:24
-    0003  CALL        r3 <- r4(2)            260:13
-    0004  GETGLOBAL   r8 <- get              261:14
-    0005  MOVE        r9 <- r0               261:18
-    0006  CONST       r10 <- k1              261:24
-    0007  CALL        r7 <- r8(2)            261:13
-    0008  GETGLOBAL   r12 <- text-rows       262:16
-    0009  MOVE        r13 <- r0              262:26
-    0010  MOVE        r14 <- r1              262:32
-    0011  CALL        r11 <- r12(2)          262:15
-    0012  GETGLOBAL   r16 <- <               264:8
-    0013  MOVE        r17 <- r3              264:10
-    0014  MOVE        r18 <- r7              264:14
-    0015  CALL        r15 <- r16(2)          264:7
-    0016  JUMPUNLESS  r15, 0023              generated 263:5
-    0017  GETGLOBAL   r19 <- assoc           264:20
-    0018  MOVE        r20 <- r0              264:26
-    0019  CONST       r21 <- k1              264:32
-    0020  MOVE        r22 <- r3              264:44
-    0021  TAILCALL    r19(3)                 264:19
-    0022  JUMP        0047                   generated 263:5
-    0023  GETGLOBAL   r24 <- >=              265:8
-    0024  MOVE        r25 <- r3              265:11
-    0025  GETGLOBAL   r27 <- +               265:16
-    0026  MOVE        r28 <- r7              265:18
-    0027  MOVE        r29 <- r11             265:22
-    0028  CALL        r26 <- r27(2)          265:15
-    0029  CALL        r23 <- r24(2)          265:7
-    0030  JUMPUNLESS  r23, 0042              generated 263:5
-    0031  GETGLOBAL   r30 <- assoc           265:31
-    0032  MOVE        r31 <- r0              265:37
-    0033  CONST       r32 <- k1              265:43
-    0034  GETGLOBAL   r34 <- inc             265:56
-    0035  GETGLOBAL   r36 <- -               265:61
-    0036  MOVE        r37 <- r3              265:63
-    0037  MOVE        r38 <- r11             265:67
-    0038  CALL        r35 <- r36(2)          265:60
-    0039  CALL        r33 <- r34(1)          265:55
-    0040  TAILCALL    r30(3)                 265:30
-    0041  JUMP        0047                   generated 263:5
-    0042  CONST       r39 <- k2              generated 263:5
-    0043  JUMPUNLESS  r39, 0046              generated 263:5
-    0044  MOVE        r2 <- r0               generated 263:5
-    0045  JUMP        0047                   generated 263:5
-    0046  CONST       r2 <- k3               generated 263:5
-    0047  RETURN      r2                     260:3
+    0000  GETGLOBAL   r4 <- get              259:14
+    0001  MOVE        r5 <- r0               259:18
+    0002  CONST       r6 <- k0               259:24
+    0003  CALL        r3 <- r4(2)            259:13
+    0004  GETGLOBAL   r8 <- get              260:14
+    0005  MOVE        r9 <- r0               260:18
+    0006  CONST       r10 <- k1              260:24
+    0007  CALL        r7 <- r8(2)            260:13
+    0008  GETGLOBAL   r12 <- text-rows       261:16
+    0009  MOVE        r13 <- r0              261:26
+    0010  MOVE        r14 <- r1              261:32
+    0011  CALL        r11 <- r12(2)          261:15
+    0012  GETGLOBAL   r16 <- <               263:8
+    0013  MOVE        r17 <- r3              263:10
+    0014  MOVE        r18 <- r7              263:14
+    0015  CALL        r15 <- r16(2)          263:7
+    0016  JUMPUNLESS  r15, 0023              generated 262:5
+    0017  GETGLOBAL   r19 <- assoc           263:20
+    0018  MOVE        r20 <- r0              263:26
+    0019  CONST       r21 <- k1              263:32
+    0020  MOVE        r22 <- r3              263:44
+    0021  TAILCALL    r19(3)                 263:19
+    0022  JUMP        0047                   generated 262:5
+    0023  GETGLOBAL   r24 <- >=              264:8
+    0024  MOVE        r25 <- r3              264:11
+    0025  GETGLOBAL   r27 <- +               264:16
+    0026  MOVE        r28 <- r7              264:18
+    0027  MOVE        r29 <- r11             264:22
+    0028  CALL        r26 <- r27(2)          264:15
+    0029  CALL        r23 <- r24(2)          264:7
+    0030  JUMPUNLESS  r23, 0042              generated 262:5
+    0031  GETGLOBAL   r30 <- assoc           264:31
+    0032  MOVE        r31 <- r0              264:37
+    0033  CONST       r32 <- k1              264:43
+    0034  GETGLOBAL   r34 <- inc             264:56
+    0035  GETGLOBAL   r36 <- -               264:61
+    0036  MOVE        r37 <- r3              264:63
+    0037  MOVE        r38 <- r11             264:67
+    0038  CALL        r35 <- r36(2)          264:60
+    0039  CALL        r33 <- r34(1)          264:55
+    0040  TAILCALL    r30(3)                 264:30
+    0041  JUMP        0047                   generated 262:5
+    0042  CONST       r39 <- k2              generated 262:5
+    0043  JUMPUNLESS  r39, 0046              generated 262:5
+    0044  MOVE        r2 <- r0               generated 262:5
+    0045  JUMP        0047                   generated 262:5
+    0046  CONST       r2 <- k3               generated 262:5
+    0047  RETURN      r2                     259:3
 
-proto 34  status-line  params 2  slots 57
+proto 32  status-line  params 2  slots 57
   constants
     k0  :filename
     k1  nil
@@ -1362,141 +1350,141 @@ proto 34  status-line  params 2  slots 57
     k10  :message
     k11  "  "
   code
-    0000  GETGLOBAL   r5 <- =                269:19
-    0001  GETGLOBAL   r8 <- get              269:22
-    0002  MOVE        r9 <- r0               269:26
-    0003  CONST       r10 <- k0              269:32
-    0004  CALL        r6 <- r8(2)            269:21
-    0005  CONST       r7 <- k1               269:43
-    0006  CALL        r4 <- r5(2)            269:18
-    0007  JUMPUNLESS  r4, 0010               269:14
-    0008  CONST       r3 <- k2               269:48
-    0009  JUMP        0014                   269:14
-    0010  GETGLOBAL   r11 <- get             269:61
-    0011  MOVE        r12 <- r0              269:65
-    0012  CONST       r13 <- k0              269:71
-    0013  CALL        r3 <- r11(2)           269:60
-    0014  GETGLOBAL   r16 <- get             270:19
-    0015  MOVE        r17 <- r0              270:23
-    0016  CONST       r18 <- k3              270:29
-    0017  CALL        r15 <- r16(2)          270:18
-    0018  JUMPUNLESS  r15, 0021              270:14
-    0019  CONST       r14 <- k4              270:41
-    0020  JUMP        0022                   270:14
-    0021  CONST       r14 <- k5              270:46
-    0022  GETGLOBAL   r20 <- str             271:14
-    0023  CONST       r21 <- k6              271:18
-    0024  GETGLOBAL   r25 <- inc             271:23
-    0025  GETGLOBAL   r27 <- get             271:28
-    0026  MOVE        r28 <- r0              271:32
-    0027  CONST       r29 <- k7              271:38
-    0028  CALL        r26 <- r27(2)          271:27
-    0029  CALL        r22 <- r25(1)          271:22
-    0030  CONST       r23 <- k8              271:52
-    0031  GETGLOBAL   r30 <- inc             271:57
-    0032  GETGLOBAL   r32 <- get             271:62
-    0033  MOVE        r33 <- r0              271:66
-    0034  CONST       r34 <- k9              271:72
-    0035  CALL        r31 <- r32(2)          271:61
-    0036  CALL        r24 <- r30(1)          271:56
-    0037  CALL        r19 <- r20(4)          271:13
-    0038  GETGLOBAL   r37 <- =               272:18
-    0039  GETGLOBAL   r40 <- get             272:21
-    0040  MOVE        r41 <- r0              272:25
-    0041  CONST       r42 <- k10             272:31
-    0042  CALL        r38 <- r40(2)          272:20
-    0043  CONST       r39 <- k1              272:41
-    0044  CALL        r36 <- r37(2)          272:17
-    0045  JUMPUNLESS  r36, 0048              272:13
-    0046  CONST       r35 <- k5              272:46
-    0047  JUMP        0055                   272:13
-    0048  GETGLOBAL   r43 <- str             272:50
-    0049  CONST       r44 <- k11             272:54
-    0050  GETGLOBAL   r46 <- get             272:60
-    0051  MOVE        r47 <- r0              272:64
-    0052  CONST       r48 <- k10             272:70
-    0053  CALL        r45 <- r46(2)          272:59
-    0054  CALL        r35 <- r43(2)          272:49
-    0055  GETGLOBAL   r49 <- clip            273:6
-    0056  MOVE        r50 <- r1              273:11
-    0057  GETGLOBAL   r52 <- str             273:17
-    0058  MOVE        r53 <- r3              273:21
-    0059  MOVE        r54 <- r14             273:26
-    0060  MOVE        r55 <- r19             273:31
-    0061  MOVE        r56 <- r35             273:35
-    0062  CALL        r51 <- r52(4)          273:16
-    0063  TAILCALL    r49(2)                 273:5
-    0064  RETURN      r2                     269:3
+    0000  GETGLOBAL   r5 <- =                268:19
+    0001  GETGLOBAL   r8 <- get              268:22
+    0002  MOVE        r9 <- r0               268:26
+    0003  CONST       r10 <- k0              268:32
+    0004  CALL        r6 <- r8(2)            268:21
+    0005  CONST       r7 <- k1               268:43
+    0006  CALL        r4 <- r5(2)            268:18
+    0007  JUMPUNLESS  r4, 0010               268:14
+    0008  CONST       r3 <- k2               268:48
+    0009  JUMP        0014                   268:14
+    0010  GETGLOBAL   r11 <- get             268:61
+    0011  MOVE        r12 <- r0              268:65
+    0012  CONST       r13 <- k0              268:71
+    0013  CALL        r3 <- r11(2)           268:60
+    0014  GETGLOBAL   r16 <- get             269:19
+    0015  MOVE        r17 <- r0              269:23
+    0016  CONST       r18 <- k3              269:29
+    0017  CALL        r15 <- r16(2)          269:18
+    0018  JUMPUNLESS  r15, 0021              269:14
+    0019  CONST       r14 <- k4              269:41
+    0020  JUMP        0022                   269:14
+    0021  CONST       r14 <- k5              269:46
+    0022  GETGLOBAL   r20 <- str             270:14
+    0023  CONST       r21 <- k6              270:18
+    0024  GETGLOBAL   r25 <- inc             270:23
+    0025  GETGLOBAL   r27 <- get             270:28
+    0026  MOVE        r28 <- r0              270:32
+    0027  CONST       r29 <- k7              270:38
+    0028  CALL        r26 <- r27(2)          270:27
+    0029  CALL        r22 <- r25(1)          270:22
+    0030  CONST       r23 <- k8              270:52
+    0031  GETGLOBAL   r30 <- inc             270:57
+    0032  GETGLOBAL   r32 <- get             270:62
+    0033  MOVE        r33 <- r0              270:66
+    0034  CONST       r34 <- k9              270:72
+    0035  CALL        r31 <- r32(2)          270:61
+    0036  CALL        r24 <- r30(1)          270:56
+    0037  CALL        r19 <- r20(4)          270:13
+    0038  GETGLOBAL   r37 <- =               271:18
+    0039  GETGLOBAL   r40 <- get             271:21
+    0040  MOVE        r41 <- r0              271:25
+    0041  CONST       r42 <- k10             271:31
+    0042  CALL        r38 <- r40(2)          271:20
+    0043  CONST       r39 <- k1              271:41
+    0044  CALL        r36 <- r37(2)          271:17
+    0045  JUMPUNLESS  r36, 0048              271:13
+    0046  CONST       r35 <- k5              271:46
+    0047  JUMP        0055                   271:13
+    0048  GETGLOBAL   r43 <- str             271:50
+    0049  CONST       r44 <- k11             271:54
+    0050  GETGLOBAL   r46 <- get             271:60
+    0051  MOVE        r47 <- r0              271:64
+    0052  CONST       r48 <- k10             271:70
+    0053  CALL        r45 <- r46(2)          271:59
+    0054  CALL        r35 <- r43(2)          271:49
+    0055  GETGLOBAL   r49 <- clip            272:6
+    0056  MOVE        r50 <- r1              272:11
+    0057  GETGLOBAL   r52 <- str             272:17
+    0058  MOVE        r53 <- r3              272:21
+    0059  MOVE        r54 <- r14             272:26
+    0060  MOVE        r55 <- r19             272:31
+    0061  MOVE        r56 <- r35             272:35
+    0062  CALL        r51 <- r52(4)          272:16
+    0063  TAILCALL    r49(2)                 272:5
+    0064  RETURN      r2                     268:3
 
-proto 35  frame  params 3  slots 54
+proto 33  frame  params 3  slots 54
   constants
     k0  :scroll-row
     k1  :lines
     k2  "\n"
     k3  :help?
   code
-    0000  GETGLOBAL   r5 <- scroll-to-cursor 276:16
-    0001  MOVE        r6 <- r0               276:33
-    0002  MOVE        r7 <- r2               276:39
-    0003  CALL        r4 <- r5(2)            276:15
-    0004  GETGLOBAL   r9 <- get              277:14
-    0005  MOVE        r10 <- r4              277:18
-    0006  CONST       r11 <- k0              277:24
-    0007  CALL        r8 <- r9(2)            277:13
-    0008  GETGLOBAL   r13 <- take            278:15
-    0009  GETGLOBAL   r16 <- text-rows       278:21
-    0010  MOVE        r17 <- r4              278:31
-    0011  MOVE        r18 <- r2              278:37
-    0012  CALL        r14 <- r16(2)          278:20
-    0013  GETGLOBAL   r19 <- drop            278:44
-    0014  MOVE        r20 <- r8              278:49
-    0015  GETGLOBAL   r22 <- get             278:54
-    0016  MOVE        r23 <- r4              278:58
-    0017  CONST       r24 <- k1              278:64
-    0018  CALL        r21 <- r22(2)          278:53
-    0019  CALL        r15 <- r19(2)          278:43
-    0020  CALL        r12 <- r13(2)          278:14
-    0021  GETGLOBAL   r26 <- join            279:15
-    0022  CONST       r27 <- k2              279:20
-    0023  GETGLOBAL   r29 <- map             279:26
-    0024  CLOSURE     r30 <- proto 36        279:30
-    0025  MOVE        r31 <- r12             279:53
-    0026  CALL        r28 <- r29(2)          279:25
-    0027  CALL        r25 <- r26(2)          279:14
-    0028  GETGLOBAL   r34 <- get             280:19
-    0029  MOVE        r35 <- r4              280:23
-    0030  CONST       r36 <- k3              280:29
-    0031  CALL        r33 <- r34(2)          280:18
-    0032  JUMPUNLESS  r33, 0045              280:14
-    0033  GETGLOBAL   r37 <- str             281:17
-    0034  GETGLOBAL   r41 <- help-line       281:22
-    0035  MOVE        r42 <- r4              281:32
-    0036  MOVE        r43 <- r1              281:38
-    0037  CALL        r38 <- r41(2)          281:21
-    0038  CONST       r39 <- k2              281:44
-    0039  GETGLOBAL   r44 <- status-line     281:50
-    0040  MOVE        r45 <- r4              281:62
-    0041  MOVE        r46 <- r1              281:68
-    0042  CALL        r40 <- r44(2)          281:49
-    0043  CALL        r32 <- r37(3)          281:16
-    0044  JUMP        0049                   280:14
-    0045  GETGLOBAL   r47 <- status-line     282:17
-    0046  MOVE        r48 <- r4              282:29
-    0047  MOVE        r49 <- r1              282:35
-    0048  CALL        r32 <- r47(2)          282:16
-    0049  GETGLOBAL   r50 <- str             283:6
-    0050  MOVE        r51 <- r25             283:10
-    0051  CONST       r52 <- k2              283:15
-    0052  MOVE        r53 <- r32             283:20
-    0053  TAILCALL    r50(3)                 283:5
-    0054  RETURN      r3                     276:3
+    0000  GETGLOBAL   r5 <- scroll-to-cursor 275:16
+    0001  MOVE        r6 <- r0               275:33
+    0002  MOVE        r7 <- r2               275:39
+    0003  CALL        r4 <- r5(2)            275:15
+    0004  GETGLOBAL   r9 <- get              276:14
+    0005  MOVE        r10 <- r4              276:18
+    0006  CONST       r11 <- k0              276:24
+    0007  CALL        r8 <- r9(2)            276:13
+    0008  GETGLOBAL   r13 <- take            277:15
+    0009  GETGLOBAL   r16 <- text-rows       277:21
+    0010  MOVE        r17 <- r4              277:31
+    0011  MOVE        r18 <- r2              277:37
+    0012  CALL        r14 <- r16(2)          277:20
+    0013  GETGLOBAL   r19 <- drop            277:44
+    0014  MOVE        r20 <- r8              277:49
+    0015  GETGLOBAL   r22 <- get             277:54
+    0016  MOVE        r23 <- r4              277:58
+    0017  CONST       r24 <- k1              277:64
+    0018  CALL        r21 <- r22(2)          277:53
+    0019  CALL        r15 <- r19(2)          277:43
+    0020  CALL        r12 <- r13(2)          277:14
+    0021  GETGLOBAL   r26 <- join            278:15
+    0022  CONST       r27 <- k2              278:20
+    0023  GETGLOBAL   r29 <- map             278:26
+    0024  CLOSURE     r30 <- proto 34        278:30
+    0025  MOVE        r31 <- r12             278:53
+    0026  CALL        r28 <- r29(2)          278:25
+    0027  CALL        r25 <- r26(2)          278:14
+    0028  GETGLOBAL   r34 <- get             279:19
+    0029  MOVE        r35 <- r4              279:23
+    0030  CONST       r36 <- k3              279:29
+    0031  CALL        r33 <- r34(2)          279:18
+    0032  JUMPUNLESS  r33, 0045              279:14
+    0033  GETGLOBAL   r37 <- str             280:17
+    0034  GETGLOBAL   r41 <- help-line       280:22
+    0035  MOVE        r42 <- r4              280:32
+    0036  MOVE        r43 <- r1              280:38
+    0037  CALL        r38 <- r41(2)          280:21
+    0038  CONST       r39 <- k2              280:44
+    0039  GETGLOBAL   r44 <- status-line     280:50
+    0040  MOVE        r45 <- r4              280:62
+    0041  MOVE        r46 <- r1              280:68
+    0042  CALL        r40 <- r44(2)          280:49
+    0043  CALL        r32 <- r37(3)          280:16
+    0044  JUMP        0049                   279:14
+    0045  GETGLOBAL   r47 <- status-line     281:17
+    0046  MOVE        r48 <- r4              281:29
+    0047  MOVE        r49 <- r1              281:35
+    0048  CALL        r32 <- r47(2)          281:16
+    0049  GETGLOBAL   r50 <- str             282:6
+    0050  MOVE        r51 <- r25             282:10
+    0051  CONST       r52 <- k2              282:15
+    0052  MOVE        r53 <- r32             282:20
+    0053  TAILCALL    r50(3)                 282:5
+    0054  RETURN      r3                     275:3
 
-proto 36  <fn>  params 1  slots 5
+proto 34  <fn>  params 1  slots 5
   captures
     c0  local r1
   code
-    0000  GETGLOBAL   r2 <- clip             279:39
-    0001  GETCAP      r3 <- c0               279:44
-    0002  MOVE        r4 <- r0               279:49
-    0003  TAILCALL    r2(2)                  279:38
-    0004  RETURN      r1                     279:38
+    0000  GETGLOBAL   r2 <- clip             278:39
+    0001  GETCAP      r3 <- c0               278:44
+    0002  MOVE        r4 <- r0               278:49
+    0003  TAILCALL    r2(2)                  278:38
+    0004  RETURN      r1                     278:38

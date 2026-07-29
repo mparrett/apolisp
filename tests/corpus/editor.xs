@@ -39,13 +39,12 @@
 
 ; --- Strings -----------------------------------------------------------------
 ;
-; The cursor is a *character* column and `str-slice` takes *byte* indices
-; (ADR-049), so every edit converts through the scalar vector. Holding the line
-; as scalars and converting at the edges is the shape that avoids doing this
-; twice per keystroke.
-
-(defn scalars-take [n s] (scalars-str (take n (str-scalars s))))
-(defn scalars-drop [n s] (scalars-str (drop n (str-scalars s))))
+; The cursor is a *character* column, so every edit needs a character-indexed
+; slice. This file used to define one out of `str-scalars` + `take`/`drop` +
+; `scalars-str`, which is quadratic in the column because `take` and `drop` are
+; prelude `conj` loops. ADR-052 made `str-scalar-slice` native and the whole
+; section went away — this program is the reason it exists, and Q34 is the
+; measurement that argued for it.
 
 ; --- Buffer: pure state -> state ---------------------------------------------
 
@@ -92,7 +91,7 @@
   (let [row (get state :cursor-row)
         col (get state :cursor-col)
         line (current-line state)
-        next (str (scalars-take col line) s (scalars-drop col line))]
+        next (str (str-scalar-slice line 0 col) s (str-scalar-slice line col (str-scalar-len line)))]
     (touch (assoc state
                   :lines (assoc (get state :lines) row next)
                   :cursor-col (+ col (str-scalar-len s))))))
@@ -104,8 +103,8 @@
         lines (get state :lines)
         before (take row lines)
         after (drop (inc row) lines)
-        head (scalars-take col line)
-        tail (scalars-drop col line)]
+        head (str-scalar-slice line 0 col)
+        tail (str-scalar-slice line col (str-scalar-len line))]
     (touch (assoc state
                   :lines (vec (concat before [head] [tail] after))
                   :cursor-row (inc row)
@@ -127,7 +126,7 @@
     (cond
       (> col 0)
       (let [line (current-line state)
-            next (str (scalars-take (dec col) line) (scalars-drop col line))]
+            next (str (str-scalar-slice line 0 (dec col)) (str-scalar-slice line col (str-scalar-len line)))]
         (touch (assoc state
                       :lines (assoc (get state :lines) row next)
                       :cursor-col (dec col))))
@@ -244,7 +243,7 @@
 ; sequence is emitted from here — a golden that contained cursor positioning
 ; would pin the terminal protocol rather than the editor.
 
-(defn clip [w s] (if (<= (str-scalar-len s) w) s (scalars-take w s)))
+(defn clip [w s] (if (<= (str-scalar-len s) w) s (str-scalar-slice s 0 w)))
 
 ; How many rows the buffer gets. `scroll-to-cursor` and `frame` must agree on
 ; this or the painted cursor lands on the wrong line, so both ask here.

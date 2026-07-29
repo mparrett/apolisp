@@ -12,7 +12,7 @@
 use apolisp::bytecode::{CaptureSrc, Chunk, Instr, Proto, Slot};
 use apolisp::error::SpanOrigin;
 use apolisp::value::{Interner, Value};
-use apolisp::{bytecode, compile, error, reader};
+use apolisp::{bytecode, compile, error, expand, reader, vm};
 
 mod common;
 use common::check_goldens;
@@ -24,6 +24,33 @@ fn compile_ok(src: &str) -> (Chunk, Interner) {
     let chunk = compile::compile(&forms, &mut interner)
         .unwrap_or_else(|e| panic!("{src:?}: {}", e.render("<test>", src)));
     (chunk, interner)
+}
+
+/// Read, **expand**, then compile — what `apolisp compile` does, and what the
+/// corpus-wide properties below have to use.
+///
+/// `compile_ok` skips expansion, which is right for the hand-written snippets
+/// in this file: they are core forms, and reaching the compiler through the
+/// expander would test the expander instead. It was wrong for the corpus, and
+/// silently so. Every corpus program's macros happened to expand to something
+/// the compiler also accepted *unexpanded*, so two properties claiming to hold
+/// "over the whole corpus" were holding over a program the VM never runs.
+/// `editor.xs` is the first entry with a macro that syntax-quotes a parameter
+/// vector, and unexpanded that reads as `(fn ~name ~params ...)` — a list where
+/// the compiler wants a vector. The properties did not weaken; they had never
+/// been applied to post-expansion bytecode at all.
+///
+/// The prelude is deliberately left out. `compile_unit` would fold it in, and
+/// then the span assertion below would be checking prelude origins against the
+/// program's source length.
+fn compile_expanded(src: &str) -> Chunk {
+    let mut vm = vm::Vm::new();
+    let forms = reader::read_all(src, &mut vm.interner)
+        .unwrap_or_else(|e| panic!("{}", e.render("<test>", src)));
+    let forms = expand::expand_all(forms, &mut vm)
+        .unwrap_or_else(|e| panic!("{}", e.render("<test>", src)));
+    compile::compile(&forms, &mut vm.interner)
+        .unwrap_or_else(|e| panic!("{}", e.render("<test>", src)))
 }
 
 /// The error from reading *or* compiling. The depth bound (ADR-036) is a reader
@@ -95,7 +122,8 @@ fn every_instruction_has_an_origin() {
         if reader::read_all(&src, &mut interner).unwrap().is_empty() {
             continue;
         }
-        let (chunk, _) = compile_ok(&src);
+        let chunk = compile_expanded(&src);
+        let mut from_source = 0usize;
         for (i, p) in chunk.protos.iter().enumerate() {
             assert_eq!(
                 p.code.len(),
@@ -106,26 +134,42 @@ fn every_instruction_has_an_origin() {
                 p.lines.len()
             );
             for (pc, o) in p.lines.iter().enumerate() {
-                // Nothing in the corpus is macro-generated yet, so every
-                // instruction traces to real source text. When milestone 5
-                // lands, `Generated` becomes legal here and this assertion is
-                // the thing that has to be widened deliberately.
+                // Widened when the corpus gained a program whose macros expand
+                // to real code (`editor.xs`), which is the deliberate widening
+                // the previous comment here asked for. `Generated` is legal
+                // post-expansion; `Unknown` still is not, because the point of
+                // the property is that every instruction points *somewhere*. A
+                // `Generated` span is the macro call site, so it is inside this
+                // file too and the bound applies to both.
                 match o {
-                    SpanOrigin::Source(s) => assert!(
-                        (s.end as usize) <= src.len(),
-                        "{}: proto {i} pc {pc} has span {}..{} outside a {}-byte file",
-                        path.display(),
-                        s.start,
-                        s.end,
-                        src.len()
-                    ),
+                    SpanOrigin::Source(s) | SpanOrigin::Generated(s) => {
+                        if matches!(o, SpanOrigin::Source(_)) {
+                            from_source += 1;
+                        }
+                        assert!(
+                            (s.end as usize) <= src.len(),
+                            "{}: proto {i} pc {pc} has span {}..{} outside a {}-byte file",
+                            path.display(),
+                            s.start,
+                            s.end,
+                            src.len()
+                        );
+                    }
                     other => panic!(
-                        "{}: proto {i} pc {pc} has origin {other:?}, not a source span",
+                        "{}: proto {i} pc {pc} has origin {other:?}, which points nowhere",
                         path.display()
                     ),
                 }
             }
         }
+        // Without this, a mutant that stamped every instruction `Generated`
+        // would pass the loop above — legalizing `Generated` costs the property
+        // its teeth unless something still insists source code reaches bytecode.
+        assert!(
+            from_source > 0,
+            "{}: no instruction traces to source text",
+            path.display()
+        );
     }
 }
 
@@ -222,7 +266,7 @@ fn instr_size_is_asserted_not_assumed() {
 fn slot_operands_stay_inside_the_frame() {
     for path in common::corpus_files() {
         let src = std::fs::read_to_string(&path).unwrap();
-        let (chunk, _) = compile_ok(&src);
+        let chunk = compile_expanded(&src);
         for (i, p) in chunk.protos.iter().enumerate() {
             for (pc, ins) in p.code.iter().enumerate() {
                 for s in slots_of(ins) {

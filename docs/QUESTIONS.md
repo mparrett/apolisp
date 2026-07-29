@@ -11,7 +11,7 @@ design review of 2026-07-25.
 Q3 (→ADR-025), Q4 (→ADR-028), Q7 (→ADR-029), Q9 (→ADR-029), Q10 (→ADR-037),
 Q11 (→ADR-027), Q13 (→ADR-041), Q17 (→ADR-027), Q21 (→ADR-030), Q23 (→ADR-039),
 Q24 (→ADR-038), Q25 (→ADR-038), Q26 (→ADR-041), Q6 (→ADR-041), Q27 (→ADR-042),
-Q8 (→ADR-043), Q22 (→ADR-043), Q1 (→ADR-044), Q5 (→ADR-047), Q29 (→ADR-048).*
+Q8 (→ADR-043), Q22 (→ADR-043), Q1 (→ADR-044), Q5 (→ADR-047), Q29 (→ADR-048), Q34 (→ADR-052).*
 
 ---
 
@@ -267,43 +267,53 @@ environment.** `main.rs` takes a command and a path. The pager pages its own
 source because that is the only file it can name, and every terminal program
 takes an argument.
 
-**Q34 — A scalar-indexed slice, or the safe string path stays quadratic.**
-*(Filed 2026-07-28 from `notes/the-editor-program.md`, with the measurement.)*
+**Q35 — Segmentation: is a grapheme a thing this language can talk about?**
+*(Filed 2026-07-29 by ADR-052, which made the scalar path fast without making it
+correct. Recorded as a trap in `TRAPS.md`.)*
 
-ADR-018 and ADR-049 built a string surface that is careful about Unicode:
-`str-slice` takes **byte** indices and raises inside a character, `count` on a
-string is refused, and `str-scalar-len`/`str-scalars` are the character-correct
-way to work. What none of those entries noticed is that the correct path has no
-**native slice**. Character-level surgery has to go `str-scalars` → `take`/`drop`
-→ `scalars-str`, and `take` and `drop` are prelude `conj` loops, so an edit at
-column *c* is O(c²).
+ADR-018 promised "separate explicit operations for bytes, scalar values, and
+graphemes" and the third has never existed. So `str-scalar-slice` cuts between
+scalars, and a scalar is not what a person calls a character: backspace over
+`café` spelled `e` + U+0301 removes the accent and leaves the glyph count
+unchanged, and one `DEL` on a ZWJ family emoji turns one glyph into two. The
+editor does both today, now faster than before.
 
-Measured on one insert per keystroke, release build:
+**The shapes.** *A dependency* — `unicode-segmentation` is the obvious one, and
+ADR-014 fixes the dependency set, so this is an ADR either way. *A table* built
+into the core, which is the largest thing this project would ever have carried
+and grows with each Unicode revision. *Nothing, stated deliberately* — the
+language declines to segment, `TRAPS.md` carries the warning, and any program that
+cares does its own clustering. That third option is currently what is true, and
+the only defect is that it is true by omission rather than by decision.
 
-| line length | scalars `take`/`drop` | native `str-slice` | speedup |
-|---:|---:|---:|---:|
-| 100 | 272.6 µs | 3.74 µs | 73× |
-| 400 | 1,244.2 µs | 3.59 µs | 347× |
-| 1,600 | 12,604.8 µs | 4.34 µs | 2,905× |
+What would force it: a program whose correctness a user would notice. The editor
+is close, since backspace is the operation, and no test asserts the wrong
+behaviour is wrong.
 
-The native path is **flat**. The language already contains the fast primitive;
-it is just the one that is byte-indexed, so *fast* and *correct about Unicode*
-are currently different functions.
+**Q36 — Structural edits are O(buffer), and nothing tracks it.**
+*(Filed 2026-07-29 by ADR-052, which fixed the adjacent cost and not this one.)*
 
-**The shapes.** A native `str-scalar-slice` taking character indices is the
-direct answer and the largest surface. A `str-scalar-offset` returning the byte
-offset of character *n* is smaller and composes with the `str-slice` that already
-exists — one scan instead of a vector, and it leaves the existing surface alone.
-Making `take`/`drop` native would fix this case and not the general one, and
-ADR-041 part 6 has opinions about natives that call back into the language.
-Fixing Q6/E-11 so `conj` stops copying would fix it everywhere and is much
-larger.
+`split-line` and `join-prev` rebuild the whole line vector with `concat`, so
+pressing `RET` is linear in the buffer and, through Q6/E-11's `conj`, superlinear
+in practice. Measured after ADR-052, release:
 
-**Not urgent, and not nothing.** No corpus program is long enough to feel it —
-which is exactly why it survived ADR-018, ADR-041 and ADR-049 without comment.
-A program that edits text is the first thing to reach it, and the trap it leaves
-behind is the shape `TRAPS.md` already records once for `str-len`: the surface
-built to keep Unicode honest is the one nobody can afford to use.
+| buffer lines | typing | `RET` |
+|---:|---:|---:|
+| 250 | 0.005 ms | 0.709 ms |
+| 1,000 | 0.011 ms | 7.244 ms |
+
+Four times the buffer costs typing 2.2× and `RET` 10.2×. ADR-052 made typing 20×
+faster and `RET` only 1.8× faster, so the *gap between them widened*: `RET` now
+costs about 660 times a character where before it was about 60. Fixing the cheap
+operation made the expensive one conspicuous, which is the honest reason this is
+being filed now rather than when it was first measured.
+
+**The shapes.** *Fix Q6/E-11* so `conj` stops copying, which fixes this and much
+else and is the largest option. *A native `splice`* for the one-in, one-out vector
+edit both functions want. *The line zipper an external review proposed*, which
+needs Q6/E-11 first to be worth anything (`notes/the-editor-program.md`).
+*Nothing* — a 1,000-line file takes 7 ms per newline, which is slow and not
+unusable, and no program in the corpus is larger.
 
 ## No milestone — decide when evidence arrives
 

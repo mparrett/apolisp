@@ -2720,6 +2720,9 @@ way to find out.
 
 ### ADR-049 — The string surface names its units
 
+*Decision stands; its rejection of scalar-indexed slicing is superseded by
+ADR-052, which explains why that clause misread ADR-018.*
+
 *(New, 2026-07-28. Refines ADR-018 and ADR-041 part 5. Removes `str-len`.
 Prompted by `notes/the-report-program.md`.)*
 
@@ -2957,6 +2960,108 @@ mid-session and resumed in a fresh process with the mode wrong. The transcript
 would match, because output is buffered, so the round-trip property cannot see
 it. ADR-045 already notes raw mode outlives a failed program; this is the same
 fact reaching serialization.
+
+---
+
+### ADR-052 — `str-scalar-slice`, and the rejection that misread ADR-018
+
+*(New, 2026-07-29. Adds `str-scalar-slice`. **Supersedes ADR-049's rejection of
+scalar-indexed slicing.** Resolves Q34. Prompted by
+`notes/the-editor-program.md`; predicted in
+`notes/str-scalar-slice-prediction.md`.)*
+
+**Decision.** `(str-scalar-slice s from to)` returns the substring between the
+**scalar** indices `from` and `to`. It raises when `from > to` or when `to`
+exceeds the string's scalar length. It is **O(n) in the string** — one
+`char_indices` pass, with no index built and nothing cached.
+
+**1. Why ADR-049's rejection does not hold.** That entry rejected this primitive
+in one clause: *"Scalar-indexed slicing, which is ADR-018's O(1)-character-indexing
+promise being broken to avoid naming a unit."* Every part of that is wrong, and
+the parts are worth separating because the same mistake is easy to repeat.
+
+ADR-018 does not promise O(1) character indexing. It says **"No promise of O(1)
+character indexing"** — a declined guarantee, not a prohibited operation. A
+linear scalar slice keeps that non-promise exactly: it is O(n), and this entry
+says so in the decision line rather than in a footnote. The rejection read a
+performance disclaimer as a ban.
+
+ADR-018's decision text also says **"Separate explicit operations for bytes,
+scalar values, and graphemes."** A scalar-indexed slice is the second of those
+three. The rejection cited the entry that asks for the operation as the reason
+not to add it.
+
+And it does not "avoid naming a unit" — the name contains the unit, which is
+ADR-049's own rule (part 2) being followed rather than dodged. `str-slice` speaks
+bytes and says so; `str-scalar-slice` speaks scalars and says so.
+
+**2. Why linear is enough, and why O(1) was never the question.** The defect Q34
+records is not that slicing costs more than O(1). It is that the
+character-correct path had no native slice at all, so it went `str-scalars` →
+`take`/`drop` → `scalars-str`, and `take`/`drop` are prelude `conj` loops —
+quadratic in the column (Q6/E-11). The fix is replacing a quadratic
+language-level loop with a linear native scan. Dropping an exponent is the win;
+the constant was never the point.
+
+**3. The byte surface is unchanged.** `str-slice` still takes byte indices and
+still raises inside a character. Two slices now exist, in two units, both named
+— which is ADR-049's rule applied at a second site, not weakened.
+
+**4. What this does not fix**, stated because a large speedup invites the
+assumption that the program is fast:
+
+- **Graphemes.** A scalar is not a character. Backspace still splits `e` + U+0301
+  and still dismantles a ZWJ sequence, and this primitive makes that *faster*
+  rather than correct. See `TRAPS.md`.
+- **`RET`.** `split-line` rebuilds the line vector with `concat`, which is
+  O(buffer) and is not a string question at all.
+- **Q6/E-11.** `take`, `drop`, `map`, `filter` and the rest stay quadratic
+  everywhere else. This entry removes the one call site that hurt, and removes no
+  exponent from the collection surface.
+
+**Rejected.** *`str-scalar-offset`* — scalar index to byte offset, composed with
+the existing `str-slice`. Smaller, and safe by ADR-049 part 2's test, since its
+result flows into an operation that validates. Rejected on ergonomics rather than
+safety: it hands the caller a way to compute byte indices so that the byte API
+stays the one being called, so the correct operation remains two steps and
+remains byte-flavoured. The recurring shape in `TRAPS.md` is that the surface
+built to keep Unicode honest is the one nobody can afford to use, and an offset
+routes around that shape where a slice removes it.
+
+*Making `take`/`drop` native* — fixes this call site and not the general case, and
+ADR-041 part 6 has opinions about natives that call back into the language.
+*Fixing Q6/E-11 first* — the right answer eventually and much larger; it stays
+open, and this entry does not depend on it.
+
+*Caching a scalar→byte index on the string object* — would make repeated slices
+of one line O(1) and is the obvious next step if a measurement ever asks for it.
+Rejected now because it adds mutable state to an immutable value for a cost
+nothing has yet shown, and ADR-018's non-promise is what makes declining it
+legal.
+
+**Cost.** Core goes from 6,561 to 6,616 of 7,500 — **55 lines, against the 25–35
+predicted**, and the overrun is comment rather than code. ADR-030 counts comments
+on purpose, so this is a real cost and not an accounting artifact. The editor's
+`scalars-take` and `scalars-drop` stop existing, and its `.disasm` loses two
+protos.
+
+Measured, release, length-preserving edit at the middle of the line:
+
+| line length | old idiom | `str-scalar-slice` | speedup |
+|---:|---:|---:|---:|
+| 100 | 93.6 µs | 0.92 µs | 102× |
+| 1,600 | 9,683.8 µs | 4.54 µs | 2,134× |
+| 25,000 | 2,213,853.5 µs | 43.58 µs | 50,802× |
+| 100,000 | — | 165.68 µs | — |
+
+The last two rows are the point: 4× the characters costs 4.01× and 3.80×, so the
+primitive is **linear and measurably so**, exactly as the decision line claims. It
+is not flat, and nothing here needed it to be.
+
+**Open.** Graphemes, as a decision about a dependency, a table, or a stated
+refusal — **Q35**. `split-line`'s O(buffer) rebuild, now the largest remaining
+cost in the editor and conspicuous only because this entry fixed the other one —
+**Q36**. Q6/E-11, which is under both of them.
 
 ---
 

@@ -1,0 +1,13 @@
+--- stdout
+--- frame
+hello
+!world
+C-o save  C-x C-c quit  C-g hide
+demo.txt * 2:6
+--- lines
+["hello" "!world"]
+quit? true  modified? true
+--- value
+nil
+--- exit
+0

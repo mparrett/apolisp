@@ -109,10 +109,16 @@ fn value_of(src: &str) -> String {
 /// `macros.xs` earns one for a reason the `.expanded` golden cannot cover: a
 /// macro can expand to something that reads correctly and computes the wrong
 /// answer, and only running it says which.
+///
+/// `editor.xs` earns one for the same reason at a larger scale, and it is the
+/// only entry where the transcript is the *whole* point: the other phases pin
+/// how it reads, expands and compiles, and none of them can say whether nineteen
+/// keystrokes fold into the right buffer.
 #[test]
 fn out_transcripts_match() {
     let runnable = [
         "control.xs",
+        "editor.xs",
         "errors.xs",
         "hello.xs",
         "macros.xs",

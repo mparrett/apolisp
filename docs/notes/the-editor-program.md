@@ -227,6 +227,23 @@ wrong while the decision held — including a benchmark that took three attempts
 because the *fixture* was the confound both times, the same error this note
 already records from the previous session.
 
+**And the third of those three operations is never coming, 2026-07-30: ADR-054.**
+The sentence quoted above promised bytes, scalar values *and graphemes*, and the
+grapheme third is now withdrawn rather than left pending — segmentation would be
+the first dependency the language carries, and it loses to that on scope.
+
+Which means this editor's backspace is **wrong on purpose**, and the note should
+not be read as describing a program that merely has not got round to it. Deleting
+back over `café` spelled `e` + U+0301 removes the accent and leaves `cafe` with
+the glyph count unchanged, so the keystroke looks like it did nothing. ADR-052
+made that faster and did not make it correct; the two were always independent.
+
+An external review of this program assumed the scalar representation had already
+solved it, which is the reason the decision exists in writing and the reason
+`TRAPS.md` carries the entry. The behaviour is pinned by assertions in
+`tests/lang/strings.xs` that exist to fail if anyone adds segmentation without
+saying so.
+
 ## What this says about the gap-buffer idea
 
 The pre-registration proposed a line-level gap buffer to dodge the per-keystroke

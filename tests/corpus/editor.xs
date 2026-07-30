@@ -101,8 +101,8 @@
         col (get state :cursor-col)
         line (current-line state)
         lines (get state :lines)
-        before (take row lines)
-        after (drop (inc row) lines)
+        before (vec-slice lines 0 row)
+        after (vec-slice lines (inc row) (count lines))
         head (str-scalar-slice line 0 col)
         tail (str-scalar-slice line col (str-scalar-len line))]
     (touch (assoc state
@@ -116,7 +116,8 @@
         prev (line-at state (dec row))
         merged (str prev (current-line state))]
     (touch (assoc state
-                  :lines (vec (concat (take (dec row) lines) [merged] (drop (inc row) lines)))
+                  :lines (vec (concat (vec-slice lines 0 (dec row)) [merged]
+                                      (vec-slice lines (inc row) (count lines))))
                   :cursor-row (dec row)
                   :cursor-col (str-scalar-len prev)))))
 

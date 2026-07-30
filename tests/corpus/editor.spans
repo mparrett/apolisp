@@ -297,14 +297,14 @@
           4138..4156 list (str-scalar-len s)
             4139..4153 symbol str-scalar-len
             4154..4155 symbol s
-4163..4669 list (defn split-line [state] (let [row (get state :cursor-row) col (get state :cursor-col) line (current-line state) lines (get state :lines) before (take row lines) after (drop (inc row) lines) head (str-scalar-slice line 0 col) tail (str-scalar-slice line col (str-scalar-len line))] (touch (assoc state :lines (vec (concat before [head] [tail] after)) :cursor-row (inc row) :cursor-col 0))))
+4163..4695 list (defn split-line [state] (let [row (get state :cursor-row) col (get state :cursor-col) line (current-line state) lines (get state :lines) before (vec-slice lines 0 row) after (vec-slice lines (inc row) (count lines)) head (str-scalar-slice line 0 col) tail (str-scalar-slice line col (str-scalar-len line))] (touch (assoc state :lines (vec (concat before [head] [tail] after)) :cursor-row (inc row) :cursor-col 0))))
   4164..4168 symbol defn
   4169..4179 symbol split-line
   4180..4187 vector [state]
     4181..4186 symbol state
-  4190..4668 list (let [row (get state :cursor-row) col (get state :cursor-col) line (current-line state) lines (get state :lines) before (take row lines) after (drop (inc row) lines) head (str-scalar-slice line 0 col) tail (str-scalar-slice line col (str-scalar-len line))] (touch (assoc state :lines (vec (concat before [head] [tail] after)) :cursor-row (inc row) :cursor-col 0)))
+  4190..4694 list (let [row (get state :cursor-row) col (get state :cursor-col) line (current-line state) lines (get state :lines) before (vec-slice lines 0 row) after (vec-slice lines (inc row) (count lines)) head (str-scalar-slice line 0 col) tail (str-scalar-slice line col (str-scalar-len line))] (touch (assoc state :lines (vec (concat before [head] [tail] after)) :cursor-row (inc row) :cursor-col 0)))
     4191..4194 symbol let
-    4195..4502 vector [row (get state :cursor-row) col (get state :cursor-col) line (current-line state) lines (get state :lines) before (take row lines) after (drop (inc row) lines) head (str-scalar-slice line 0 col) tail (str-scalar-slice line col (str-scalar-len line))]
+    4195..4528 vector [row (get state :cursor-row) col (get state :cursor-col) line (current-line state) lines (get state :lines) before (vec-slice lines 0 row) after (vec-slice lines (inc row) (count lines)) head (str-scalar-slice line 0 col) tail (str-scalar-slice line col (str-scalar-len line))]
       4196..4199 symbol row
       4200..4223 list (get state :cursor-row)
         4201..4204 symbol get
@@ -325,1026 +325,1034 @@
         4313..4318 symbol state
         4319..4325 keyword :lines
       4335..4341 symbol before
-      4342..4358 list (take row lines)
-        4343..4347 symbol take
-        4348..4351 symbol row
-        4352..4357 symbol lines
-      4367..4372 symbol after
-      4373..4395 list (drop (inc row) lines)
-        4374..4378 symbol drop
-        4379..4388 list (inc row)
-          4380..4383 symbol inc
-          4384..4387 symbol row
-        4389..4394 symbol lines
-      4404..4408 symbol head
-      4409..4438 list (str-scalar-slice line 0 col)
-        4410..4426 symbol str-scalar-slice
-        4427..4431 symbol line
-        4432..4433 int 0
-        4434..4437 symbol col
-      4447..4451 symbol tail
-      4452..4501 list (str-scalar-slice line col (str-scalar-len line))
-        4453..4469 symbol str-scalar-slice
-        4470..4474 symbol line
-        4475..4478 symbol col
-        4479..4500 list (str-scalar-len line)
-          4480..4494 symbol str-scalar-len
-          4495..4499 symbol line
-    4507..4667 list (touch (assoc state :lines (vec (concat before [head] [tail] after)) :cursor-row (inc row) :cursor-col 0))
-      4508..4513 symbol touch
-      4514..4666 list (assoc state :lines (vec (concat before [head] [tail] after)) :cursor-row (inc row) :cursor-col 0)
-        4515..4520 symbol assoc
-        4521..4526 symbol state
-        4545..4551 keyword :lines
-        4552..4593 list (vec (concat before [head] [tail] after))
-          4553..4556 symbol vec
-          4557..4592 list (concat before [head] [tail] after)
-            4558..4564 symbol concat
-            4565..4571 symbol before
-            4572..4578 vector [head]
-              4573..4577 symbol head
-            4579..4585 vector [tail]
-              4580..4584 symbol tail
-            4586..4591 symbol after
-        4612..4623 keyword :cursor-row
-        4624..4633 list (inc row)
-          4625..4628 symbol inc
-          4629..4632 symbol row
-        4652..4663 keyword :cursor-col
-        4664..4665 int 0
-4671..5065 list (defn join-prev [state] (let [row (get state :cursor-row) lines (get state :lines) prev (line-at state (dec row)) merged (str prev (current-line state))] (touch (assoc state :lines (vec (concat (take (dec row) lines) [merged] (drop (inc row) lines))) :cursor-row (dec row) :cursor-col (str-scalar-len prev)))))
-  4672..4676 symbol defn
-  4677..4686 symbol join-prev
-  4687..4694 vector [state]
-    4688..4693 symbol state
-  4697..5064 list (let [row (get state :cursor-row) lines (get state :lines) prev (line-at state (dec row)) merged (str prev (current-line state))] (touch (assoc state :lines (vec (concat (take (dec row) lines) [merged] (drop (inc row) lines))) :cursor-row (dec row) :cursor-col (str-scalar-len prev))))
-    4698..4701 symbol let
-    4702..4850 vector [row (get state :cursor-row) lines (get state :lines) prev (line-at state (dec row)) merged (str prev (current-line state))]
-      4703..4706 symbol row
-      4707..4730 list (get state :cursor-row)
-        4708..4711 symbol get
-        4712..4717 symbol state
-        4718..4729 keyword :cursor-row
-      4739..4744 symbol lines
-      4745..4763 list (get state :lines)
-        4746..4749 symbol get
-        4750..4755 symbol state
-        4756..4762 keyword :lines
-      4772..4776 symbol prev
-      4777..4802 list (line-at state (dec row))
-        4778..4785 symbol line-at
-        4786..4791 symbol state
-        4792..4801 list (dec row)
-          4793..4796 symbol dec
-          4797..4800 symbol row
-      4811..4817 symbol merged
-      4818..4849 list (str prev (current-line state))
-        4819..4822 symbol str
-        4823..4827 symbol prev
-        4828..4848 list (current-line state)
-          4829..4841 symbol current-line
-          4842..4847 symbol state
-    4855..5063 list (touch (assoc state :lines (vec (concat (take (dec row) lines) [merged] (drop (inc row) lines))) :cursor-row (dec row) :cursor-col (str-scalar-len prev)))
-      4856..4861 symbol touch
-      4862..5062 list (assoc state :lines (vec (concat (take (dec row) lines) [merged] (drop (inc row) lines))) :cursor-row (dec row) :cursor-col (str-scalar-len prev))
-        4863..4868 symbol assoc
-        4869..4874 symbol state
-        4893..4899 keyword :lines
-        4900..4969 list (vec (concat (take (dec row) lines) [merged] (drop (inc row) lines)))
-          4901..4904 symbol vec
-          4905..4968 list (concat (take (dec row) lines) [merged] (drop (inc row) lines))
-            4906..4912 symbol concat
-            4913..4935 list (take (dec row) lines)
-              4914..4918 symbol take
-              4919..4928 list (dec row)
-                4920..4923 symbol dec
-                4924..4927 symbol row
-              4929..4934 symbol lines
-            4936..4944 vector [merged]
-              4937..4943 symbol merged
-            4945..4967 list (drop (inc row) lines)
-              4946..4950 symbol drop
-              4951..4960 list (inc row)
-                4952..4955 symbol inc
-                4956..4959 symbol row
-              4961..4966 symbol lines
-        4988..4999 keyword :cursor-row
-        5000..5009 list (dec row)
-          5001..5004 symbol dec
-          5005..5008 symbol row
-        5028..5039 keyword :cursor-col
-        5040..5061 list (str-scalar-len prev)
-          5041..5055 symbol str-scalar-len
-          5056..5060 symbol prev
-5067..5533 list (defn delete-back [state] (let [row (get state :cursor-row) col (get state :cursor-col)] (cond (> col 0) (let [line (current-line state) next (str (str-scalar-slice line 0 (dec col)) (str-scalar-slice line col (str-scalar-len line)))] (touch (assoc state :lines (assoc (get state :lines) row next) :cursor-col (dec col)))) (> row 0) (join-prev state) true state)))
-  5068..5072 symbol defn
-  5073..5084 symbol delete-back
-  5085..5092 vector [state]
-    5086..5091 symbol state
-  5095..5532 list (let [row (get state :cursor-row) col (get state :cursor-col)] (cond (> col 0) (let [line (current-line state) next (str (str-scalar-slice line 0 (dec col)) (str-scalar-slice line col (str-scalar-len line)))] (touch (assoc state :lines (assoc (get state :lines) row next) :cursor-col (dec col)))) (> row 0) (join-prev state) true state))
-    5096..5099 symbol let
-    5100..5165 vector [row (get state :cursor-row) col (get state :cursor-col)]
-      5101..5104 symbol row
-      5105..5128 list (get state :cursor-row)
-        5106..5109 symbol get
-        5110..5115 symbol state
-        5116..5127 keyword :cursor-row
-      5137..5140 symbol col
-      5141..5164 list (get state :cursor-col)
-        5142..5145 symbol get
-        5146..5151 symbol state
-        5152..5163 keyword :cursor-col
-    5170..5531 list (cond (> col 0) (let [line (current-line state) next (str (str-scalar-slice line 0 (dec col)) (str-scalar-slice line col (str-scalar-len line)))] (touch (assoc state :lines (assoc (get state :lines) row next) :cursor-col (dec col)))) (> row 0) (join-prev state) true state)
-      5171..5175 symbol cond
-      5182..5191 list (> col 0)
-        5183..5184 symbol >
-        5185..5188 symbol col
-        5189..5190 int 0
-      5198..5479 list (let [line (current-line state) next (str (str-scalar-slice line 0 (dec col)) (str-scalar-slice line col (str-scalar-len line)))] (touch (assoc state :lines (assoc (get state :lines) row next) :cursor-col (dec col))))
-        5199..5202 symbol let
-        5203..5339 vector [line (current-line state) next (str (str-scalar-slice line 0 (dec col)) (str-scalar-slice line col (str-scalar-len line)))]
-          5204..5208 symbol line
-          5209..5229 list (current-line state)
-            5210..5222 symbol current-line
-            5223..5228 symbol state
-          5242..5246 symbol next
-          5247..5338 list (str (str-scalar-slice line 0 (dec col)) (str-scalar-slice line col (str-scalar-len line)))
-            5248..5251 symbol str
-            5252..5287 list (str-scalar-slice line 0 (dec col))
-              5253..5269 symbol str-scalar-slice
-              5270..5274 symbol line
-              5275..5276 int 0
-              5277..5286 list (dec col)
-                5278..5281 symbol dec
-                5282..5285 symbol col
-            5288..5337 list (str-scalar-slice line col (str-scalar-len line))
-              5289..5305 symbol str-scalar-slice
-              5306..5310 symbol line
-              5311..5314 symbol col
-              5315..5336 list (str-scalar-len line)
-                5316..5330 symbol str-scalar-len
-                5331..5335 symbol line
-        5348..5478 list (touch (assoc state :lines (assoc (get state :lines) row next) :cursor-col (dec col)))
-          5349..5354 symbol touch
-          5355..5477 list (assoc state :lines (assoc (get state :lines) row next) :cursor-col (dec col))
-            5356..5361 symbol assoc
-            5362..5367 symbol state
-            5390..5396 keyword :lines
-            5397..5432 list (assoc (get state :lines) row next)
-              5398..5403 symbol assoc
-              5404..5422 list (get state :lines)
-                5405..5408 symbol get
-                5409..5414 symbol state
-                5415..5421 keyword :lines
-              5423..5426 symbol row
-              5427..5431 symbol next
-            5455..5466 keyword :cursor-col
-            5467..5476 list (dec col)
-              5468..5471 symbol dec
-              5472..5475 symbol col
-      5486..5495 list (> row 0)
-        5487..5488 symbol >
-        5489..5492 symbol row
-        5493..5494 int 0
-      5496..5513 list (join-prev state)
-        5497..5506 symbol join-prev
-        5507..5512 symbol state
-      5520..5524 bool true
-      5525..5530 symbol state
-5616..5877 list (defn move-left [state] (let [col (get state :cursor-col) row (get state :cursor-row)] (cond (> col 0) (assoc state :cursor-col (dec col)) (> row 0) (assoc state :cursor-row (dec row) :cursor-col (line-len state (dec row))) true state)))
-  5617..5621 symbol defn
-  5622..5631 symbol move-left
-  5632..5639 vector [state]
-    5633..5638 symbol state
-  5642..5876 list (let [col (get state :cursor-col) row (get state :cursor-row)] (cond (> col 0) (assoc state :cursor-col (dec col)) (> row 0) (assoc state :cursor-row (dec row) :cursor-col (line-len state (dec row))) true state))
-    5643..5646 symbol let
-    5647..5704 vector [col (get state :cursor-col) row (get state :cursor-row)]
-      5648..5651 symbol col
-      5652..5675 list (get state :cursor-col)
-        5653..5656 symbol get
-        5657..5662 symbol state
-        5663..5674 keyword :cursor-col
-      5676..5679 symbol row
-      5680..5703 list (get state :cursor-row)
-        5681..5684 symbol get
-        5685..5690 symbol state
-        5691..5702 keyword :cursor-row
-    5709..5875 list (cond (> col 0) (assoc state :cursor-col (dec col)) (> row 0) (assoc state :cursor-row (dec row) :cursor-col (line-len state (dec row))) true state)
-      5710..5714 symbol cond
-      5721..5730 list (> col 0)
-        5722..5723 symbol >
-        5724..5727 symbol col
-        5728..5729 int 0
-      5731..5766 list (assoc state :cursor-col (dec col))
-        5732..5737 symbol assoc
-        5738..5743 symbol state
-        5744..5755 keyword :cursor-col
-        5756..5765 list (dec col)
-          5757..5760 symbol dec
-          5761..5764 symbol col
-      5773..5782 list (> row 0)
-        5774..5775 symbol >
-        5776..5779 symbol row
-        5780..5781 int 0
-      5783..5857 list (assoc state :cursor-row (dec row) :cursor-col (line-len state (dec row)))
-        5784..5789 symbol assoc
-        5790..5795 symbol state
-        5796..5807 keyword :cursor-row
-        5808..5817 list (dec row)
-          5809..5812 symbol dec
-          5813..5816 symbol row
-        5818..5829 keyword :cursor-col
-        5830..5856 list (line-len state (dec row))
-          5831..5839 symbol line-len
-          5840..5845 symbol state
-          5846..5855 list (dec row)
-            5847..5850 symbol dec
-            5851..5854 symbol row
-      5864..5868 bool true
-      5869..5874 symbol state
-5879..6158 list (defn move-right [state] (let [col (get state :cursor-col) row (get state :cursor-row)] (cond (< col (line-len state row)) (assoc state :cursor-col (inc col)) (< row (dec (line-count state))) (assoc state :cursor-row (inc row) :cursor-col 0) true state)))
-  5880..5884 symbol defn
-  5885..5895 symbol move-right
-  5896..5903 vector [state]
-    5897..5902 symbol state
-  5906..6157 list (let [col (get state :cursor-col) row (get state :cursor-row)] (cond (< col (line-len state row)) (assoc state :cursor-col (inc col)) (< row (dec (line-count state))) (assoc state :cursor-row (inc row) :cursor-col 0) true state))
-    5907..5910 symbol let
-    5911..5968 vector [col (get state :cursor-col) row (get state :cursor-row)]
-      5912..5915 symbol col
-      5916..5939 list (get state :cursor-col)
-        5917..5920 symbol get
-        5921..5926 symbol state
-        5927..5938 keyword :cursor-col
-      5940..5943 symbol row
-      5944..5967 list (get state :cursor-row)
-        5945..5948 symbol get
-        5949..5954 symbol state
-        5955..5966 keyword :cursor-row
-    5973..6156 list (cond (< col (line-len state row)) (assoc state :cursor-col (inc col)) (< row (dec (line-count state))) (assoc state :cursor-row (inc row) :cursor-col 0) true state)
-      5974..5978 symbol cond
-      5985..6013 list (< col (line-len state row))
-        5986..5987 symbol <
-        5988..5991 symbol col
-        5992..6012 list (line-len state row)
-          5993..6001 symbol line-len
-          6002..6007 symbol state
-          6008..6011 symbol row
-      6014..6049 list (assoc state :cursor-col (inc col))
-        6015..6020 symbol assoc
-        6021..6026 symbol state
-        6027..6038 keyword :cursor-col
-        6039..6048 list (inc col)
-          6040..6043 symbol inc
-          6044..6047 symbol col
-      6056..6088 list (< row (dec (line-count state)))
-        6057..6058 symbol <
-        6059..6062 symbol row
-        6063..6087 list (dec (line-count state))
-          6064..6067 symbol dec
-          6068..6086 list (line-count state)
-            6069..6079 symbol line-count
-            6080..6085 symbol state
-      6089..6138 list (assoc state :cursor-row (inc row) :cursor-col 0)
-        6090..6095 symbol assoc
-        6096..6101 symbol state
-        6102..6113 keyword :cursor-row
-        6114..6123 list (inc row)
-          6115..6118 symbol inc
-          6119..6122 symbol row
-        6124..6135 keyword :cursor-col
-        6136..6137 int 0
-      6145..6149 bool true
-      6150..6155 symbol state
-6160..6281 list (defn move-up [state] (if (> (get state :cursor-row) 0) (move-vert state (dec (get state :cursor-row))) state))
-  6161..6165 symbol defn
-  6166..6173 symbol move-up
-  6174..6181 vector [state]
-    6175..6180 symbol state
-  6184..6280 list (if (> (get state :cursor-row) 0) (move-vert state (dec (get state :cursor-row))) state)
-    6185..6187 symbol if
-    6188..6217 list (> (get state :cursor-row) 0)
-      6189..6190 symbol >
-      6191..6214 list (get state :cursor-row)
-        6192..6195 symbol get
-        6196..6201 symbol state
-        6202..6213 keyword :cursor-row
-      6215..6216 int 0
-    6222..6269 list (move-vert state (dec (get state :cursor-row)))
-      6223..6232 symbol move-vert
-      6233..6238 symbol state
-      6239..6268 list (dec (get state :cursor-row))
-        6240..6243 symbol dec
-        6244..6267 list (get state :cursor-row)
-          6245..6248 symbol get
-          6249..6254 symbol state
-          6255..6266 keyword :cursor-row
-    6274..6279 symbol state
-6283..6429 list (defn move-down [state] (if (< (get state :cursor-row) (dec (line-count state))) (move-vert state (inc (get state :cursor-row))) state))
-  6284..6288 symbol defn
-  6289..6298 symbol move-down
-  6299..6306 vector [state]
-    6300..6305 symbol state
-  6309..6428 list (if (< (get state :cursor-row) (dec (line-count state))) (move-vert state (inc (get state :cursor-row))) state)
-    6310..6312 symbol if
-    6313..6365 list (< (get state :cursor-row) (dec (line-count state)))
-      6314..6315 symbol <
-      6316..6339 list (get state :cursor-row)
-        6317..6320 symbol get
-        6321..6326 symbol state
-        6327..6338 keyword :cursor-row
-      6340..6364 list (dec (line-count state))
-        6341..6344 symbol dec
-        6345..6363 list (line-count state)
-          6346..6356 symbol line-count
-          6357..6362 symbol state
-    6370..6417 list (move-vert state (inc (get state :cursor-row)))
-      6371..6380 symbol move-vert
-      6381..6386 symbol state
-      6387..6416 list (inc (get state :cursor-row))
-        6388..6391 symbol inc
-        6392..6415 list (get state :cursor-row)
-          6393..6396 symbol get
-          6397..6402 symbol state
-          6403..6414 keyword :cursor-row
-    6422..6427 symbol state
-6431..6484 list (defn line-start [state] (assoc state :cursor-col 0))
-  6432..6436 symbol defn
-  6437..6447 symbol line-start
-  6448..6455 vector [state]
-    6449..6454 symbol state
-  6456..6483 list (assoc state :cursor-col 0)
-    6457..6462 symbol assoc
-    6463..6468 symbol state
-    6469..6480 keyword :cursor-col
-    6481..6482 int 0
-6485..6575 list (defn line-end [state] (assoc state :cursor-col (line-len state (get state :cursor-row))))
-  6486..6490 symbol defn
-  6491..6499 symbol line-end
-  6500..6507 vector [state]
-    6501..6506 symbol state
-  6508..6574 list (assoc state :cursor-col (line-len state (get state :cursor-row)))
-    6509..6514 symbol assoc
-    6515..6520 symbol state
-    6521..6532 keyword :cursor-col
-    6533..6573 list (line-len state (get state :cursor-row))
-      6534..6542 symbol line-len
-      6543..6548 symbol state
-      6549..6572 list (get state :cursor-row)
-        6550..6553 symbol get
-        6554..6559 symbol state
-        6560..6571 keyword :cursor-row
-7394..7791 list (def global-keymap {"left" [:command :move-left] "right" [:command :move-right] "up" [:command :move-up] "down" [:command :move-down] "C-a" [:command :line-start] "C-e" [:command :line-end] "RET" [:command :newline] "DEL" [:command :delete-back] "C-o" [:command :save] "C-g" [:command :toggle-help] "C-x" [:prefix {"C-c" [:command :quit] "C-s" [:command :save]}]})
-  7395..7398 symbol def
-  7399..7412 symbol global-keymap
-  7415..7790 map {"left" [:command :move-left] "right" [:command :move-right] "up" [:command :move-up] "down" [:command :move-down] "C-a" [:command :line-start] "C-e" [:command :line-end] "RET" [:command :newline] "DEL" [:command :delete-back] "C-o" [:command :save] "C-g" [:command :toggle-help] "C-x" [:prefix {"C-c" [:command :quit] "C-s" [:command :save]}]}
-    7416..7422 string "left"
-    7423..7444 vector [:command :move-left]
-      7424..7432 keyword :command
-      7433..7443 keyword :move-left
-    7446..7453 string "right"
-    7454..7476 vector [:command :move-right]
-      7455..7463 keyword :command
-      7464..7475 keyword :move-right
-    7480..7484 string "up"
-    7485..7504 vector [:command :move-up]
-      7486..7494 keyword :command
-      7495..7503 keyword :move-up
-    7510..7516 string "down"
-    7517..7538 vector [:command :move-down]
-      7518..7526 keyword :command
-      7527..7537 keyword :move-down
-    7542..7547 string "C-a"
-    7548..7570 vector [:command :line-start]
-      7549..7557 keyword :command
-      7558..7569 keyword :line-start
-    7572..7577 string "C-e"
-    7578..7598 vector [:command :line-end]
-      7579..7587 keyword :command
-      7588..7597 keyword :line-end
-    7602..7607 string "RET"
-    7608..7627 vector [:command :newline]
-      7609..7617 keyword :command
-      7618..7626 keyword :newline
-    7632..7637 string "DEL"
-    7638..7661 vector [:command :delete-back]
+      4342..4365 list (vec-slice lines 0 row)
+        4343..4352 symbol vec-slice
+        4353..4358 symbol lines
+        4359..4360 int 0
+        4361..4364 symbol row
+      4374..4379 symbol after
+      4380..4421 list (vec-slice lines (inc row) (count lines))
+        4381..4390 symbol vec-slice
+        4391..4396 symbol lines
+        4397..4406 list (inc row)
+          4398..4401 symbol inc
+          4402..4405 symbol row
+        4407..4420 list (count lines)
+          4408..4413 symbol count
+          4414..4419 symbol lines
+      4430..4434 symbol head
+      4435..4464 list (str-scalar-slice line 0 col)
+        4436..4452 symbol str-scalar-slice
+        4453..4457 symbol line
+        4458..4459 int 0
+        4460..4463 symbol col
+      4473..4477 symbol tail
+      4478..4527 list (str-scalar-slice line col (str-scalar-len line))
+        4479..4495 symbol str-scalar-slice
+        4496..4500 symbol line
+        4501..4504 symbol col
+        4505..4526 list (str-scalar-len line)
+          4506..4520 symbol str-scalar-len
+          4521..4525 symbol line
+    4533..4693 list (touch (assoc state :lines (vec (concat before [head] [tail] after)) :cursor-row (inc row) :cursor-col 0))
+      4534..4539 symbol touch
+      4540..4692 list (assoc state :lines (vec (concat before [head] [tail] after)) :cursor-row (inc row) :cursor-col 0)
+        4541..4546 symbol assoc
+        4547..4552 symbol state
+        4571..4577 keyword :lines
+        4578..4619 list (vec (concat before [head] [tail] after))
+          4579..4582 symbol vec
+          4583..4618 list (concat before [head] [tail] after)
+            4584..4590 symbol concat
+            4591..4597 symbol before
+            4598..4604 vector [head]
+              4599..4603 symbol head
+            4605..4611 vector [tail]
+              4606..4610 symbol tail
+            4612..4617 symbol after
+        4638..4649 keyword :cursor-row
+        4650..4659 list (inc row)
+          4651..4654 symbol inc
+          4655..4658 symbol row
+        4678..4689 keyword :cursor-col
+        4690..4691 int 0
+4697..5155 list (defn join-prev [state] (let [row (get state :cursor-row) lines (get state :lines) prev (line-at state (dec row)) merged (str prev (current-line state))] (touch (assoc state :lines (vec (concat (vec-slice lines 0 (dec row)) [merged] (vec-slice lines (inc row) (count lines)))) :cursor-row (dec row) :cursor-col (str-scalar-len prev)))))
+  4698..4702 symbol defn
+  4703..4712 symbol join-prev
+  4713..4720 vector [state]
+    4714..4719 symbol state
+  4723..5154 list (let [row (get state :cursor-row) lines (get state :lines) prev (line-at state (dec row)) merged (str prev (current-line state))] (touch (assoc state :lines (vec (concat (vec-slice lines 0 (dec row)) [merged] (vec-slice lines (inc row) (count lines)))) :cursor-row (dec row) :cursor-col (str-scalar-len prev))))
+    4724..4727 symbol let
+    4728..4876 vector [row (get state :cursor-row) lines (get state :lines) prev (line-at state (dec row)) merged (str prev (current-line state))]
+      4729..4732 symbol row
+      4733..4756 list (get state :cursor-row)
+        4734..4737 symbol get
+        4738..4743 symbol state
+        4744..4755 keyword :cursor-row
+      4765..4770 symbol lines
+      4771..4789 list (get state :lines)
+        4772..4775 symbol get
+        4776..4781 symbol state
+        4782..4788 keyword :lines
+      4798..4802 symbol prev
+      4803..4828 list (line-at state (dec row))
+        4804..4811 symbol line-at
+        4812..4817 symbol state
+        4818..4827 list (dec row)
+          4819..4822 symbol dec
+          4823..4826 symbol row
+      4837..4843 symbol merged
+      4844..4875 list (str prev (current-line state))
+        4845..4848 symbol str
+        4849..4853 symbol prev
+        4854..4874 list (current-line state)
+          4855..4867 symbol current-line
+          4868..4873 symbol state
+    4881..5153 list (touch (assoc state :lines (vec (concat (vec-slice lines 0 (dec row)) [merged] (vec-slice lines (inc row) (count lines)))) :cursor-row (dec row) :cursor-col (str-scalar-len prev)))
+      4882..4887 symbol touch
+      4888..5152 list (assoc state :lines (vec (concat (vec-slice lines 0 (dec row)) [merged] (vec-slice lines (inc row) (count lines)))) :cursor-row (dec row) :cursor-col (str-scalar-len prev))
+        4889..4894 symbol assoc
+        4895..4900 symbol state
+        4919..4925 keyword :lines
+        4926..5059 list (vec (concat (vec-slice lines 0 (dec row)) [merged] (vec-slice lines (inc row) (count lines))))
+          4927..4930 symbol vec
+          4931..5058 list (concat (vec-slice lines 0 (dec row)) [merged] (vec-slice lines (inc row) (count lines)))
+            4932..4938 symbol concat
+            4939..4968 list (vec-slice lines 0 (dec row))
+              4940..4949 symbol vec-slice
+              4950..4955 symbol lines
+              4956..4957 int 0
+              4958..4967 list (dec row)
+                4959..4962 symbol dec
+                4963..4966 symbol row
+            4969..4977 vector [merged]
+              4970..4976 symbol merged
+            5016..5057 list (vec-slice lines (inc row) (count lines))
+              5017..5026 symbol vec-slice
+              5027..5032 symbol lines
+              5033..5042 list (inc row)
+                5034..5037 symbol inc
+                5038..5041 symbol row
+              5043..5056 list (count lines)
+                5044..5049 symbol count
+                5050..5055 symbol lines
+        5078..5089 keyword :cursor-row
+        5090..5099 list (dec row)
+          5091..5094 symbol dec
+          5095..5098 symbol row
+        5118..5129 keyword :cursor-col
+        5130..5151 list (str-scalar-len prev)
+          5131..5145 symbol str-scalar-len
+          5146..5150 symbol prev
+5157..5623 list (defn delete-back [state] (let [row (get state :cursor-row) col (get state :cursor-col)] (cond (> col 0) (let [line (current-line state) next (str (str-scalar-slice line 0 (dec col)) (str-scalar-slice line col (str-scalar-len line)))] (touch (assoc state :lines (assoc (get state :lines) row next) :cursor-col (dec col)))) (> row 0) (join-prev state) true state)))
+  5158..5162 symbol defn
+  5163..5174 symbol delete-back
+  5175..5182 vector [state]
+    5176..5181 symbol state
+  5185..5622 list (let [row (get state :cursor-row) col (get state :cursor-col)] (cond (> col 0) (let [line (current-line state) next (str (str-scalar-slice line 0 (dec col)) (str-scalar-slice line col (str-scalar-len line)))] (touch (assoc state :lines (assoc (get state :lines) row next) :cursor-col (dec col)))) (> row 0) (join-prev state) true state))
+    5186..5189 symbol let
+    5190..5255 vector [row (get state :cursor-row) col (get state :cursor-col)]
+      5191..5194 symbol row
+      5195..5218 list (get state :cursor-row)
+        5196..5199 symbol get
+        5200..5205 symbol state
+        5206..5217 keyword :cursor-row
+      5227..5230 symbol col
+      5231..5254 list (get state :cursor-col)
+        5232..5235 symbol get
+        5236..5241 symbol state
+        5242..5253 keyword :cursor-col
+    5260..5621 list (cond (> col 0) (let [line (current-line state) next (str (str-scalar-slice line 0 (dec col)) (str-scalar-slice line col (str-scalar-len line)))] (touch (assoc state :lines (assoc (get state :lines) row next) :cursor-col (dec col)))) (> row 0) (join-prev state) true state)
+      5261..5265 symbol cond
+      5272..5281 list (> col 0)
+        5273..5274 symbol >
+        5275..5278 symbol col
+        5279..5280 int 0
+      5288..5569 list (let [line (current-line state) next (str (str-scalar-slice line 0 (dec col)) (str-scalar-slice line col (str-scalar-len line)))] (touch (assoc state :lines (assoc (get state :lines) row next) :cursor-col (dec col))))
+        5289..5292 symbol let
+        5293..5429 vector [line (current-line state) next (str (str-scalar-slice line 0 (dec col)) (str-scalar-slice line col (str-scalar-len line)))]
+          5294..5298 symbol line
+          5299..5319 list (current-line state)
+            5300..5312 symbol current-line
+            5313..5318 symbol state
+          5332..5336 symbol next
+          5337..5428 list (str (str-scalar-slice line 0 (dec col)) (str-scalar-slice line col (str-scalar-len line)))
+            5338..5341 symbol str
+            5342..5377 list (str-scalar-slice line 0 (dec col))
+              5343..5359 symbol str-scalar-slice
+              5360..5364 symbol line
+              5365..5366 int 0
+              5367..5376 list (dec col)
+                5368..5371 symbol dec
+                5372..5375 symbol col
+            5378..5427 list (str-scalar-slice line col (str-scalar-len line))
+              5379..5395 symbol str-scalar-slice
+              5396..5400 symbol line
+              5401..5404 symbol col
+              5405..5426 list (str-scalar-len line)
+                5406..5420 symbol str-scalar-len
+                5421..5425 symbol line
+        5438..5568 list (touch (assoc state :lines (assoc (get state :lines) row next) :cursor-col (dec col)))
+          5439..5444 symbol touch
+          5445..5567 list (assoc state :lines (assoc (get state :lines) row next) :cursor-col (dec col))
+            5446..5451 symbol assoc
+            5452..5457 symbol state
+            5480..5486 keyword :lines
+            5487..5522 list (assoc (get state :lines) row next)
+              5488..5493 symbol assoc
+              5494..5512 list (get state :lines)
+                5495..5498 symbol get
+                5499..5504 symbol state
+                5505..5511 keyword :lines
+              5513..5516 symbol row
+              5517..5521 symbol next
+            5545..5556 keyword :cursor-col
+            5557..5566 list (dec col)
+              5558..5561 symbol dec
+              5562..5565 symbol col
+      5576..5585 list (> row 0)
+        5577..5578 symbol >
+        5579..5582 symbol row
+        5583..5584 int 0
+      5586..5603 list (join-prev state)
+        5587..5596 symbol join-prev
+        5597..5602 symbol state
+      5610..5614 bool true
+      5615..5620 symbol state
+5706..5967 list (defn move-left [state] (let [col (get state :cursor-col) row (get state :cursor-row)] (cond (> col 0) (assoc state :cursor-col (dec col)) (> row 0) (assoc state :cursor-row (dec row) :cursor-col (line-len state (dec row))) true state)))
+  5707..5711 symbol defn
+  5712..5721 symbol move-left
+  5722..5729 vector [state]
+    5723..5728 symbol state
+  5732..5966 list (let [col (get state :cursor-col) row (get state :cursor-row)] (cond (> col 0) (assoc state :cursor-col (dec col)) (> row 0) (assoc state :cursor-row (dec row) :cursor-col (line-len state (dec row))) true state))
+    5733..5736 symbol let
+    5737..5794 vector [col (get state :cursor-col) row (get state :cursor-row)]
+      5738..5741 symbol col
+      5742..5765 list (get state :cursor-col)
+        5743..5746 symbol get
+        5747..5752 symbol state
+        5753..5764 keyword :cursor-col
+      5766..5769 symbol row
+      5770..5793 list (get state :cursor-row)
+        5771..5774 symbol get
+        5775..5780 symbol state
+        5781..5792 keyword :cursor-row
+    5799..5965 list (cond (> col 0) (assoc state :cursor-col (dec col)) (> row 0) (assoc state :cursor-row (dec row) :cursor-col (line-len state (dec row))) true state)
+      5800..5804 symbol cond
+      5811..5820 list (> col 0)
+        5812..5813 symbol >
+        5814..5817 symbol col
+        5818..5819 int 0
+      5821..5856 list (assoc state :cursor-col (dec col))
+        5822..5827 symbol assoc
+        5828..5833 symbol state
+        5834..5845 keyword :cursor-col
+        5846..5855 list (dec col)
+          5847..5850 symbol dec
+          5851..5854 symbol col
+      5863..5872 list (> row 0)
+        5864..5865 symbol >
+        5866..5869 symbol row
+        5870..5871 int 0
+      5873..5947 list (assoc state :cursor-row (dec row) :cursor-col (line-len state (dec row)))
+        5874..5879 symbol assoc
+        5880..5885 symbol state
+        5886..5897 keyword :cursor-row
+        5898..5907 list (dec row)
+          5899..5902 symbol dec
+          5903..5906 symbol row
+        5908..5919 keyword :cursor-col
+        5920..5946 list (line-len state (dec row))
+          5921..5929 symbol line-len
+          5930..5935 symbol state
+          5936..5945 list (dec row)
+            5937..5940 symbol dec
+            5941..5944 symbol row
+      5954..5958 bool true
+      5959..5964 symbol state
+5969..6248 list (defn move-right [state] (let [col (get state :cursor-col) row (get state :cursor-row)] (cond (< col (line-len state row)) (assoc state :cursor-col (inc col)) (< row (dec (line-count state))) (assoc state :cursor-row (inc row) :cursor-col 0) true state)))
+  5970..5974 symbol defn
+  5975..5985 symbol move-right
+  5986..5993 vector [state]
+    5987..5992 symbol state
+  5996..6247 list (let [col (get state :cursor-col) row (get state :cursor-row)] (cond (< col (line-len state row)) (assoc state :cursor-col (inc col)) (< row (dec (line-count state))) (assoc state :cursor-row (inc row) :cursor-col 0) true state))
+    5997..6000 symbol let
+    6001..6058 vector [col (get state :cursor-col) row (get state :cursor-row)]
+      6002..6005 symbol col
+      6006..6029 list (get state :cursor-col)
+        6007..6010 symbol get
+        6011..6016 symbol state
+        6017..6028 keyword :cursor-col
+      6030..6033 symbol row
+      6034..6057 list (get state :cursor-row)
+        6035..6038 symbol get
+        6039..6044 symbol state
+        6045..6056 keyword :cursor-row
+    6063..6246 list (cond (< col (line-len state row)) (assoc state :cursor-col (inc col)) (< row (dec (line-count state))) (assoc state :cursor-row (inc row) :cursor-col 0) true state)
+      6064..6068 symbol cond
+      6075..6103 list (< col (line-len state row))
+        6076..6077 symbol <
+        6078..6081 symbol col
+        6082..6102 list (line-len state row)
+          6083..6091 symbol line-len
+          6092..6097 symbol state
+          6098..6101 symbol row
+      6104..6139 list (assoc state :cursor-col (inc col))
+        6105..6110 symbol assoc
+        6111..6116 symbol state
+        6117..6128 keyword :cursor-col
+        6129..6138 list (inc col)
+          6130..6133 symbol inc
+          6134..6137 symbol col
+      6146..6178 list (< row (dec (line-count state)))
+        6147..6148 symbol <
+        6149..6152 symbol row
+        6153..6177 list (dec (line-count state))
+          6154..6157 symbol dec
+          6158..6176 list (line-count state)
+            6159..6169 symbol line-count
+            6170..6175 symbol state
+      6179..6228 list (assoc state :cursor-row (inc row) :cursor-col 0)
+        6180..6185 symbol assoc
+        6186..6191 symbol state
+        6192..6203 keyword :cursor-row
+        6204..6213 list (inc row)
+          6205..6208 symbol inc
+          6209..6212 symbol row
+        6214..6225 keyword :cursor-col
+        6226..6227 int 0
+      6235..6239 bool true
+      6240..6245 symbol state
+6250..6371 list (defn move-up [state] (if (> (get state :cursor-row) 0) (move-vert state (dec (get state :cursor-row))) state))
+  6251..6255 symbol defn
+  6256..6263 symbol move-up
+  6264..6271 vector [state]
+    6265..6270 symbol state
+  6274..6370 list (if (> (get state :cursor-row) 0) (move-vert state (dec (get state :cursor-row))) state)
+    6275..6277 symbol if
+    6278..6307 list (> (get state :cursor-row) 0)
+      6279..6280 symbol >
+      6281..6304 list (get state :cursor-row)
+        6282..6285 symbol get
+        6286..6291 symbol state
+        6292..6303 keyword :cursor-row
+      6305..6306 int 0
+    6312..6359 list (move-vert state (dec (get state :cursor-row)))
+      6313..6322 symbol move-vert
+      6323..6328 symbol state
+      6329..6358 list (dec (get state :cursor-row))
+        6330..6333 symbol dec
+        6334..6357 list (get state :cursor-row)
+          6335..6338 symbol get
+          6339..6344 symbol state
+          6345..6356 keyword :cursor-row
+    6364..6369 symbol state
+6373..6519 list (defn move-down [state] (if (< (get state :cursor-row) (dec (line-count state))) (move-vert state (inc (get state :cursor-row))) state))
+  6374..6378 symbol defn
+  6379..6388 symbol move-down
+  6389..6396 vector [state]
+    6390..6395 symbol state
+  6399..6518 list (if (< (get state :cursor-row) (dec (line-count state))) (move-vert state (inc (get state :cursor-row))) state)
+    6400..6402 symbol if
+    6403..6455 list (< (get state :cursor-row) (dec (line-count state)))
+      6404..6405 symbol <
+      6406..6429 list (get state :cursor-row)
+        6407..6410 symbol get
+        6411..6416 symbol state
+        6417..6428 keyword :cursor-row
+      6430..6454 list (dec (line-count state))
+        6431..6434 symbol dec
+        6435..6453 list (line-count state)
+          6436..6446 symbol line-count
+          6447..6452 symbol state
+    6460..6507 list (move-vert state (inc (get state :cursor-row)))
+      6461..6470 symbol move-vert
+      6471..6476 symbol state
+      6477..6506 list (inc (get state :cursor-row))
+        6478..6481 symbol inc
+        6482..6505 list (get state :cursor-row)
+          6483..6486 symbol get
+          6487..6492 symbol state
+          6493..6504 keyword :cursor-row
+    6512..6517 symbol state
+6521..6574 list (defn line-start [state] (assoc state :cursor-col 0))
+  6522..6526 symbol defn
+  6527..6537 symbol line-start
+  6538..6545 vector [state]
+    6539..6544 symbol state
+  6546..6573 list (assoc state :cursor-col 0)
+    6547..6552 symbol assoc
+    6553..6558 symbol state
+    6559..6570 keyword :cursor-col
+    6571..6572 int 0
+6575..6665 list (defn line-end [state] (assoc state :cursor-col (line-len state (get state :cursor-row))))
+  6576..6580 symbol defn
+  6581..6589 symbol line-end
+  6590..6597 vector [state]
+    6591..6596 symbol state
+  6598..6664 list (assoc state :cursor-col (line-len state (get state :cursor-row)))
+    6599..6604 symbol assoc
+    6605..6610 symbol state
+    6611..6622 keyword :cursor-col
+    6623..6663 list (line-len state (get state :cursor-row))
+      6624..6632 symbol line-len
+      6633..6638 symbol state
+      6639..6662 list (get state :cursor-row)
+        6640..6643 symbol get
+        6644..6649 symbol state
+        6650..6661 keyword :cursor-row
+7484..7881 list (def global-keymap {"left" [:command :move-left] "right" [:command :move-right] "up" [:command :move-up] "down" [:command :move-down] "C-a" [:command :line-start] "C-e" [:command :line-end] "RET" [:command :newline] "DEL" [:command :delete-back] "C-o" [:command :save] "C-g" [:command :toggle-help] "C-x" [:prefix {"C-c" [:command :quit] "C-s" [:command :save]}]})
+  7485..7488 symbol def
+  7489..7502 symbol global-keymap
+  7505..7880 map {"left" [:command :move-left] "right" [:command :move-right] "up" [:command :move-up] "down" [:command :move-down] "C-a" [:command :line-start] "C-e" [:command :line-end] "RET" [:command :newline] "DEL" [:command :delete-back] "C-o" [:command :save] "C-g" [:command :toggle-help] "C-x" [:prefix {"C-c" [:command :quit] "C-s" [:command :save]}]}
+    7506..7512 string "left"
+    7513..7534 vector [:command :move-left]
+      7514..7522 keyword :command
+      7523..7533 keyword :move-left
+    7536..7543 string "right"
+    7544..7566 vector [:command :move-right]
+      7545..7553 keyword :command
+      7554..7565 keyword :move-right
+    7570..7574 string "up"
+    7575..7594 vector [:command :move-up]
+      7576..7584 keyword :command
+      7585..7593 keyword :move-up
+    7600..7606 string "down"
+    7607..7628 vector [:command :move-down]
+      7608..7616 keyword :command
+      7617..7627 keyword :move-down
+    7632..7637 string "C-a"
+    7638..7660 vector [:command :line-start]
       7639..7647 keyword :command
-      7648..7660 keyword :delete-back
-    7665..7670 string "C-o"
-    7671..7687 vector [:command :save]
-      7672..7680 keyword :command
-      7681..7686 keyword :save
-    7693..7698 string "C-g"
-    7699..7722 vector [:command :toggle-help]
-      7700..7708 keyword :command
-      7709..7721 keyword :toggle-help
-    7726..7731 string "C-x"
-    7732..7789 vector [:prefix {"C-c" [:command :quit] "C-s" [:command :save]}]
-      7733..7740 keyword :prefix
-      7741..7788 map {"C-c" [:command :quit] "C-s" [:command :save]}
-        7742..7747 string "C-c"
-        7748..7764 vector [:command :quit]
-          7749..7757 keyword :command
-          7758..7763 keyword :quit
-        7765..7770 string "C-s"
-        7771..7787 vector [:command :save]
-          7772..7780 keyword :command
-          7781..7786 keyword :save
-8270..8400 list (def restates-goal {:move-left true :move-right true :line-start true :line-end true :newline true :delete-back true})
-  8271..8274 symbol def
-  8275..8288 symbol restates-goal
-  8291..8399 map {:move-left true :move-right true :line-start true :line-end true :newline true :delete-back true}
-    8292..8302 keyword :move-left
-    8303..8307 bool true
-    8309..8320 keyword :move-right
-    8321..8325 bool true
-    8329..8340 keyword :line-start
-    8341..8345 bool true
-    8346..8355 keyword :line-end
-    8356..8360 bool true
-    8364..8372 keyword :newline
-    8373..8377 bool true
-    8381..8393 keyword :delete-back
-    8394..8398 bool true
-8402..8477 list (defn restate-goal [state] (assoc state :goal-col (get state :cursor-col)))
-  8403..8407 symbol defn
-  8408..8420 symbol restate-goal
-  8421..8428 vector [state]
-    8422..8427 symbol state
-  8429..8476 list (assoc state :goal-col (get state :cursor-col))
-    8430..8435 symbol assoc
-    8436..8441 symbol state
-    8442..8451 keyword :goal-col
-    8452..8475 list (get state :cursor-col)
-      8453..8456 symbol get
-      8457..8462 symbol state
-      8463..8474 keyword :cursor-col
-8479..9250 list (defn apply-command [state c] (cond (= c :move-left) (move-left state) (= c :move-right) (move-right state) (= c :move-up) (move-up state) (= c :move-down) (move-down state) (= c :line-start) (line-start state) (= c :line-end) (line-end state) (= c :newline) (split-line state) (= c :delete-back) (delete-back state) (= c :quit) (assoc state :quit? true) (= c :toggle-help) (assoc state :help? (not (get state :help?))) (= c :save) (assoc state :save-requested? true) true (assoc state :message (str "no command " c))))
-  8480..8484 symbol defn
-  8485..8498 symbol apply-command
-  8499..8508 vector [state c]
-    8500..8505 symbol state
-    8506..8507 symbol c
-  8511..9249 list (cond (= c :move-left) (move-left state) (= c :move-right) (move-right state) (= c :move-up) (move-up state) (= c :move-down) (move-down state) (= c :line-start) (line-start state) (= c :line-end) (line-end state) (= c :newline) (split-line state) (= c :delete-back) (delete-back state) (= c :quit) (assoc state :quit? true) (= c :toggle-help) (assoc state :help? (not (get state :help?))) (= c :save) (assoc state :save-requested? true) true (assoc state :message (str "no command " c)))
-    8512..8516 symbol cond
-    8521..8537 list (= c :move-left)
-      8522..8523 symbol =
-      8524..8525 symbol c
-      8526..8536 keyword :move-left
-    8538..8555 list (move-left state)
-      8539..8548 symbol move-left
-      8549..8554 symbol state
-    8560..8577 list (= c :move-right)
-      8561..8562 symbol =
-      8563..8564 symbol c
-      8565..8576 keyword :move-right
-    8578..8596 list (move-right state)
-      8579..8589 symbol move-right
-      8590..8595 symbol state
-    8601..8615 list (= c :move-up)
-      8602..8603 symbol =
-      8604..8605 symbol c
-      8606..8614 keyword :move-up
-    8616..8631 list (move-up state)
-      8617..8624 symbol move-up
-      8625..8630 symbol state
-    8636..8652 list (= c :move-down)
-      8637..8638 symbol =
-      8639..8640 symbol c
-      8641..8651 keyword :move-down
-    8653..8670 list (move-down state)
-      8654..8663 symbol move-down
-      8664..8669 symbol state
-    8675..8692 list (= c :line-start)
-      8676..8677 symbol =
-      8678..8679 symbol c
-      8680..8691 keyword :line-start
-    8693..8711 list (line-start state)
-      8694..8704 symbol line-start
-      8705..8710 symbol state
-    8716..8731 list (= c :line-end)
-      8717..8718 symbol =
-      8719..8720 symbol c
-      8721..8730 keyword :line-end
-    8732..8748 list (line-end state)
-      8733..8741 symbol line-end
-      8742..8747 symbol state
-    8753..8767 list (= c :newline)
-      8754..8755 symbol =
-      8756..8757 symbol c
-      8758..8766 keyword :newline
-    8768..8786 list (split-line state)
-      8769..8779 symbol split-line
-      8780..8785 symbol state
-    8791..8809 list (= c :delete-back)
-      8792..8793 symbol =
-      8794..8795 symbol c
-      8796..8808 keyword :delete-back
-    8810..8829 list (delete-back state)
-      8811..8822 symbol delete-back
-      8823..8828 symbol state
-    8834..8845 list (= c :quit)
-      8835..8836 symbol =
-      8837..8838 symbol c
-      8839..8844 keyword :quit
-    8846..8871 list (assoc state :quit? true)
-      8847..8852 symbol assoc
-      8853..8858 symbol state
-      8859..8865 keyword :quit?
-      8866..8870 bool true
-    8876..8894 list (= c :toggle-help)
-      8877..8878 symbol =
-      8879..8880 symbol c
-      8881..8893 keyword :toggle-help
-    8895..8940 list (assoc state :help? (not (get state :help?)))
-      8896..8901 symbol assoc
-      8902..8907 symbol state
-      8908..8914 keyword :help?
-      8915..8939 list (not (get state :help?))
-        8916..8919 symbol not
-        8920..8938 list (get state :help?)
-          8921..8924 symbol get
-          8925..8930 symbol state
-          8931..8937 keyword :help?
-    9147..9158 list (= c :save)
-      9148..9149 symbol =
-      9150..9151 symbol c
-      9152..9157 keyword :save
-    9159..9194 list (assoc state :save-requested? true)
-      9160..9165 symbol assoc
-      9166..9171 symbol state
-      9172..9188 keyword :save-requested?
-      9189..9193 bool true
-    9199..9203 bool true
-    9204..9248 list (assoc state :message (str "no command " c))
-      9205..9210 symbol assoc
-      9211..9216 symbol state
-      9217..9225 keyword :message
-      9226..9247 list (str "no command " c)
-        9227..9230 symbol str
-        9231..9244 string "no command "
-        9245..9246 symbol c
-9252..9375 list (defn run-command [state c] (let [next (apply-command state c)] (if (get restates-goal c) (restate-goal next) next)))
-  9253..9257 symbol defn
-  9258..9269 symbol run-command
-  9270..9279 vector [state c]
-    9271..9276 symbol state
-    9277..9278 symbol c
-  9282..9374 list (let [next (apply-command state c)] (if (get restates-goal c) (restate-goal next) next))
-    9283..9286 symbol let
-    9287..9317 vector [next (apply-command state c)]
-      9288..9292 symbol next
-      9293..9316 list (apply-command state c)
-        9294..9307 symbol apply-command
-        9308..9313 symbol state
-        9314..9315 symbol c
-    9322..9373 list (if (get restates-goal c) (restate-goal next) next)
-      9323..9325 symbol if
-      9326..9347 list (get restates-goal c)
-        9327..9330 symbol get
-        9331..9344 symbol restates-goal
-        9345..9346 symbol c
-      9348..9367 list (restate-goal next)
-        9349..9361 symbol restate-goal
-        9362..9366 symbol next
-      9368..9372 symbol next
-9454..9508 list (defn printable? [chord] (= (str-scalar-len chord) 1))
-  9455..9459 symbol defn
-  9460..9470 symbol printable?
-  9471..9478 vector [chord]
-    9472..9477 symbol chord
-  9479..9507 list (= (str-scalar-len chord) 1)
-    9480..9481 symbol =
-    9482..9504 list (str-scalar-len chord)
-      9483..9497 symbol str-scalar-len
-      9498..9503 symbol chord
-    9505..9506 int 1
-9510..10149 list (defn dispatch [state chord] (let [pending (get state :pending) table (if (= pending nil) global-keymap pending) hit (get table chord) state (assoc state :message nil :pending nil)] (cond (= hit nil) (if (and (= pending nil) (printable? chord)) (restate-goal (insert-str state chord)) (assoc state :message (str chord " is undefined"))) (= (nth hit 0) :prefix) (assoc state :pending (nth hit 1)) true (run-command state (nth hit 1)))))
-  9511..9515 symbol defn
-  9516..9524 symbol dispatch
-  9525..9538 vector [state chord]
-    9526..9531 symbol state
-    9532..9537 symbol chord
-  9541..10148 list (let [pending (get state :pending) table (if (= pending nil) global-keymap pending) hit (get table chord) state (assoc state :message nil :pending nil)] (cond (= hit nil) (if (and (= pending nil) (printable? chord)) (restate-goal (insert-str state chord)) (assoc state :message (str chord " is undefined"))) (= (nth hit 0) :prefix) (assoc state :pending (nth hit 1)) true (run-command state (nth hit 1))))
-    9542..9545 symbol let
-    9546..9717 vector [pending (get state :pending) table (if (= pending nil) global-keymap pending) hit (get table chord) state (assoc state :message nil :pending nil)]
-      9547..9554 symbol pending
-      9555..9575 list (get state :pending)
-        9556..9559 symbol get
-        9560..9565 symbol state
-        9566..9574 keyword :pending
-      9584..9589 symbol table
-      9590..9632 list (if (= pending nil) global-keymap pending)
-        9591..9593 symbol if
-        9594..9609 list (= pending nil)
-          9595..9596 symbol =
-          9597..9604 symbol pending
-          9605..9608 nil nil
-        9610..9623 symbol global-keymap
-        9624..9631 symbol pending
-      9641..9644 symbol hit
-      9645..9662 list (get table chord)
+      7648..7659 keyword :line-start
+    7662..7667 string "C-e"
+    7668..7688 vector [:command :line-end]
+      7669..7677 keyword :command
+      7678..7687 keyword :line-end
+    7692..7697 string "RET"
+    7698..7717 vector [:command :newline]
+      7699..7707 keyword :command
+      7708..7716 keyword :newline
+    7722..7727 string "DEL"
+    7728..7751 vector [:command :delete-back]
+      7729..7737 keyword :command
+      7738..7750 keyword :delete-back
+    7755..7760 string "C-o"
+    7761..7777 vector [:command :save]
+      7762..7770 keyword :command
+      7771..7776 keyword :save
+    7783..7788 string "C-g"
+    7789..7812 vector [:command :toggle-help]
+      7790..7798 keyword :command
+      7799..7811 keyword :toggle-help
+    7816..7821 string "C-x"
+    7822..7879 vector [:prefix {"C-c" [:command :quit] "C-s" [:command :save]}]
+      7823..7830 keyword :prefix
+      7831..7878 map {"C-c" [:command :quit] "C-s" [:command :save]}
+        7832..7837 string "C-c"
+        7838..7854 vector [:command :quit]
+          7839..7847 keyword :command
+          7848..7853 keyword :quit
+        7855..7860 string "C-s"
+        7861..7877 vector [:command :save]
+          7862..7870 keyword :command
+          7871..7876 keyword :save
+8360..8490 list (def restates-goal {:move-left true :move-right true :line-start true :line-end true :newline true :delete-back true})
+  8361..8364 symbol def
+  8365..8378 symbol restates-goal
+  8381..8489 map {:move-left true :move-right true :line-start true :line-end true :newline true :delete-back true}
+    8382..8392 keyword :move-left
+    8393..8397 bool true
+    8399..8410 keyword :move-right
+    8411..8415 bool true
+    8419..8430 keyword :line-start
+    8431..8435 bool true
+    8436..8445 keyword :line-end
+    8446..8450 bool true
+    8454..8462 keyword :newline
+    8463..8467 bool true
+    8471..8483 keyword :delete-back
+    8484..8488 bool true
+8492..8567 list (defn restate-goal [state] (assoc state :goal-col (get state :cursor-col)))
+  8493..8497 symbol defn
+  8498..8510 symbol restate-goal
+  8511..8518 vector [state]
+    8512..8517 symbol state
+  8519..8566 list (assoc state :goal-col (get state :cursor-col))
+    8520..8525 symbol assoc
+    8526..8531 symbol state
+    8532..8541 keyword :goal-col
+    8542..8565 list (get state :cursor-col)
+      8543..8546 symbol get
+      8547..8552 symbol state
+      8553..8564 keyword :cursor-col
+8569..9340 list (defn apply-command [state c] (cond (= c :move-left) (move-left state) (= c :move-right) (move-right state) (= c :move-up) (move-up state) (= c :move-down) (move-down state) (= c :line-start) (line-start state) (= c :line-end) (line-end state) (= c :newline) (split-line state) (= c :delete-back) (delete-back state) (= c :quit) (assoc state :quit? true) (= c :toggle-help) (assoc state :help? (not (get state :help?))) (= c :save) (assoc state :save-requested? true) true (assoc state :message (str "no command " c))))
+  8570..8574 symbol defn
+  8575..8588 symbol apply-command
+  8589..8598 vector [state c]
+    8590..8595 symbol state
+    8596..8597 symbol c
+  8601..9339 list (cond (= c :move-left) (move-left state) (= c :move-right) (move-right state) (= c :move-up) (move-up state) (= c :move-down) (move-down state) (= c :line-start) (line-start state) (= c :line-end) (line-end state) (= c :newline) (split-line state) (= c :delete-back) (delete-back state) (= c :quit) (assoc state :quit? true) (= c :toggle-help) (assoc state :help? (not (get state :help?))) (= c :save) (assoc state :save-requested? true) true (assoc state :message (str "no command " c)))
+    8602..8606 symbol cond
+    8611..8627 list (= c :move-left)
+      8612..8613 symbol =
+      8614..8615 symbol c
+      8616..8626 keyword :move-left
+    8628..8645 list (move-left state)
+      8629..8638 symbol move-left
+      8639..8644 symbol state
+    8650..8667 list (= c :move-right)
+      8651..8652 symbol =
+      8653..8654 symbol c
+      8655..8666 keyword :move-right
+    8668..8686 list (move-right state)
+      8669..8679 symbol move-right
+      8680..8685 symbol state
+    8691..8705 list (= c :move-up)
+      8692..8693 symbol =
+      8694..8695 symbol c
+      8696..8704 keyword :move-up
+    8706..8721 list (move-up state)
+      8707..8714 symbol move-up
+      8715..8720 symbol state
+    8726..8742 list (= c :move-down)
+      8727..8728 symbol =
+      8729..8730 symbol c
+      8731..8741 keyword :move-down
+    8743..8760 list (move-down state)
+      8744..8753 symbol move-down
+      8754..8759 symbol state
+    8765..8782 list (= c :line-start)
+      8766..8767 symbol =
+      8768..8769 symbol c
+      8770..8781 keyword :line-start
+    8783..8801 list (line-start state)
+      8784..8794 symbol line-start
+      8795..8800 symbol state
+    8806..8821 list (= c :line-end)
+      8807..8808 symbol =
+      8809..8810 symbol c
+      8811..8820 keyword :line-end
+    8822..8838 list (line-end state)
+      8823..8831 symbol line-end
+      8832..8837 symbol state
+    8843..8857 list (= c :newline)
+      8844..8845 symbol =
+      8846..8847 symbol c
+      8848..8856 keyword :newline
+    8858..8876 list (split-line state)
+      8859..8869 symbol split-line
+      8870..8875 symbol state
+    8881..8899 list (= c :delete-back)
+      8882..8883 symbol =
+      8884..8885 symbol c
+      8886..8898 keyword :delete-back
+    8900..8919 list (delete-back state)
+      8901..8912 symbol delete-back
+      8913..8918 symbol state
+    8924..8935 list (= c :quit)
+      8925..8926 symbol =
+      8927..8928 symbol c
+      8929..8934 keyword :quit
+    8936..8961 list (assoc state :quit? true)
+      8937..8942 symbol assoc
+      8943..8948 symbol state
+      8949..8955 keyword :quit?
+      8956..8960 bool true
+    8966..8984 list (= c :toggle-help)
+      8967..8968 symbol =
+      8969..8970 symbol c
+      8971..8983 keyword :toggle-help
+    8985..9030 list (assoc state :help? (not (get state :help?)))
+      8986..8991 symbol assoc
+      8992..8997 symbol state
+      8998..9004 keyword :help?
+      9005..9029 list (not (get state :help?))
+        9006..9009 symbol not
+        9010..9028 list (get state :help?)
+          9011..9014 symbol get
+          9015..9020 symbol state
+          9021..9027 keyword :help?
+    9237..9248 list (= c :save)
+      9238..9239 symbol =
+      9240..9241 symbol c
+      9242..9247 keyword :save
+    9249..9284 list (assoc state :save-requested? true)
+      9250..9255 symbol assoc
+      9256..9261 symbol state
+      9262..9278 keyword :save-requested?
+      9279..9283 bool true
+    9289..9293 bool true
+    9294..9338 list (assoc state :message (str "no command " c))
+      9295..9300 symbol assoc
+      9301..9306 symbol state
+      9307..9315 keyword :message
+      9316..9337 list (str "no command " c)
+        9317..9320 symbol str
+        9321..9334 string "no command "
+        9335..9336 symbol c
+9342..9465 list (defn run-command [state c] (let [next (apply-command state c)] (if (get restates-goal c) (restate-goal next) next)))
+  9343..9347 symbol defn
+  9348..9359 symbol run-command
+  9360..9369 vector [state c]
+    9361..9366 symbol state
+    9367..9368 symbol c
+  9372..9464 list (let [next (apply-command state c)] (if (get restates-goal c) (restate-goal next) next))
+    9373..9376 symbol let
+    9377..9407 vector [next (apply-command state c)]
+      9378..9382 symbol next
+      9383..9406 list (apply-command state c)
+        9384..9397 symbol apply-command
+        9398..9403 symbol state
+        9404..9405 symbol c
+    9412..9463 list (if (get restates-goal c) (restate-goal next) next)
+      9413..9415 symbol if
+      9416..9437 list (get restates-goal c)
+        9417..9420 symbol get
+        9421..9434 symbol restates-goal
+        9435..9436 symbol c
+      9438..9457 list (restate-goal next)
+        9439..9451 symbol restate-goal
+        9452..9456 symbol next
+      9458..9462 symbol next
+9544..9598 list (defn printable? [chord] (= (str-scalar-len chord) 1))
+  9545..9549 symbol defn
+  9550..9560 symbol printable?
+  9561..9568 vector [chord]
+    9562..9567 symbol chord
+  9569..9597 list (= (str-scalar-len chord) 1)
+    9570..9571 symbol =
+    9572..9594 list (str-scalar-len chord)
+      9573..9587 symbol str-scalar-len
+      9588..9593 symbol chord
+    9595..9596 int 1
+9600..10239 list (defn dispatch [state chord] (let [pending (get state :pending) table (if (= pending nil) global-keymap pending) hit (get table chord) state (assoc state :message nil :pending nil)] (cond (= hit nil) (if (and (= pending nil) (printable? chord)) (restate-goal (insert-str state chord)) (assoc state :message (str chord " is undefined"))) (= (nth hit 0) :prefix) (assoc state :pending (nth hit 1)) true (run-command state (nth hit 1)))))
+  9601..9605 symbol defn
+  9606..9614 symbol dispatch
+  9615..9628 vector [state chord]
+    9616..9621 symbol state
+    9622..9627 symbol chord
+  9631..10238 list (let [pending (get state :pending) table (if (= pending nil) global-keymap pending) hit (get table chord) state (assoc state :message nil :pending nil)] (cond (= hit nil) (if (and (= pending nil) (printable? chord)) (restate-goal (insert-str state chord)) (assoc state :message (str chord " is undefined"))) (= (nth hit 0) :prefix) (assoc state :pending (nth hit 1)) true (run-command state (nth hit 1))))
+    9632..9635 symbol let
+    9636..9807 vector [pending (get state :pending) table (if (= pending nil) global-keymap pending) hit (get table chord) state (assoc state :message nil :pending nil)]
+      9637..9644 symbol pending
+      9645..9665 list (get state :pending)
         9646..9649 symbol get
-        9650..9655 symbol table
-        9656..9661 symbol chord
-      9671..9676 symbol state
-      9677..9716 list (assoc state :message nil :pending nil)
-        9678..9683 symbol assoc
-        9684..9689 symbol state
-        9690..9698 keyword :message
-        9699..9702 nil nil
-        9703..9711 keyword :pending
-        9712..9715 nil nil
-    9722..10147 list (cond (= hit nil) (if (and (= pending nil) (printable? chord)) (restate-goal (insert-str state chord)) (assoc state :message (str chord " is undefined"))) (= (nth hit 0) :prefix) (assoc state :pending (nth hit 1)) true (run-command state (nth hit 1)))
-      9723..9727 symbol cond
-      9734..9745 list (= hit nil)
-        9735..9736 symbol =
-        9737..9740 symbol hit
-        9741..9744 nil nil
-      9886..10038 list (if (and (= pending nil) (printable? chord)) (restate-goal (insert-str state chord)) (assoc state :message (str chord " is undefined")))
-        9887..9889 symbol if
-        9890..9930 list (and (= pending nil) (printable? chord))
-          9891..9894 symbol and
-          9895..9910 list (= pending nil)
-            9896..9897 symbol =
-            9898..9905 symbol pending
-            9906..9909 nil nil
-          9911..9929 list (printable? chord)
-            9912..9922 symbol printable?
-            9923..9928 symbol chord
-        9939..9978 list (restate-goal (insert-str state chord))
-          9940..9952 symbol restate-goal
-          9953..9977 list (insert-str state chord)
-            9954..9964 symbol insert-str
-            9965..9970 symbol state
-            9971..9976 symbol chord
-        9987..10037 list (assoc state :message (str chord " is undefined"))
-          9988..9993 symbol assoc
-          9994..9999 symbol state
-          10000..10008 keyword :message
-          10009..10036 list (str chord " is undefined")
-            10010..10013 symbol str
-            10014..10019 symbol chord
-            10020..10035 string " is undefined"
-      10045..10068 list (= (nth hit 0) :prefix)
-        10046..10047 symbol =
-        10048..10059 list (nth hit 0)
-          10049..10052 symbol nth
-          10053..10056 symbol hit
-          10057..10058 int 0
-        10060..10067 keyword :prefix
-      10069..10103 list (assoc state :pending (nth hit 1))
-        10070..10075 symbol assoc
-        10076..10081 symbol state
-        10082..10090 keyword :pending
-        10091..10102 list (nth hit 1)
-          10092..10095 symbol nth
-          10096..10099 symbol hit
-          10100..10101 int 1
-      10110..10114 bool true
-      10115..10146 list (run-command state (nth hit 1))
-        10116..10127 symbol run-command
-        10128..10133 symbol state
-        10134..10145 list (nth hit 1)
-          10135..10138 symbol nth
-          10139..10142 symbol hit
-          10143..10144 int 1
-10448..10523 list (defn clip [w s] (if (<= (str-scalar-len s) w) s (str-scalar-slice s 0 w)))
-  10449..10453 symbol defn
-  10454..10458 symbol clip
-  10459..10464 vector [w s]
-    10460..10461 symbol w
-    10462..10463 symbol s
-  10465..10522 list (if (<= (str-scalar-len s) w) s (str-scalar-slice s 0 w))
-    10466..10468 symbol if
-    10469..10494 list (<= (str-scalar-len s) w)
-      10470..10472 symbol <=
-      10473..10491 list (str-scalar-len s)
-        10474..10488 symbol str-scalar-len
-        10489..10490 symbol s
-      10492..10493 symbol w
-    10495..10496 symbol s
-    10497..10521 list (str-scalar-slice s 0 w)
-      10498..10514 symbol str-scalar-slice
-      10515..10516 symbol s
-      10517..10518 int 0
-      10519..10520 symbol w
-10675..10752 list (defn text-rows [state rows] (if (get state :help?) (- rows 2) (dec rows)))
-  10676..10680 symbol defn
-  10681..10690 symbol text-rows
-  10691..10703 vector [state rows]
-    10692..10697 symbol state
-    10698..10702 symbol rows
-  10706..10751 list (if (get state :help?) (- rows 2) (dec rows))
-    10707..10709 symbol if
-    10710..10728 list (get state :help?)
-      10711..10714 symbol get
-      10715..10720 symbol state
-      10721..10727 keyword :help?
-    10729..10739 list (- rows 2)
-      10730..10731 symbol -
-      10732..10736 symbol rows
-      10737..10738 int 2
-    10740..10750 list (dec rows)
-      10741..10744 symbol dec
-      10745..10749 symbol rows
-10909..10987 list (defn help-line [state cols] (clip cols "C-o save  C-x C-c quit  C-g hide"))
-  10910..10914 symbol defn
-  10915..10924 symbol help-line
-  10925..10937 vector [state cols]
-    10926..10931 symbol state
-    10932..10936 symbol cols
-  10940..10986 list (clip cols "C-o save  C-x C-c quit  C-g hide")
-    10941..10945 symbol clip
-    10946..10950 symbol cols
-    10951..10985 string "C-o save  C-x C-c quit  C-g hide"
-10989..11287 list (defn scroll-to-cursor [state rows] (let [row (get state :cursor-row) top (get state :scroll-row) avail (text-rows state rows)] (cond (< row top) (assoc state :scroll-row row) (>= row (+ top avail)) (assoc state :scroll-row (inc (- row avail))) true state)))
-  10990..10994 symbol defn
-  10995..11011 symbol scroll-to-cursor
-  11012..11024 vector [state rows]
-    11013..11018 symbol state
-    11019..11023 symbol rows
-  11027..11286 list (let [row (get state :cursor-row) top (get state :scroll-row) avail (text-rows state rows)] (cond (< row top) (assoc state :scroll-row row) (>= row (+ top avail)) (assoc state :scroll-row (inc (- row avail))) true state))
-    11028..11031 symbol let
-    11032..11134 vector [row (get state :cursor-row) top (get state :scroll-row) avail (text-rows state rows)]
-      11033..11036 symbol row
-      11037..11060 list (get state :cursor-row)
-        11038..11041 symbol get
-        11042..11047 symbol state
-        11048..11059 keyword :cursor-row
-      11069..11072 symbol top
-      11073..11096 list (get state :scroll-row)
-        11074..11077 symbol get
-        11078..11083 symbol state
-        11084..11095 keyword :scroll-row
-      11105..11110 symbol avail
-      11111..11133 list (text-rows state rows)
-        11112..11121 symbol text-rows
-        11122..11127 symbol state
-        11128..11132 symbol rows
-    11139..11285 list (cond (< row top) (assoc state :scroll-row row) (>= row (+ top avail)) (assoc state :scroll-row (inc (- row avail))) true state)
-      11140..11144 symbol cond
-      11151..11162 list (< row top)
-        11152..11153 symbol <
-        11154..11157 symbol row
-        11158..11161 symbol top
-      11163..11192 list (assoc state :scroll-row row)
-        11164..11169 symbol assoc
-        11170..11175 symbol state
-        11176..11187 keyword :scroll-row
-        11188..11191 symbol row
-      11199..11221 list (>= row (+ top avail))
-        11200..11202 symbol >=
-        11203..11206 symbol row
-        11207..11220 list (+ top avail)
-          11208..11209 symbol +
-          11210..11213 symbol top
-          11214..11219 symbol avail
-      11222..11267 list (assoc state :scroll-row (inc (- row avail)))
-        11223..11228 symbol assoc
-        11229..11234 symbol state
-        11235..11246 keyword :scroll-row
-        11247..11266 list (inc (- row avail))
-          11248..11251 symbol inc
-          11252..11265 list (- row avail)
-            11253..11254 symbol -
-            11255..11258 symbol row
-            11259..11264 symbol avail
-      11274..11278 bool true
-      11279..11284 symbol state
-11289..11660 list (defn status-line [state cols] (let [name (if (= (get state :filename) nil) "*scratch*" (get state :filename)) flag (if (get state :modified?) " *" "") pos (str " " (inc (get state :cursor-row)) ":" (inc (get state :cursor-col))) msg (if (= (get state :message) nil) "" (str "  " (get state :message)))] (clip cols (str name flag pos msg))))
-  11290..11294 symbol defn
-  11295..11306 symbol status-line
-  11307..11319 vector [state cols]
-    11308..11313 symbol state
-    11314..11318 symbol cols
-  11322..11659 list (let [name (if (= (get state :filename) nil) "*scratch*" (get state :filename)) flag (if (get state :modified?) " *" "") pos (str " " (inc (get state :cursor-row)) ":" (inc (get state :cursor-col))) msg (if (= (get state :message) nil) "" (str "  " (get state :message)))] (clip cols (str name flag pos msg)))
-    11323..11326 symbol let
-    11327..11618 vector [name (if (= (get state :filename) nil) "*scratch*" (get state :filename)) flag (if (get state :modified?) " *" "") pos (str " " (inc (get state :cursor-row)) ":" (inc (get state :cursor-col))) msg (if (= (get state :message) nil) "" (str "  " (get state :message)))]
-      11328..11332 symbol name
-      11333..11401 list (if (= (get state :filename) nil) "*scratch*" (get state :filename))
-        11334..11336 symbol if
-        11337..11366 list (= (get state :filename) nil)
-          11338..11339 symbol =
-          11340..11361 list (get state :filename)
-            11341..11344 symbol get
-            11345..11350 symbol state
-            11351..11360 keyword :filename
-          11362..11365 nil nil
-        11367..11378 string "*scratch*"
-        11379..11400 list (get state :filename)
-          11380..11383 symbol get
-          11384..11389 symbol state
-          11390..11399 keyword :filename
-      11410..11414 symbol flag
-      11415..11450 list (if (get state :modified?) " *" "")
-        11416..11418 symbol if
-        11419..11441 list (get state :modified?)
-          11420..11423 symbol get
-          11424..11429 symbol state
-          11430..11440 keyword :modified?
-        11442..11446 string " *"
-        11447..11449 string ""
-      11459..11462 symbol pos
-      11463..11536 list (str " " (inc (get state :cursor-row)) ":" (inc (get state :cursor-col)))
-        11464..11467 symbol str
-        11468..11471 string " "
-        11472..11501 list (inc (get state :cursor-row))
-          11473..11476 symbol inc
-          11477..11500 list (get state :cursor-row)
-            11478..11481 symbol get
-            11482..11487 symbol state
-            11488..11499 keyword :cursor-row
-        11502..11505 string ":"
-        11506..11535 list (inc (get state :cursor-col))
-          11507..11510 symbol inc
-          11511..11534 list (get state :cursor-col)
-            11512..11515 symbol get
-            11516..11521 symbol state
-            11522..11533 keyword :cursor-col
-      11545..11548 symbol msg
-      11549..11617 list (if (= (get state :message) nil) "" (str "  " (get state :message)))
-        11550..11552 symbol if
-        11553..11581 list (= (get state :message) nil)
-          11554..11555 symbol =
-          11556..11576 list (get state :message)
-            11557..11560 symbol get
-            11561..11566 symbol state
-            11567..11575 keyword :message
-          11577..11580 nil nil
-        11582..11584 string ""
-        11585..11616 list (str "  " (get state :message))
-          11586..11589 symbol str
-          11590..11594 string "  "
-          11595..11615 list (get state :message)
-            11596..11599 symbol get
-            11600..11605 symbol state
-            11606..11614 keyword :message
-    11623..11658 list (clip cols (str name flag pos msg))
-      11624..11628 symbol clip
-      11629..11633 symbol cols
-      11634..11657 list (str name flag pos msg)
-        11635..11638 symbol str
-        11639..11643 symbol name
-        11644..11648 symbol flag
-        11649..11652 symbol pos
-        11653..11656 symbol msg
-11662..12082 list (defn frame [state cols rows] (let [state (scroll-to-cursor state rows) top (get state :scroll-row) page (take (text-rows state rows) (drop top (get state :lines))) body (join "\n" (map (fn [l] (clip cols l)) page)) foot (if (get state :help?) (str (help-line state cols) "\n" (status-line state cols)) (status-line state cols))] (str body "\n" foot)))
-  11663..11667 symbol defn
-  11668..11673 symbol frame
-  11674..11691 vector [state cols rows]
-    11675..11680 symbol state
-    11681..11685 symbol cols
-    11686..11690 symbol rows
-  11694..12081 list (let [state (scroll-to-cursor state rows) top (get state :scroll-row) page (take (text-rows state rows) (drop top (get state :lines))) body (join "\n" (map (fn [l] (clip cols l)) page)) foot (if (get state :help?) (str (help-line state cols) "\n" (status-line state cols)) (status-line state cols))] (str body "\n" foot))
-    11695..11698 symbol let
-    11699..12055 vector [state (scroll-to-cursor state rows) top (get state :scroll-row) page (take (text-rows state rows) (drop top (get state :lines))) body (join "\n" (map (fn [l] (clip cols l)) page)) foot (if (get state :help?) (str (help-line state cols) "\n" (status-line state cols)) (status-line state cols))]
-      11700..11705 symbol state
-      11706..11735 list (scroll-to-cursor state rows)
-        11707..11723 symbol scroll-to-cursor
-        11724..11729 symbol state
-        11730..11734 symbol rows
-      11744..11747 symbol top
-      11748..11771 list (get state :scroll-row)
-        11749..11752 symbol get
-        11753..11758 symbol state
-        11759..11770 keyword :scroll-row
-      11780..11784 symbol page
-      11785..11844 list (take (text-rows state rows) (drop top (get state :lines)))
-        11786..11790 symbol take
-        11791..11813 list (text-rows state rows)
-          11792..11801 symbol text-rows
-          11802..11807 symbol state
-          11808..11812 symbol rows
-        11814..11843 list (drop top (get state :lines))
-          11815..11819 symbol drop
-          11820..11823 symbol top
-          11824..11842 list (get state :lines)
-            11825..11828 symbol get
-            11829..11834 symbol state
-            11835..11841 keyword :lines
-      11853..11857 symbol body
-      11858..11903 list (join "\n" (map (fn [l] (clip cols l)) page))
-        11859..11863 symbol join
-        11864..11868 string "\n"
-        11869..11902 list (map (fn [l] (clip cols l)) page)
-          11870..11873 symbol map
-          11874..11896 list (fn [l] (clip cols l))
-            11875..11877 symbol fn
-            11878..11881 vector [l]
-              11879..11880 symbol l
-            11882..11895 list (clip cols l)
-              11883..11887 symbol clip
-              11888..11892 symbol cols
-              11893..11894 symbol l
-          11897..11901 symbol page
-      11912..11916 symbol foot
-      11917..12054 list (if (get state :help?) (str (help-line state cols) "\n" (status-line state cols)) (status-line state cols))
-        11918..11920 symbol if
-        11921..11939 list (get state :help?)
-          11922..11925 symbol get
-          11926..11931 symbol state
-          11932..11938 keyword :help?
-        11955..12013 list (str (help-line state cols) "\n" (status-line state cols))
-          11956..11959 symbol str
-          11960..11982 list (help-line state cols)
-            11961..11970 symbol help-line
-            11971..11976 symbol state
-            11977..11981 symbol cols
-          11983..11987 string "\n"
-          11988..12012 list (status-line state cols)
-            11989..12000 symbol status-line
-            12001..12006 symbol state
-            12007..12011 symbol cols
-        12029..12053 list (status-line state cols)
-          12030..12041 symbol status-line
-          12042..12047 symbol state
-          12048..12052 symbol cols
-    12060..12080 list (str body "\n" foot)
-      12061..12064 symbol str
-      12065..12069 symbol body
-      12070..12074 string "\n"
-      12075..12079 symbol foot
-12963..13140 list (def script ["h" "e" "l" "l" "o" "RET" "w" "o" "r" "l" "d" "C-a" "!" "up" "C-e" "?" "DEL" "down" "C-e" "RET" "z" "RET" "l" "o" "n" "g" "e" "r" "up" "up" "C-x" "C-c"])
-  12964..12967 symbol def
-  12968..12974 symbol script
-  12977..13139 vector ["h" "e" "l" "l" "o" "RET" "w" "o" "r" "l" "d" "C-a" "!" "up" "C-e" "?" "DEL" "down" "C-e" "RET" "z" "RET" "l" "o" "n" "g" "e" "r" "up" "up" "C-x" "C-c"]
-    12978..12981 string "h"
-    12982..12985 string "e"
-    12986..12989 string "l"
-    12990..12993 string "l"
-    12994..12997 string "o"
-    12998..13003 string "RET"
-    13004..13007 string "w"
-    13008..13011 string "o"
-    13012..13015 string "r"
-    13016..13019 string "l"
-    13020..13023 string "d"
-    13027..13032 string "C-a"
-    13033..13036 string "!"
-    13037..13041 string "up"
-    13042..13047 string "C-e"
-    13048..13051 string "?"
-    13052..13057 string "DEL"
-    13058..13064 string "down"
-    13068..13073 string "C-e"
-    13074..13079 string "RET"
-    13080..13083 string "z"
-    13084..13089 string "RET"
-    13090..13093 string "l"
-    13094..13097 string "o"
-    13098..13101 string "n"
-    13102..13105 string "g"
-    13106..13109 string "e"
-    13110..13113 string "r"
-    13114..13118 string "up"
-    13119..13123 string "up"
-    13127..13132 string "C-x"
-    13133..13138 string "C-c"
-13141..13205 list (def final (reduce dispatch (new-state "demo.txt" [""]) script))
-  13142..13145 symbol def
-  13146..13151 symbol final
-  13152..13204 list (reduce dispatch (new-state "demo.txt" [""]) script)
-    13153..13159 symbol reduce
-    13160..13168 symbol dispatch
-    13169..13196 list (new-state "demo.txt" [""])
-      13170..13179 symbol new-state
-      13180..13190 string "demo.txt"
-      13191..13195 vector [""]
-        13192..13194 string ""
-    13197..13203 symbol script
-13206..13227 list (println "--- frame")
-  13207..13214 symbol println
-  13215..13226 string "--- frame"
-13228..13256 list (println (frame final 32 6))
-  13229..13236 symbol println
-  13237..13255 list (frame final 32 6)
-    13238..13243 symbol frame
-    13244..13249 symbol final
-    13250..13252 int 32
-    13253..13254 int 6
-13257..13278 list (println "--- lines")
-  13258..13265 symbol println
-  13266..13277 string "--- lines"
-13279..13313 list (println (str (get final :lines)))
-  13280..13287 symbol println
-  13288..13312 list (str (get final :lines))
-    13289..13292 symbol str
-    13293..13311 list (get final :lines)
-      13294..13297 symbol get
-      13298..13303 symbol final
-      13304..13310 keyword :lines
-13314..13395 list (println (str "quit? " (get final :quit?) "  modified? " (get final :modified?)))
-  13315..13322 symbol println
-  13323..13394 list (str "quit? " (get final :quit?) "  modified? " (get final :modified?))
-    13324..13327 symbol str
-    13328..13336 string "quit? "
-    13337..13355 list (get final :quit?)
-      13338..13341 symbol get
-      13342..13347 symbol final
-      13348..13354 keyword :quit?
-    13356..13370 string "  modified? "
-    13371..13393 list (get final :modified?)
-      13372..13375 symbol get
-      13376..13381 symbol final
-      13382..13392 keyword :modified?
+        9650..9655 symbol state
+        9656..9664 keyword :pending
+      9674..9679 symbol table
+      9680..9722 list (if (= pending nil) global-keymap pending)
+        9681..9683 symbol if
+        9684..9699 list (= pending nil)
+          9685..9686 symbol =
+          9687..9694 symbol pending
+          9695..9698 nil nil
+        9700..9713 symbol global-keymap
+        9714..9721 symbol pending
+      9731..9734 symbol hit
+      9735..9752 list (get table chord)
+        9736..9739 symbol get
+        9740..9745 symbol table
+        9746..9751 symbol chord
+      9761..9766 symbol state
+      9767..9806 list (assoc state :message nil :pending nil)
+        9768..9773 symbol assoc
+        9774..9779 symbol state
+        9780..9788 keyword :message
+        9789..9792 nil nil
+        9793..9801 keyword :pending
+        9802..9805 nil nil
+    9812..10237 list (cond (= hit nil) (if (and (= pending nil) (printable? chord)) (restate-goal (insert-str state chord)) (assoc state :message (str chord " is undefined"))) (= (nth hit 0) :prefix) (assoc state :pending (nth hit 1)) true (run-command state (nth hit 1)))
+      9813..9817 symbol cond
+      9824..9835 list (= hit nil)
+        9825..9826 symbol =
+        9827..9830 symbol hit
+        9831..9834 nil nil
+      9976..10128 list (if (and (= pending nil) (printable? chord)) (restate-goal (insert-str state chord)) (assoc state :message (str chord " is undefined")))
+        9977..9979 symbol if
+        9980..10020 list (and (= pending nil) (printable? chord))
+          9981..9984 symbol and
+          9985..10000 list (= pending nil)
+            9986..9987 symbol =
+            9988..9995 symbol pending
+            9996..9999 nil nil
+          10001..10019 list (printable? chord)
+            10002..10012 symbol printable?
+            10013..10018 symbol chord
+        10029..10068 list (restate-goal (insert-str state chord))
+          10030..10042 symbol restate-goal
+          10043..10067 list (insert-str state chord)
+            10044..10054 symbol insert-str
+            10055..10060 symbol state
+            10061..10066 symbol chord
+        10077..10127 list (assoc state :message (str chord " is undefined"))
+          10078..10083 symbol assoc
+          10084..10089 symbol state
+          10090..10098 keyword :message
+          10099..10126 list (str chord " is undefined")
+            10100..10103 symbol str
+            10104..10109 symbol chord
+            10110..10125 string " is undefined"
+      10135..10158 list (= (nth hit 0) :prefix)
+        10136..10137 symbol =
+        10138..10149 list (nth hit 0)
+          10139..10142 symbol nth
+          10143..10146 symbol hit
+          10147..10148 int 0
+        10150..10157 keyword :prefix
+      10159..10193 list (assoc state :pending (nth hit 1))
+        10160..10165 symbol assoc
+        10166..10171 symbol state
+        10172..10180 keyword :pending
+        10181..10192 list (nth hit 1)
+          10182..10185 symbol nth
+          10186..10189 symbol hit
+          10190..10191 int 1
+      10200..10204 bool true
+      10205..10236 list (run-command state (nth hit 1))
+        10206..10217 symbol run-command
+        10218..10223 symbol state
+        10224..10235 list (nth hit 1)
+          10225..10228 symbol nth
+          10229..10232 symbol hit
+          10233..10234 int 1
+10538..10613 list (defn clip [w s] (if (<= (str-scalar-len s) w) s (str-scalar-slice s 0 w)))
+  10539..10543 symbol defn
+  10544..10548 symbol clip
+  10549..10554 vector [w s]
+    10550..10551 symbol w
+    10552..10553 symbol s
+  10555..10612 list (if (<= (str-scalar-len s) w) s (str-scalar-slice s 0 w))
+    10556..10558 symbol if
+    10559..10584 list (<= (str-scalar-len s) w)
+      10560..10562 symbol <=
+      10563..10581 list (str-scalar-len s)
+        10564..10578 symbol str-scalar-len
+        10579..10580 symbol s
+      10582..10583 symbol w
+    10585..10586 symbol s
+    10587..10611 list (str-scalar-slice s 0 w)
+      10588..10604 symbol str-scalar-slice
+      10605..10606 symbol s
+      10607..10608 int 0
+      10609..10610 symbol w
+10765..10842 list (defn text-rows [state rows] (if (get state :help?) (- rows 2) (dec rows)))
+  10766..10770 symbol defn
+  10771..10780 symbol text-rows
+  10781..10793 vector [state rows]
+    10782..10787 symbol state
+    10788..10792 symbol rows
+  10796..10841 list (if (get state :help?) (- rows 2) (dec rows))
+    10797..10799 symbol if
+    10800..10818 list (get state :help?)
+      10801..10804 symbol get
+      10805..10810 symbol state
+      10811..10817 keyword :help?
+    10819..10829 list (- rows 2)
+      10820..10821 symbol -
+      10822..10826 symbol rows
+      10827..10828 int 2
+    10830..10840 list (dec rows)
+      10831..10834 symbol dec
+      10835..10839 symbol rows
+10999..11077 list (defn help-line [state cols] (clip cols "C-o save  C-x C-c quit  C-g hide"))
+  11000..11004 symbol defn
+  11005..11014 symbol help-line
+  11015..11027 vector [state cols]
+    11016..11021 symbol state
+    11022..11026 symbol cols
+  11030..11076 list (clip cols "C-o save  C-x C-c quit  C-g hide")
+    11031..11035 symbol clip
+    11036..11040 symbol cols
+    11041..11075 string "C-o save  C-x C-c quit  C-g hide"
+11079..11377 list (defn scroll-to-cursor [state rows] (let [row (get state :cursor-row) top (get state :scroll-row) avail (text-rows state rows)] (cond (< row top) (assoc state :scroll-row row) (>= row (+ top avail)) (assoc state :scroll-row (inc (- row avail))) true state)))
+  11080..11084 symbol defn
+  11085..11101 symbol scroll-to-cursor
+  11102..11114 vector [state rows]
+    11103..11108 symbol state
+    11109..11113 symbol rows
+  11117..11376 list (let [row (get state :cursor-row) top (get state :scroll-row) avail (text-rows state rows)] (cond (< row top) (assoc state :scroll-row row) (>= row (+ top avail)) (assoc state :scroll-row (inc (- row avail))) true state))
+    11118..11121 symbol let
+    11122..11224 vector [row (get state :cursor-row) top (get state :scroll-row) avail (text-rows state rows)]
+      11123..11126 symbol row
+      11127..11150 list (get state :cursor-row)
+        11128..11131 symbol get
+        11132..11137 symbol state
+        11138..11149 keyword :cursor-row
+      11159..11162 symbol top
+      11163..11186 list (get state :scroll-row)
+        11164..11167 symbol get
+        11168..11173 symbol state
+        11174..11185 keyword :scroll-row
+      11195..11200 symbol avail
+      11201..11223 list (text-rows state rows)
+        11202..11211 symbol text-rows
+        11212..11217 symbol state
+        11218..11222 symbol rows
+    11229..11375 list (cond (< row top) (assoc state :scroll-row row) (>= row (+ top avail)) (assoc state :scroll-row (inc (- row avail))) true state)
+      11230..11234 symbol cond
+      11241..11252 list (< row top)
+        11242..11243 symbol <
+        11244..11247 symbol row
+        11248..11251 symbol top
+      11253..11282 list (assoc state :scroll-row row)
+        11254..11259 symbol assoc
+        11260..11265 symbol state
+        11266..11277 keyword :scroll-row
+        11278..11281 symbol row
+      11289..11311 list (>= row (+ top avail))
+        11290..11292 symbol >=
+        11293..11296 symbol row
+        11297..11310 list (+ top avail)
+          11298..11299 symbol +
+          11300..11303 symbol top
+          11304..11309 symbol avail
+      11312..11357 list (assoc state :scroll-row (inc (- row avail)))
+        11313..11318 symbol assoc
+        11319..11324 symbol state
+        11325..11336 keyword :scroll-row
+        11337..11356 list (inc (- row avail))
+          11338..11341 symbol inc
+          11342..11355 list (- row avail)
+            11343..11344 symbol -
+            11345..11348 symbol row
+            11349..11354 symbol avail
+      11364..11368 bool true
+      11369..11374 symbol state
+11379..11750 list (defn status-line [state cols] (let [name (if (= (get state :filename) nil) "*scratch*" (get state :filename)) flag (if (get state :modified?) " *" "") pos (str " " (inc (get state :cursor-row)) ":" (inc (get state :cursor-col))) msg (if (= (get state :message) nil) "" (str "  " (get state :message)))] (clip cols (str name flag pos msg))))
+  11380..11384 symbol defn
+  11385..11396 symbol status-line
+  11397..11409 vector [state cols]
+    11398..11403 symbol state
+    11404..11408 symbol cols
+  11412..11749 list (let [name (if (= (get state :filename) nil) "*scratch*" (get state :filename)) flag (if (get state :modified?) " *" "") pos (str " " (inc (get state :cursor-row)) ":" (inc (get state :cursor-col))) msg (if (= (get state :message) nil) "" (str "  " (get state :message)))] (clip cols (str name flag pos msg)))
+    11413..11416 symbol let
+    11417..11708 vector [name (if (= (get state :filename) nil) "*scratch*" (get state :filename)) flag (if (get state :modified?) " *" "") pos (str " " (inc (get state :cursor-row)) ":" (inc (get state :cursor-col))) msg (if (= (get state :message) nil) "" (str "  " (get state :message)))]
+      11418..11422 symbol name
+      11423..11491 list (if (= (get state :filename) nil) "*scratch*" (get state :filename))
+        11424..11426 symbol if
+        11427..11456 list (= (get state :filename) nil)
+          11428..11429 symbol =
+          11430..11451 list (get state :filename)
+            11431..11434 symbol get
+            11435..11440 symbol state
+            11441..11450 keyword :filename
+          11452..11455 nil nil
+        11457..11468 string "*scratch*"
+        11469..11490 list (get state :filename)
+          11470..11473 symbol get
+          11474..11479 symbol state
+          11480..11489 keyword :filename
+      11500..11504 symbol flag
+      11505..11540 list (if (get state :modified?) " *" "")
+        11506..11508 symbol if
+        11509..11531 list (get state :modified?)
+          11510..11513 symbol get
+          11514..11519 symbol state
+          11520..11530 keyword :modified?
+        11532..11536 string " *"
+        11537..11539 string ""
+      11549..11552 symbol pos
+      11553..11626 list (str " " (inc (get state :cursor-row)) ":" (inc (get state :cursor-col)))
+        11554..11557 symbol str
+        11558..11561 string " "
+        11562..11591 list (inc (get state :cursor-row))
+          11563..11566 symbol inc
+          11567..11590 list (get state :cursor-row)
+            11568..11571 symbol get
+            11572..11577 symbol state
+            11578..11589 keyword :cursor-row
+        11592..11595 string ":"
+        11596..11625 list (inc (get state :cursor-col))
+          11597..11600 symbol inc
+          11601..11624 list (get state :cursor-col)
+            11602..11605 symbol get
+            11606..11611 symbol state
+            11612..11623 keyword :cursor-col
+      11635..11638 symbol msg
+      11639..11707 list (if (= (get state :message) nil) "" (str "  " (get state :message)))
+        11640..11642 symbol if
+        11643..11671 list (= (get state :message) nil)
+          11644..11645 symbol =
+          11646..11666 list (get state :message)
+            11647..11650 symbol get
+            11651..11656 symbol state
+            11657..11665 keyword :message
+          11667..11670 nil nil
+        11672..11674 string ""
+        11675..11706 list (str "  " (get state :message))
+          11676..11679 symbol str
+          11680..11684 string "  "
+          11685..11705 list (get state :message)
+            11686..11689 symbol get
+            11690..11695 symbol state
+            11696..11704 keyword :message
+    11713..11748 list (clip cols (str name flag pos msg))
+      11714..11718 symbol clip
+      11719..11723 symbol cols
+      11724..11747 list (str name flag pos msg)
+        11725..11728 symbol str
+        11729..11733 symbol name
+        11734..11738 symbol flag
+        11739..11742 symbol pos
+        11743..11746 symbol msg
+11752..12172 list (defn frame [state cols rows] (let [state (scroll-to-cursor state rows) top (get state :scroll-row) page (take (text-rows state rows) (drop top (get state :lines))) body (join "\n" (map (fn [l] (clip cols l)) page)) foot (if (get state :help?) (str (help-line state cols) "\n" (status-line state cols)) (status-line state cols))] (str body "\n" foot)))
+  11753..11757 symbol defn
+  11758..11763 symbol frame
+  11764..11781 vector [state cols rows]
+    11765..11770 symbol state
+    11771..11775 symbol cols
+    11776..11780 symbol rows
+  11784..12171 list (let [state (scroll-to-cursor state rows) top (get state :scroll-row) page (take (text-rows state rows) (drop top (get state :lines))) body (join "\n" (map (fn [l] (clip cols l)) page)) foot (if (get state :help?) (str (help-line state cols) "\n" (status-line state cols)) (status-line state cols))] (str body "\n" foot))
+    11785..11788 symbol let
+    11789..12145 vector [state (scroll-to-cursor state rows) top (get state :scroll-row) page (take (text-rows state rows) (drop top (get state :lines))) body (join "\n" (map (fn [l] (clip cols l)) page)) foot (if (get state :help?) (str (help-line state cols) "\n" (status-line state cols)) (status-line state cols))]
+      11790..11795 symbol state
+      11796..11825 list (scroll-to-cursor state rows)
+        11797..11813 symbol scroll-to-cursor
+        11814..11819 symbol state
+        11820..11824 symbol rows
+      11834..11837 symbol top
+      11838..11861 list (get state :scroll-row)
+        11839..11842 symbol get
+        11843..11848 symbol state
+        11849..11860 keyword :scroll-row
+      11870..11874 symbol page
+      11875..11934 list (take (text-rows state rows) (drop top (get state :lines)))
+        11876..11880 symbol take
+        11881..11903 list (text-rows state rows)
+          11882..11891 symbol text-rows
+          11892..11897 symbol state
+          11898..11902 symbol rows
+        11904..11933 list (drop top (get state :lines))
+          11905..11909 symbol drop
+          11910..11913 symbol top
+          11914..11932 list (get state :lines)
+            11915..11918 symbol get
+            11919..11924 symbol state
+            11925..11931 keyword :lines
+      11943..11947 symbol body
+      11948..11993 list (join "\n" (map (fn [l] (clip cols l)) page))
+        11949..11953 symbol join
+        11954..11958 string "\n"
+        11959..11992 list (map (fn [l] (clip cols l)) page)
+          11960..11963 symbol map
+          11964..11986 list (fn [l] (clip cols l))
+            11965..11967 symbol fn
+            11968..11971 vector [l]
+              11969..11970 symbol l
+            11972..11985 list (clip cols l)
+              11973..11977 symbol clip
+              11978..11982 symbol cols
+              11983..11984 symbol l
+          11987..11991 symbol page
+      12002..12006 symbol foot
+      12007..12144 list (if (get state :help?) (str (help-line state cols) "\n" (status-line state cols)) (status-line state cols))
+        12008..12010 symbol if
+        12011..12029 list (get state :help?)
+          12012..12015 symbol get
+          12016..12021 symbol state
+          12022..12028 keyword :help?
+        12045..12103 list (str (help-line state cols) "\n" (status-line state cols))
+          12046..12049 symbol str
+          12050..12072 list (help-line state cols)
+            12051..12060 symbol help-line
+            12061..12066 symbol state
+            12067..12071 symbol cols
+          12073..12077 string "\n"
+          12078..12102 list (status-line state cols)
+            12079..12090 symbol status-line
+            12091..12096 symbol state
+            12097..12101 symbol cols
+        12119..12143 list (status-line state cols)
+          12120..12131 symbol status-line
+          12132..12137 symbol state
+          12138..12142 symbol cols
+    12150..12170 list (str body "\n" foot)
+      12151..12154 symbol str
+      12155..12159 symbol body
+      12160..12164 string "\n"
+      12165..12169 symbol foot
+13053..13230 list (def script ["h" "e" "l" "l" "o" "RET" "w" "o" "r" "l" "d" "C-a" "!" "up" "C-e" "?" "DEL" "down" "C-e" "RET" "z" "RET" "l" "o" "n" "g" "e" "r" "up" "up" "C-x" "C-c"])
+  13054..13057 symbol def
+  13058..13064 symbol script
+  13067..13229 vector ["h" "e" "l" "l" "o" "RET" "w" "o" "r" "l" "d" "C-a" "!" "up" "C-e" "?" "DEL" "down" "C-e" "RET" "z" "RET" "l" "o" "n" "g" "e" "r" "up" "up" "C-x" "C-c"]
+    13068..13071 string "h"
+    13072..13075 string "e"
+    13076..13079 string "l"
+    13080..13083 string "l"
+    13084..13087 string "o"
+    13088..13093 string "RET"
+    13094..13097 string "w"
+    13098..13101 string "o"
+    13102..13105 string "r"
+    13106..13109 string "l"
+    13110..13113 string "d"
+    13117..13122 string "C-a"
+    13123..13126 string "!"
+    13127..13131 string "up"
+    13132..13137 string "C-e"
+    13138..13141 string "?"
+    13142..13147 string "DEL"
+    13148..13154 string "down"
+    13158..13163 string "C-e"
+    13164..13169 string "RET"
+    13170..13173 string "z"
+    13174..13179 string "RET"
+    13180..13183 string "l"
+    13184..13187 string "o"
+    13188..13191 string "n"
+    13192..13195 string "g"
+    13196..13199 string "e"
+    13200..13203 string "r"
+    13204..13208 string "up"
+    13209..13213 string "up"
+    13217..13222 string "C-x"
+    13223..13228 string "C-c"
+13231..13295 list (def final (reduce dispatch (new-state "demo.txt" [""]) script))
+  13232..13235 symbol def
+  13236..13241 symbol final
+  13242..13294 list (reduce dispatch (new-state "demo.txt" [""]) script)
+    13243..13249 symbol reduce
+    13250..13258 symbol dispatch
+    13259..13286 list (new-state "demo.txt" [""])
+      13260..13269 symbol new-state
+      13270..13280 string "demo.txt"
+      13281..13285 vector [""]
+        13282..13284 string ""
+    13287..13293 symbol script
+13296..13317 list (println "--- frame")
+  13297..13304 symbol println
+  13305..13316 string "--- frame"
+13318..13346 list (println (frame final 32 6))
+  13319..13326 symbol println
+  13327..13345 list (frame final 32 6)
+    13328..13333 symbol frame
+    13334..13339 symbol final
+    13340..13342 int 32
+    13343..13344 int 6
+13347..13368 list (println "--- lines")
+  13348..13355 symbol println
+  13356..13367 string "--- lines"
+13369..13403 list (println (str (get final :lines)))
+  13370..13377 symbol println
+  13378..13402 list (str (get final :lines))
+    13379..13382 symbol str
+    13383..13401 list (get final :lines)
+      13384..13387 symbol get
+      13388..13393 symbol final
+      13394..13400 keyword :lines
+13404..13485 list (println (str "quit? " (get final :quit?) "  modified? " (get final :modified?)))
+  13405..13412 symbol println
+  13413..13484 list (str "quit? " (get final :quit?) "  modified? " (get final :modified?))
+    13414..13417 symbol str
+    13418..13426 string "quit? "
+    13427..13445 list (get final :quit?)
+      13428..13431 symbol get
+      13432..13437 symbol final
+      13438..13444 keyword :quit?
+    13446..13460 string "  modified? "
+    13461..13483 list (get final :modified?)
+      13462..13465 symbol get
+      13466..13471 symbol final
+      13472..13482 keyword :modified?
 ok: span invariants hold

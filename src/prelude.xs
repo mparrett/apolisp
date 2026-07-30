@@ -146,15 +146,21 @@
 
 ; Both clamp rather than raising: asking for more than there is, or for a
 ; negative count, is how a caller says "as much as you have" and "none".
+;
+; The clamping lives here and not in `vec-slice`, which raises like the two
+; string slices do. That split is deliberate: the primitive refuses a bound it
+; cannot honour, and these two turn a caller's loose count into one it can
+; (ADR-053). Before that primitive they were `conj` loops, so every one of their
+; callers paid Q6/E-11 — which is most of the prelude.
 (def take
   (fn take [n xs]
-    (loop [i 0 out []]
-      (if (or (>= i n) (>= i (count xs))) out (recur (+ i 1) (conj out (nth xs i)))))))
+    (let [c (count xs)]
+      (vec-slice xs 0 (if (< n 0) 0 (if (> n c) c n))))))
 
 (def drop
   (fn drop [n xs]
-    (loop [i (if (< n 0) 0 n) out []]
-      (if (>= i (count xs)) out (recur (+ i 1) (conj out (nth xs i)))))))
+    (let [c (count xs)]
+      (vec-slice xs (if (< n 0) 0 (if (> n c) c n)) c))))
 
 ; Merge sort, and it is a merge sort on purpose. The version everyone writes
 ; first — take the smallest, remove it with `filter`, repeat — removes *every*

@@ -187,6 +187,32 @@
 (is= [1 2] (drop -1 [1 2]))
 ; take and drop partition, which is what merge sort rests on.
 (is= [1 2 3] (concat (take 1 [1 2 3]) (drop 1 [1 2 3])))
+; They have always accepted `concat`'s output, which is a *list*, and returned a
+; vector. ADR-053 moved them onto `vec-slice`, so this is the assertion that says
+; the primitive had to stay lenient about its input.
+(is= [1 2] (take 2 (concat [1 2] [3 4])))
+(is= [3 4] (drop 2 (concat [1 2] [3 4])))
+
+; --- vec-slice (ADR-053) ------------------------------------------------------
+; Half-open, like `str-slice` and `str-scalar-slice`. Not `subvec`: Clojure's is
+; vector-only and an O(1) view, and this copies and takes a list.
+(is= [2 3] (vec-slice [1 2 3 4 5] 1 3))
+(is= [1 2 3] (vec-slice [1 2 3] 0 3))
+(is= [] (vec-slice [1 2 3] 1 1))
+; Either bound may equal the count: that addresses the end.
+(is= [] (vec-slice [1 2 3] 3 3))
+(is= [] (vec-slice [] 0 0))
+(is= [2 3] (vec-slice (concat [1 2] [3 4]) 1 3))
+; A list in, a vector out — the conversion is the point, not an accident.
+(is= [1 2] (vec-slice (concat [1 2]) 0 2))
+; Unlike take/drop it raises, because a primitive should refuse a bound it cannot
+; honour and let the clamping live in the two functions that promise clamping.
+(is (throws? (vec-slice [1 2 3] 0 4)))
+(is (throws? (vec-slice [1 2 3] 2 1)))
+(is (throws? (vec-slice [1 2 3] 4 4)))
+(is (throws? (vec-slice "abc" 0 1)))
+; Shared structure is preserved rather than copied element-wise (ADR-021).
+(is= [[1 2]] (vec-slice [[1 2] [3 4]] 0 1))
 
 (is= [1 1 2 3] (sort [3 1 2 1]))
 (is= [] (sort []))

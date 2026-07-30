@@ -5104,6 +5104,27 @@ pub mod prim {
             }
             Ok(Value::List(Rc::new(ListObj(out))))
         });
+        // ADR-053. The vector member of the slice family, after `str-slice` and
+        // `str-scalar-slice`. Not `subvec`: Clojure's is vector-only and an O(1)
+        // view, this one accepts a list and copies, and giving a different
+        // operation Clojure's name is the shape `TRAPS.md` is a list of.
+        //
+        // Lenient about its input because `take`/`drop` are — `concat` returns a
+        // list, and they have always accepted one.
+        vm.native("vec-slice", 3, false, |_, a| {
+            let items = seq_items(&a[0], "vec-slice")?;
+            let (from, to) = (index(&a[1], "vec-slice")?, index(&a[2], "vec-slice")?);
+            // `from > to` is caught here rather than by the slice, because
+            // `items[f..t]` backwards panics, and ADR-039 wants a throw. The
+            // same lesson as ADR-052's `f <= t` guard, which a mutant found.
+            if from > to || to > items.len() {
+                return Err(fault(
+                    Kind::Type,
+                    format!("`vec-slice` {from}..{to} of {} elements", items.len()),
+                ));
+            }
+            Ok(Value::Vec(Rc::new(VecObj(items[from..to].to_vec()))))
+        });
         // The other half of a vector template's lowering: build a list,
         // then convert. Also Q6's, eventually.
         vm.native("vec", 1, false, |_, a| match &a[0] {

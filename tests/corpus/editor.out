@@ -9,6 +9,13 @@ demo.txt * 2:7
 --- lines
 ["hello" "!world" "z" "longer"]
 quit? true  modified? true
+--- frame at 2 rows
+!world
+demo.txt * 2:7
+--- geometry as the height collapses
+rows 3  text-rows 1  help true  scroll-row 1  cursor-row 1
+rows 2  text-rows 1  help false  scroll-row 1  cursor-row 1
+rows 1  text-rows 1  help false  scroll-row 1  cursor-row 1
 --- value
 nil
 --- exit

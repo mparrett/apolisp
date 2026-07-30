@@ -246,10 +246,27 @@
 
 (defn clip [w s] (if (<= (str-scalar-len s) w) s (str-scalar-slice s 0 w)))
 
+; Whether the hint is actually painted. Asked here rather than read off `:help?`
+; at each site, for the reason `text-rows` exists: `text-rows` reserves two rows
+; for the hint and `frame` decides whether to draw it, and the moment that answer
+; depends on anything beyond `:help?` — here, on the height — those two are back
+; to deciding the same question separately. This is the `text-rows` bug one level
+; up, and it was found the same way, by something varying that had not varied
+; before (`notes/the-editor-program.md`).
+(defn shows-help? [state rows]
+  (and (get state :help?) (>= rows 3)))
+
 ; How many rows the buffer gets. `scroll-to-cursor` and `frame` must agree on
 ; this or the painted cursor lands on the wrong line, so both ask here.
+;
+; Never below 1. At zero, `scroll-to-cursor` computes `(inc (- row avail))` and
+; puts the scroll *past* the cursor it exists to keep on screen, which breaks
+; `scroll-row <= cursor-row` and reaches the terminal as `ESC[0;1H` — row zero in
+; a 1-indexed protocol. Nothing caught it because `take` clamps a negative count
+; to an empty page (ADR-050) rather than raising, so the frame came out quietly
+; wrong. Unreachable until the shell started asking the size every iteration.
 (defn text-rows [state rows]
-  (if (get state :help?) (- rows 2) (dec rows)))
+  (max2 1 (if (shows-help? state rows) (- rows 2) (dec rows))))
 
 ; Only the chords that cannot be guessed. Sized to fit 32 columns, because the
 ; golden renders at 32 and clipping the hint would be a poor advertisement.
@@ -277,7 +294,7 @@
         top (get state :scroll-row)
         page (take (text-rows state rows) (drop top (get state :lines)))
         body (join "\n" (map (fn [l] (clip cols l)) page))
-        foot (if (get state :help?)
+        foot (if (shows-help? state rows)
                (str (help-line state cols) "\n" (status-line state cols))
                (status-line state cols))]
     (str body "\n" foot)))
@@ -307,3 +324,34 @@
 (println "--- lines")
 (println (str (get final :lines)))
 (println (str "quit? " (get final :quit?) "  modified? " (get final :modified?)))
+
+; --- The frame at a height that does not fit ---------------------------------
+;
+; Two rows is one short of what the hint needs, so `shows-help?` gives it up and
+; the buffer keeps the row. Pinned because the shell now asks the terminal its
+; size every iteration, which made this reachable by dragging a window edge; at
+; zero text rows `scroll-to-cursor` put the scroll past the cursor and the
+; painted position came out as `ESC[0;1H`, row zero in a 1-indexed protocol.
+;
+; The three numbers below are the assertion. `scroll-row` must never exceed
+; `cursor-row` — that is the invariant the bug broke, and it is the reason this
+; block prints state rather than only the frame.
+(println "--- frame at 2 rows")
+(println (frame final 32 2))
+
+; Three heights, not one. A pin at two rows alone leaves the clamp untested —
+; `shows-help?` has already given up the hint by then, so `(dec 2)` is 1 and the
+; clamp never fires. Removing it survived the first version of this block, which
+; is the failure the corpus note is about, found here by mutating on purpose.
+; One row is where `(dec 1)` reaches zero and the invariant used to break.
+(defn geometry [rows]
+  (let [sq (scroll-to-cursor final rows)]
+    (println (str "rows " rows
+                  "  text-rows " (text-rows final rows)
+                  "  help " (shows-help? final rows)
+                  "  scroll-row " (get sq :scroll-row)
+                  "  cursor-row " (get sq :cursor-row)))))
+(println "--- geometry as the height collapses")
+(geometry 3)
+(geometry 2)
+(geometry 1)

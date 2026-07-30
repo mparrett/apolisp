@@ -65,10 +65,29 @@
 (is= "é" (str-scalar-slice "héllo" 1 2))
 (is= 4 (str-byte-len (str-scalar-slice "hééllo" 1 3)))
 (is= 2 (str-scalar-len (str-scalar-slice "hééllo" 1 3)))
-; A scalar is not a grapheme, and this is the operation that proves it (TRAPS.md):
-; one scalar out of a five-scalar ZWJ family is one member of it.
+; --- ADR-054: these pin a refusal ---------------------------------------------
+;
+; The language declines to segment graphemes, so the scalar is the smallest
+; addressable unit and a cluster is however many scalars it happens to be. That
+; is a decision (ADR-054), not an oversight, and these assertions exist so it
+; stays one: if any of them starts failing, somebody added segmentation and owes
+; an entry saying so.
+;
+; A scalar is not a grapheme, and slicing is the operation that proves it: one
+; scalar out of a five-scalar ZWJ family is one member of the family.
 (is= 5 (str-scalar-len (scalars-str [128104 8205 128105 8205 128103])))
 (is= 1 (str-scalar-len (str-scalar-slice (scalars-str [128104 8205 128105 8205 128103]) 0 1)))
+
+; The combining-mark case, which is the one that costs a user something. `café`
+; spelled `e` + U+0301 is five scalars, and dropping the last one leaves a
+; readable word with no accent — a silent edit, where the emoji case at least
+; looks broken. Recorded here because the quiet failure is the expensive one.
+(is= 5 (str-scalar-len (str "cafe" (scalars-str [769]))))
+(is= 6 (str-byte-len (str "cafe" (scalars-str [769]))))
+(is= "cafe" (str-scalar-slice (str "cafe" (scalars-str [769])) 0 4))
+; And the accent is addressable on its own, which is exactly what "no
+; segmentation" means: the language will hand you half a character.
+(is= 1 (str-scalar-len (str-scalar-slice (str "cafe" (scalars-str [769])) 4 5)))
 
 ; --- text and bytes ----------------------------------------------------------
 (is= 3 (bytes-len (str-bytes "hé")))

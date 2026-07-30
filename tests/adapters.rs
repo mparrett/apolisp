@@ -368,3 +368,58 @@ fn a_socket_is_not_a_new_kind_of_value() {
     assert_eq!(ev(r#"(str (io/open? io/stdout))"#), "\"true\"");
     run(&mut s, "(io/close l)");
 }
+
+/// ADR-045 says the language has zero dependencies and that the fact is
+/// "checkable — `cargo tree --no-default-features` shows nothing". Nothing
+/// checked it, so it was true by habit.
+///
+/// ADR-054 turns that from a nice property into a load-bearing one: the reason
+/// the language declines to segment graphemes is that correctness there costs a
+/// mandatory dependency, and an argument resting on an unasserted fact is the
+/// shape `notes/the-corpus-as-an-oracle.md` is about.
+///
+/// The invariant is spelled as "every dependency is optional" rather than by
+/// shelling out to `cargo tree`, because that is the property that matters —
+/// ADR-013 makes features host capability only, so a non-optional dependency is
+/// by definition one the *language* carries.
+#[test]
+fn the_language_carries_no_dependencies() {
+    let manifest = std::fs::read_to_string(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("Cargo.toml"),
+    )
+    .expect("Cargo.toml reads");
+
+    let deps = manifest
+        .split("\n[")
+        .find(|s| s.starts_with("dependencies]"))
+        .expect("a [dependencies] section");
+
+    let entries: Vec<&str> = deps
+        .lines()
+        .skip(1)
+        .filter(|l| !l.trim().is_empty() && !l.trim_start().starts_with('#'))
+        .collect();
+
+    // Without this the test passes by parsing nothing — rewrite the manifest in
+    // `[dependencies.crossterm]` table style and the section above goes empty
+    // and the assertion below succeeds vacuously. A test that cannot fail is
+    // the failure mode this whole file is downstream of.
+    assert!(
+        entries.len() >= 2,
+        "expected to see the adapter dependencies and saw {}; \
+         the manifest format changed and this test stopped looking at anything",
+        entries.len()
+    );
+
+    let mandatory: Vec<&str> = entries
+        .into_iter()
+        .filter(|l| !l.contains("optional = true"))
+        .collect();
+
+    assert!(
+        mandatory.is_empty(),
+        "a non-optional dependency is one the language carries, which ADR-045 \
+         says it does not and ADR-054 rests on:\n{}",
+        mandatory.join("\n")
+    );
+}

@@ -3065,6 +3065,85 @@ cost in the editor and conspicuous only because this entry fixed the other one �
 
 ---
 
+### ADR-053 — `vec-slice`, and why `take`/`drop` stop being loops
+
+*(New, 2026-07-30. Adds `vec-slice`. Rewrites `take` and `drop` onto it.
+Resolves Q36. Predicted in `notes/vec-slice-prediction.md`.)*
+
+**Decision.** `(vec-slice v from to)` returns the elements between two indices,
+half-open, as a vector. It accepts a **list or a vector** and always returns a
+vector. It raises when `from > to` or `to` exceeds the count. One copy, O(n).
+
+`take` and `drop` become clamping wrappers over it and stop being `conj` loops.
+
+**1. The clamping stays in the prelude, and the primitive raises.** ADR-050 gave
+`take`/`drop` a clamping contract — asking for more than there is means "all of
+it". `vec-slice` refuses a bound it cannot honour, the way both string slices do,
+and the two functions that promise clamping do the clamping. A primitive that
+guessed would make the guess unavailable to callers who want the error.
+
+**2. It is lenient about its input because `take`/`drop` always were.** `concat`
+returns a *list*, and `(take 2 (concat [1 2] [3 4]))` has always worked and
+always returned a vector. A strict primitive would have broken that on the way
+past, silently for anyone not testing the list case. There is now an assertion
+pinning it.
+
+**3. Why not `subvec`.** Clojure's `subvec` is vector-only and an O(1) view over
+shared structure. This one takes a list and copies. Two divergences, one of them
+about complexity and one about types — and `TRAPS.md` opens by saying regressions
+cluster "where syntax matches Clojure but semantics don't". ETHOS says to inherit
+Clojure's surface rather than invent one, and that argument holds where the
+operation is the same operation. Here it is not, so the name joins this project's
+own family instead: `str-slice`, `str-scalar-slice`, `vec-slice`, all half-open,
+all raising, all naming what they cut.
+
+**4. Why not `splice`, which Q36 named first.** A `(splice v from to items)`
+shaped for `split-line` and `join-prev` would allocate once where the `vec-slice`
+composition allocates four times. It would also leave `take`/`drop` quadratic for
+every other caller, which is most of the prelude — `sort` partitions with them.
+The bet was that four linear copies beat one linear copy by a constant nobody
+would notice, and the measurement below is that bet settled: `RET` went 252×
+faster on a decision whose predicted win was 70×.
+
+**Cost.** Core 6,616 → 6,637 of 7,500; `prelude.xs` 195 → 201, which is *longer*
+rather than shorter because the comment explaining where clamping lives is bigger
+than the loops it replaced.
+
+Measured, release, 200 operations per sample with a per-size zero-iteration
+baseline:
+
+| buffer lines | `RET` before | `RET` after | |
+|---:|---:|---:|---|
+| 250 | 0.709 ms | 0.0106 ms | |
+| 1,000 | 7.244 ms | 0.0288 ms | **252×** |
+| 4,000 | did not finish | 0.0999 ms | |
+| 16,000 | — | 0.3796 ms | |
+
+Four times the buffer now costs 3.80× where it cost 10.2×. And `take` of half a
+vector, which is what the general case buys:
+
+| elements | `conj` loop | `vec-slice` | speedup |
+|---:|---:|---:|---:|
+| 250 | 151.8 µs | 1.56 µs | 97× |
+| 4,000 | 28,781.2 µs | 16.87 µs | 1,706× |
+| 16,000 | 436,816.9 µs | 64.32 µs | 6,792× |
+
+3.81× per 4× elements against the loop's 15.2×.
+
+**Open.** **Typing is now linear in the buffer**, which it was not when last
+measured — `insert-str` calls `assoc` on the lines vector and that is a native
+O(n) copy, invisible while the string path was quadratic and dominant. At 16,000
+lines a keystroke is 0.127 ms, which is fine, and the shape is E-11's
+copy-on-write not yet paying rather than anything this entry introduced. It is the
+third time in three entries that removing the largest cost has exposed the next
+one, and the pattern is worth more than any of the individual findings.
+
+Q6/E-11 itself stays open: `map`, `filter`, `repeat` and `join` are still `conj`
+loops, and `repeat` is quadratic enough that it cannot build the fixtures for
+these benchmarks.
+
+---
+
 ## Errata
 
 Factual corrections to entries whose **decision still stands**. A wrong reason is

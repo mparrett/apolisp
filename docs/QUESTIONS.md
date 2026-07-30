@@ -11,7 +11,7 @@ design review of 2026-07-25.
 Q3 (→ADR-025), Q4 (→ADR-028), Q7 (→ADR-029), Q9 (→ADR-029), Q10 (→ADR-037),
 Q11 (→ADR-027), Q13 (→ADR-041), Q17 (→ADR-027), Q21 (→ADR-030), Q23 (→ADR-039),
 Q24 (→ADR-038), Q25 (→ADR-038), Q26 (→ADR-041), Q6 (→ADR-041), Q27 (→ADR-042),
-Q8 (→ADR-043), Q22 (→ADR-043), Q1 (→ADR-044), Q5 (→ADR-047), Q29 (→ADR-048), Q34 (→ADR-052).*
+Q8 (→ADR-043), Q22 (→ADR-043), Q1 (→ADR-044), Q5 (→ADR-047), Q29 (→ADR-048), Q34 (→ADR-052), Q36 (→ADR-053).*
 
 ---
 
@@ -289,31 +289,6 @@ the only defect is that it is true by omission rather than by decision.
 What would force it: a program whose correctness a user would notice. The editor
 is close, since backspace is the operation, and no test asserts the wrong
 behaviour is wrong.
-
-**Q36 — Structural edits are O(buffer), and nothing tracks it.**
-*(Filed 2026-07-29 by ADR-052, which fixed the adjacent cost and not this one.)*
-
-`split-line` and `join-prev` rebuild the whole line vector with `concat`, so
-pressing `RET` is linear in the buffer and, through Q6/E-11's `conj`, superlinear
-in practice. Measured after ADR-052, release:
-
-| buffer lines | typing | `RET` |
-|---:|---:|---:|
-| 250 | 0.005 ms | 0.709 ms |
-| 1,000 | 0.011 ms | 7.244 ms |
-
-Four times the buffer costs typing 2.2× and `RET` 10.2×. ADR-052 made typing 20×
-faster and `RET` only 1.8× faster, so the *gap between them widened*: `RET` now
-costs about 660 times a character where before it was about 60. Fixing the cheap
-operation made the expensive one conspicuous, which is the honest reason this is
-being filed now rather than when it was first measured.
-
-**The shapes.** *Fix Q6/E-11* so `conj` stops copying, which fixes this and much
-else and is the largest option. *A native `splice`* for the one-in, one-out vector
-edit both functions want. *The line zipper an external review proposed*, which
-needs Q6/E-11 first to be worth anything (`notes/the-editor-program.md`).
-*Nothing* — a 1,000-line file takes 7 ms per newline, which is slow and not
-unusable, and no program in the corpus is larger.
 
 ## No milestone — decide when evidence arrives
 

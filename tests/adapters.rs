@@ -423,3 +423,80 @@ fn the_language_carries_no_dependencies() {
         mandatory.join("\n")
     );
 }
+
+/// The editor is one program split across two files: `tests/corpus/editor.xs`
+/// keeps the pure core a golden can reach, and `examples/editor-shell.xs` keeps
+/// the tty half it cannot. A file is a compilation unit and there is no `load`,
+/// so nothing makes the halves agree — and the core has moved out from under the
+/// shell four times, most sharply when ADR-052 deleted `scalars-take` outright.
+///
+/// **A compile check does not work here, and that is worth recording.** Globals
+/// resolve at call time, so a shell calling a function the core deleted compiles
+/// perfectly and faults on the line that runs it. The first version of this test
+/// compiled the join and passed with a call to the deleted `scalars-take` sitting
+/// in it — found by putting one there on purpose, not by reading it.
+///
+/// So it evaluates the join instead, minus the single `(edit ...)` call that
+/// needs a terminal, which binds every definition without touching the tty. Then
+/// it runs the shell's pure half for real.
+#[test]
+fn the_editor_shell_still_fits_the_core() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    let corpus = std::fs::read_to_string(root.join("tests/corpus/editor.xs"))
+        .expect("the corpus editor reads");
+    let shell = std::fs::read_to_string(root.join("examples/editor-shell.xs"))
+        .expect("the editor shell reads");
+
+    // `just edit` cuts at the same marker. If it moves, fail loudly rather than
+    // quietly checking the scripted half and calling that a test.
+    const MARKER: &str = "\n; --- The session";
+    let cut = corpus
+        .find(MARKER)
+        .expect("the corpus editor still marks where its script begins");
+
+    let mut s = Session::new();
+    let joined = format!("{}\n{}", &corpus[..cut], shell);
+    match s.eval(&joined) {
+        Ok(Ended::Value(_)) => {}
+        Ok(Ended::Threw(u)) => panic!(
+            "core + shell threw while defining: {}",
+            printer::print(&u.value, &s.vm.interner)
+        ),
+        Err(e) => panic!("core + shell did not evaluate: {}", e.msg),
+    }
+
+    // The shell's pure half, executed rather than merely compiled.
+    assert_eq!(
+        run(&mut s, r#"(read-chord {:key :char :char "a" :ctrl false})"#),
+        "\"a\""
+    );
+    assert_eq!(
+        run(&mut s, r#"(read-chord {:key :char :char "o" :ctrl true})"#),
+        "\"C-o\""
+    );
+    assert_eq!(run(&mut s, "(read-chord {:key :enter})"), "\"RET\"");
+    assert_eq!(run(&mut s, "(read-chord {:key :backspace})"), "\"DEL\"");
+    // A resize arrives as `{:type :other}` and has no `:key`, which is the whole
+    // of Tier 0 resize handling: it falls to the catch-all, dispatch calls it
+    // undefined, and the loop turns over and repaints at the new size.
+    assert_eq!(run(&mut s, "(read-chord {:type :other})"), "\"other\"");
+
+    // What the shell reaches into the core for. Named rather than inferred,
+    // because inferring it needs a free-variable analysis and naming it makes
+    // deleting one fail here instead of under the user's cursor.
+    for name in [
+        "new-state",
+        "dispatch",
+        "frame",
+        "scroll-to-cursor",
+        "text-rows",
+        "shows-help?",
+        "clip",
+    ] {
+        let id = apolisp::value::SymId(s.vm.interner.intern(name));
+        assert!(
+            s.vm.global(id).is_some(),
+            "the shell calls `{name}` and the core no longer defines it"
+        );
+    }
+}

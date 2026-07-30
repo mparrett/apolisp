@@ -97,6 +97,21 @@ hooks:
     git config core.hooksPath hooks
     @echo 'advisory pre-commit hook installed — it warns, it never blocks'
 
+# Run the editor on a file. The corpus keeps the pure core and `examples/` keeps
+# the shell, because one is goldenable and the other needs a tty — and a file is
+# a compilation unit with no `load`, so running it means joining them here. The
+# `(edit ...)` call is appended rather than baked into the shell, which is how a
+# program takes an argument in a language with no argv.
+#
+# Release on purpose: the debug VM is roughly ten times slower and it shows.
+edit FILE:
+    @cargo build --release --quiet
+    @mkdir -p target/examples
+    @sed '/^; --- The session/,$d' tests/corpus/editor.xs > target/examples/editor.xs
+    @cat examples/editor-shell.xs >> target/examples/editor.xs
+    @printf '\n(edit "%s")\n' '{{FILE}}' >> target/examples/editor.xs
+    @./target/release/apolisp run target/examples/editor.xs
+
 # Regenerate golden files. Deliberately not part of `test`: a golden update is
 # a behavioural change, and the review-gated rule (BUILD.md) means a human reads
 # the diff and says why. Generating is what *creates* the diff — so generate

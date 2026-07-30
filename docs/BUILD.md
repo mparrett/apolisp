@@ -123,6 +123,25 @@ a diff. This is the highest-leverage thing in the project and should exist by th
 end of week one. It is also what makes reckless optimization safe (ADR-021) and
 what keeps the system discussable once the code is real.
 
+**`examples/` — the half a golden cannot reach.** A program that needs a terminal
+cannot carry a `.out`, and leaving it out of the repository entirely is how the
+editor's shell spent four core changes going stale in a scratchpad. So the
+corpus keeps the pure half and `examples/` keeps the impure one, and the split is
+the same claim the pure/impure architecture makes rather than a filing decision.
+
+A file is a compilation unit and there is no `load`, so the two halves are joined
+by `just edit FILE`, which cuts the corpus program at its script marker, appends
+the shell, and appends the `(edit "FILE")` call — which is also how a program
+takes an argument in a language with no argv.
+
+`the_editor_shell_still_fits_the_core` keeps them honest. It **evaluates** the
+join rather than compiling it, minus the one call that needs a tty: globals here
+resolve at call time, so a shell calling something the core deleted *compiles*
+perfectly and faults only when the line runs. A compile check was written first
+and passed with a call to a function ADR-052 had deleted still sitting in it.
+Anything in `examples/` needs a check that runs, or it is a file nobody notices
+has rotted.
+
 **Rung 4 — behavior is specified.** A test suite written **in the language
 itself** wherever possible, so it survives implementation churn and doubles as a
 dogfooding pass. Keep it independent of the internals it tests.

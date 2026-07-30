@@ -72,8 +72,11 @@ a clippy error because neither check was in the one command anyone runs.
   tree untouched and the suite green — indistinguishable from a survivor, and
   the flattering reading is the wrong one. Assert the old text was there before
   writing the new (`docs/notes/milestone-9-mutants.md`).
-- **Try to break your own test.** Milestone 1's span property was dead — two of
-  three mutants passed the entire suite. Ten minutes of deliberate mutation
-  found what the property, the corpus, and a review all missed
-  (`docs/notes/milestone-1-pilot.md`).
+- **Break a new check while you are writing it, before you trust it.** Six here
+  have been green while testing the wrong thing, and every one was a *true
+  assertion applied to the wrong subject* — review reads the assertion, nothing
+  reads the subject. Three were caught at write time; the other three had been
+  believed for days. Mutate it, feed it an input unlike the others, or just print
+  what it observed — the last costs thirty seconds and catches a check looking at
+  nothing (`docs/notes/the-corpus-as-an-oracle.md`).
 - **Separate commits** for docs, for behaviour, and for formatting.

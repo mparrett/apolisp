@@ -1,4 +1,4 @@
-# The corpus as an oracle — two dead properties, found two different ways
+# The corpus as an oracle — checks that were true about the wrong thing
 
 **Not normative.** Working notes on the checking loop, not on the language.
 
@@ -6,6 +6,12 @@ Two properties that swept `corpus_files()` were green for three days while
 checking bytecode the VM never runs. This is the second time a corpus-wide
 property in this project has been dead, and the two were found by different
 means, which is the part worth recording.
+
+**Six instances now**, four of them from the session that produced this note.
+They are tabulated under *Six instances, and a third channel* below, along with
+the shape they share: every one was a correct assertion applied to the wrong
+subject, and reviewing an assertion does not read its subject. Start there if you
+are looking for the general claim rather than this particular incident.
 
 ## What happened
 
@@ -78,6 +84,72 @@ diversity, and nine programs that each pin one small feature are not diverse
 merely by being nine. The editor is 270 lines against 212 for the other nine
 combined, and it broke something on the way in.
 
+## Six instances, and a third channel
+
+*(Added 2026-07-30. The section above was written after the second instance. Four
+more arrived in the same working session, which is the reason this one exists —
+two data points are an anecdote and six are a property of how the work is done.)*
+
+| # | The check | How it was found | What it would have hidden |
+|---|---|---|---|
+| 1 | Milestone 1's span property | mutation | every origin `Unknown`, every span starting at byte 0 — two of three mutants passed the whole suite |
+| 2 | `every_instruction_has_an_origin`, `slot_operands_stay_inside_the_frame` | an unlike input | all post-expansion codegen, for every program, since milestone 5 |
+| 3 | `str-scalar-slice`'s separate `from > to` check | mutation | nothing — and that was the finding |
+| 4 | The editor's two-row pin | mutation | the `max2 1` clamp, the entire bug the fix was for |
+| 5 | `the_language_carries_no_dependencies` | asking what it observed | every dependency, if the manifest were ever reformatted |
+| 6 | The editor shell's compile check | mutation | a shell calling a core function that no longer exists |
+
+**Every one of these was a true assertion about the wrong subject.** Not one was
+a wrong assertion. #2's bounds checks were correct, applied to bytecode the VM
+never runs. #4's assertions were correct, at a height where the clamp cannot
+fire. #5's "every dependency is optional" is correct and vacuous over an empty
+list. #6 compiled exactly what it claimed to compile, and compiling is not what
+catches an unbound global in a language that resolves them at call time.
+
+A green test is a claim about a pair — the assertion, and the subject it was
+applied to. **Review reads the assertion. Nothing reads the subject.** That is
+the whole of it, and it is why all six survived being written and read by someone
+who understood them.
+
+### The third channel
+
+Instance 5 was not found by mutation or by a new input. It was found by printing
+what the parse actually saw before trusting the assertion built on it — two
+dependency lines, which is the number that makes the check mean something.
+
+That is cheaper than either other channel and it is the only one that works
+*before* a test has ever been green for the wrong reason. Mutation needs the code
+to exist and a hypothesis about how it might break; an unlike input needs the
+input. Asking a check to show its working needs a `println` and thirty seconds.
+
+- **Mutation** finds a check that asserts too little about what it sees.
+- **An unlike input** finds a check that sees too few things.
+- **Asking what it observed** finds a check that is looking at nothing at all.
+
+### A survivor does not always mean "add an assertion"
+
+Instance 3 is the one that does not fit the pattern, and it is worth keeping for
+that. `str-scalar-slice` had a `from > to` branch of its own, and removing it
+changed no behaviour any test could see — the scan reaches the same error either
+way, and ADR-039 clause 3 says the message is prose rather than contract. The
+naive reading of a survivor is "the test is too weak". Here the correct reading
+was "the code is redundant", and deleting it was the fix.
+
+Deleting it then exposed something a stronger test would not have: without the
+loop's early `break`, `s[f..t]` runs backwards and **panics**, which is a process
+abort where ADR-039 requires a throw. That is now held by an `f <= t` guard
+rather than by an argument about loop ordering. A survivor is a question about
+which of the two is wrong, and answering "the test" by reflex would have kept a
+redundant branch and missed a real one.
+
+### The cheap part is when
+
+Four of the six were caught by mutation, and none of the four took five minutes.
+Three of the six were caught in the same session the check was written — before
+the thing had ever been trusted. The habit costs least at the moment the
+assertion is written and most after it has been green for three days, which is
+exactly backwards from when it feels necessary.
+
 ## The comment that named its own trigger and did not fire
 
 The assertion carried this, from milestone 2:
@@ -124,3 +196,13 @@ different one.
 4. Milestone 1 asked whether mutation should be a standing rung rather than Q18.
    This adds a second question next to it: should *corpus growth* be scheduled,
    rather than happening when a program is written for other reasons?
+5. Six instances is enough that "kill one mutant before trusting a new check"
+   is a habit with evidence, not a preference. Does it belong in `CLAUDE.md`'s
+   habits list, which currently says *try to break your own test* on the strength
+   of one? The stronger claim the six support is narrower and more actionable:
+   **do it at the moment the check is written**, because three of the six were
+   caught that way and the other three had already been believed for days.
+6. Instance 5 was found by printing what a parse observed, which no rung covers
+   and which cost thirty seconds. Is "show the check its own working before
+   trusting it" a third habit, or just what mutation looks like when the code is
+   too young to mutate?

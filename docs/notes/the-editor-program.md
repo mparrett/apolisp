@@ -131,6 +131,25 @@ scored against a reader. Measuring the wrong operation is not a failure a more
 careful prediction would have caught — nothing in the pre-registration
 distinguished typing from splitting either.
 
+**Narrowed a second time, 2026-07-30.** After ADR-052 and ADR-053 removed the two
+quadratics, typing is not independent of the buffer either — it grows 3.72× per 4×
+lines, because `insert-str` calls `assoc` on the lines vector and that is a native
+O(n) copy. That was always true and was unmeasurable while the scalar loops
+dominated it:
+
+| buffer | typing ms/key | `RET` ms/key |
+|---:|---:|---:|
+| 250 | 0.0042 | 0.0106 |
+| 1,000 | 0.0110 | 0.0288 |
+| 16,000 | 0.1269 | 0.3796 |
+
+So the headline claim of this benchmark has now been corrected twice, both times
+by removing a cost that had been hiding the next one. **A benchmark on a system
+with one dominant quadratic measures the quadratic and nothing else**, and no
+amount of care in the original run could have found the `assoc` cost, because
+nothing could see past the scalar loops. That is the most transferable thing in
+this note and it was not any of its predictions.
+
 **4. It depends on the line, and superlinearly.** Buffer fixed at 200 lines:
 
 | line length | µs/keystroke |

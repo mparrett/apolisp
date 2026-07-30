@@ -436,6 +436,12 @@ milestone-8 property test actually suspends on is unresolved — Q7.
 
 ### ADR-018 — Strings are not sequences; text/bytes conversion is explicit
 
+*Decision stands. The grapheme third of "separate explicit operations for bytes,
+scalar values, and graphemes" is withdrawn by ADR-054; the byte and scalar
+operations exist and are unaffected. The "no promise of O(1) character indexing"
+clause is a declined guarantee and not a prohibition — see ADR-052, which had to
+say so after ADR-049 read it the other way.*
+
 *(Ported from SPEC v0.1 Part II.)*
 
 **Decision.**
@@ -3141,6 +3147,77 @@ one, and the pattern is worth more than any of the individual findings.
 Q6/E-11 itself stays open: `map`, `filter`, `repeat` and `join` are still `conj`
 loops, and `repeat` is quadratic enough that it cannot build the fixtures for
 these benchmarks.
+
+---
+
+### ADR-054 — The language does not segment graphemes, and that is a decision
+
+*(New, 2026-07-30. **Withdraws the grapheme clause of ADR-018.** Resolves Q35.
+Prompted by an external review of the editor that assumed this was already
+handled.)*
+
+**Decision.** There are no grapheme operations and there will not be. The
+**Unicode scalar value is the smallest addressable unit** in this language. A
+cluster is however many scalars it happens to be, `str-scalar-slice` will hand a
+caller half of one, and a program that needs clusters builds them itself out of
+`str-scalars`.
+
+**1. What this withdraws.** ADR-018 promised "separate explicit operations for
+bytes, scalar values, and graphemes." Two of the three exist. The third is
+withdrawn rather than left pending, because "not yet" and "no" are different
+claims and only one of them is honest after fifty-three entries in which nothing
+needed it.
+
+**2. Why, and the cost is real.** Correctness is first in the ETHOS ordering, so
+this needs a better reason than convenience, and the reason is scope. That same
+document says the project is *"not for generality, ecosystem compatibility, or
+stability"*. Grapheme segmentation is UAX #29 — a standard, a table, and a table
+that changes with each Unicode revision.
+
+The price is exact and worth naming rather than softening: **backspace over `café`
+spelled `e` + U+0301 removes the accent and leaves `cafe`.** The glyph count does
+not change, so it reads as though nothing happened. The editor in the corpus does
+this today, and now does it faster than before.
+
+**3. The dependency is the part that decides it.** `unicode-segmentation` is
+pre-approved by name in ADR-014, so this is not a question of whether the crate
+is allowed. It is that ADR-013 makes features gate *host capability and never
+language semantics*, so a segmentation crate cannot be optional — string
+operations are language semantics. It would be the first dependency the
+**language** carries.
+
+ADR-045 defended that emptiness while adding two host dependencies, and called it
+"a fact two write-ups assert… checkable — `cargo tree --no-default-features`
+shows nothing." Nothing checked it. It does now: `the_language_carries_no_dependencies`
+asserts every manifest dependency is optional, because an argument resting on an
+unasserted fact is precisely what `notes/the-corpus-as-an-oracle.md` is about.
+The invariant this entry spends is one this entry also makes real.
+
+**4. What replaces the operation.** The trap is in `TRAPS.md`, and the behaviour
+is now pinned by assertions in `tests/lang/strings.xs` that exist to fail if
+somebody adds segmentation without an entry. A refusal nothing tests is
+indistinguishable from an omission, which is the state Q35 was filed to end.
+
+**Rejected.** *Adding `unicode-segmentation`*, whose case is genuinely good: the
+crate is pre-approved, ADR-018 promised the operation, and a user typing an
+accented character into the editor sees text quietly corrupted. It loses to the
+zero-dependency language on scope, and the entry would rather record that trade
+than pretend it was one-sided.
+
+*A hand-rolled partial.* ZWJ sequences, variation selectors and regional
+indicators are table-free ranges and could be clustered in a few lines. Combining
+marks cannot: Rust's standard library exposes no general-category data. The result
+would fix emoji and leave accents broken while looking like a grapheme surface —
+fuzzy Unicode, which is the exact shape `TRAPS.md` exists to catch. Worse than
+nothing, because nothing is honest.
+
+**Cost.** No lines. One promise withdrawn, one invariant asserted for the first
+time, and a known-wrong backspace that is now known-wrong on purpose.
+
+**Open.** Reversible, and cheaply: ADR-014's pre-approval stands, the surface
+would be three functions mirroring the scalar family, and the trigger is a
+program whose correctness a user would actually notice. The editor is close and
+is not that program.
 
 ---
 

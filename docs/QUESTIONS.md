@@ -11,7 +11,8 @@ design review of 2026-07-25.
 Q3 (→ADR-025), Q4 (→ADR-028), Q7 (→ADR-029), Q9 (→ADR-029), Q10 (→ADR-037),
 Q11 (→ADR-027), Q13 (→ADR-041), Q17 (→ADR-027), Q21 (→ADR-030), Q23 (→ADR-039),
 Q24 (→ADR-038), Q25 (→ADR-038), Q26 (→ADR-041), Q6 (→ADR-041), Q27 (→ADR-042),
-Q8 (→ADR-043), Q22 (→ADR-043), Q1 (→ADR-044), Q5 (→ADR-047), Q29 (→ADR-048), Q34 (→ADR-052), Q36 (→ADR-053).*
+Q8 (→ADR-043), Q22 (→ADR-043), Q1 (→ADR-044), Q5 (→ADR-047), Q29 (→ADR-048),
+Q34 (→ADR-052), Q36 (→ADR-053), Q35 (→ADR-054, which resolves it as a refusal).*
 
 ---
 
@@ -266,29 +267,6 @@ Adjacent, and worth settling in the same breath: **a program has no argv and no
 environment.** `main.rs` takes a command and a path. The pager pages its own
 source because that is the only file it can name, and every terminal program
 takes an argument.
-
-**Q35 — Segmentation: is a grapheme a thing this language can talk about?**
-*(Filed 2026-07-29 by ADR-052, which made the scalar path fast without making it
-correct. Recorded as a trap in `TRAPS.md`.)*
-
-ADR-018 promised "separate explicit operations for bytes, scalar values, and
-graphemes" and the third has never existed. So `str-scalar-slice` cuts between
-scalars, and a scalar is not what a person calls a character: backspace over
-`café` spelled `e` + U+0301 removes the accent and leaves the glyph count
-unchanged, and one `DEL` on a ZWJ family emoji turns one glyph into two. The
-editor does both today, now faster than before.
-
-**The shapes.** *A dependency* — `unicode-segmentation` is the obvious one, and
-ADR-014 fixes the dependency set, so this is an ADR either way. *A table* built
-into the core, which is the largest thing this project would ever have carried
-and grows with each Unicode revision. *Nothing, stated deliberately* — the
-language declines to segment, `TRAPS.md` carries the warning, and any program that
-cares does its own clustering. That third option is currently what is true, and
-the only defect is that it is true by omission rather than by decision.
-
-What would force it: a program whose correctness a user would notice. The editor
-is close, since backspace is the operation, and no test asserts the wrong
-behaviour is wrong.
 
 ## No milestone — decide when evidence arrives
 

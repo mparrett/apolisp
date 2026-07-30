@@ -170,12 +170,24 @@ happens. And `left` from the end of the family lands at scalar 4 of 5 — inside
 the cluster, a cursor column that renders nowhere.
 
 Nothing in the language is wrong here; scalars are the right primitive and the
-missing layer is segmentation, which would be a dependency (ADR-014) or a table.
-The trap is the *inference*: "we hold scalars, therefore Unicode is handled" is
-false, and it is the kind of false that a reviewer, an author, and a golden all
-accepted at once. Also note the interaction with Q34 — a scalar-indexed slice
-fixes the speed of the character-level path without making any of the above
-correct, so the two are independent and neither implies the other.
+missing layer is segmentation. The trap is the *inference*: "we hold scalars,
+therefore Unicode is handled" is false, and it is the kind of false that a
+reviewer, an author, and a golden all accepted at once.
+
+**Settled by ADR-054: the language does not segment, and will not.** So this
+entry is permanent rather than a placeholder — the scalar is the smallest
+addressable unit, `str-scalar-slice` will hand you half a character, and any
+program that needs clusters builds them from `str-scalars`. The behaviour above
+is pinned by assertions in `tests/lang/strings.xs` that exist to fail if somebody
+adds segmentation without an entry.
+
+The accent case is the one to remember, because it is the quiet one: deleting a
+combining mark leaves a readable word with the same glyph count, so it looks like
+the keystroke did nothing. The emoji case at least looks broken.
+
+Note also that ADR-052's `str-scalar-slice` fixed the *speed* of the
+character-level path without making any of this correct. The two are independent
+and neither implies the other, which is most of why the inference is tempting.
 
 **Removing the maximum with `filter` drops duplicates.** The obvious selection
 sort — take the largest, `filter` it out, repeat — removes *every* element equal

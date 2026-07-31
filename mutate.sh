@@ -87,9 +87,27 @@ PY
     return 0
   fi
 
+  # A mutant can hang rather than fail — `notes/milestone-8-mutants.md` has one
+  # that stops decrementing fuel, and it terminated only because a step counter
+  # happened to carry a guard. Bounded here rather than left to luck; a timeout
+  # is reported as its own outcome, because "it never finished" is not "the check
+  # caught it".
   local out rc=0
-  out="$(cargo test --quiet $check 2>&1)" || rc=$?
+  out="$(perl -e '
+    my $pid = fork();
+    if ($pid == 0) { exec @ARGV or exit 127 }
+    local $SIG{ALRM} = sub { kill 9, $pid; waitpid $pid, 0; exit 124 };
+    alarm 120;
+    waitpid $pid, 0;
+    exit $? >> 8;
+  ' -- sh -c "cargo test --quiet $check 2>&1")" || rc=$?
   restore
+
+  if [ "$rc" -eq 124 ]; then
+    echo "!! PROVES NOTHING — the mutant did not finish inside 120s"
+    dead+=("$desc — timed out")
+    return 0
+  fi
 
   # `error[E0xxx]` and "could not compile" are rustc; `error: test failed` is
   # cargo reporting the outcome this script *wants*. Matching `^error:` treated
@@ -312,6 +330,85 @@ mutation src/lib.rs \
   'let _p = ex.pending.pop().expect("just checked");' \
   "$VM" \
   'a displaced parked unwind is merged into the one that displaced it (ADR-028 invariant 3)'
+
+# --- The snapshot (milestone 8) ---------------------------------------------
+#
+# `notes/milestone-8-mutants.md` ran all ten and predicted all ten, including
+# four survivors. Every one of those four was the same kind: a field the encoder
+# handles correctly that no program in the snapshot corpus ever populated. The
+# strongest property in the project — cutting at every instruction boundary, over
+# nine programs, in two forms — caught none of them, because a property only sees
+# the state its inputs create.
+#
+# All four were closed by adding programs rather than by changing the encoder, so
+# all ten should die here. Any survivor is that corpus having lost a program.
+
+SNAP='--test snapshot'
+
+mutation src/lib.rs \
+  'out: vm.out.clone(),' \
+  'out: Default::default(),' \
+  "$SNAP" \
+  'capture keeps the output buffer, which is what the transcript compares'
+
+mutation src/lib.rs \
+  'gensym: vm.gensym,' \
+  'gensym: 0,' \
+  "$SNAP" \
+  'capture keeps the gensym counter, so a resume cannot reissue a name it handed out'
+
+mutation src/lib.rs \
+  'if img.fingerprint != fingerprint(chunk) {' \
+  'if false {' \
+  "$SNAP" \
+  'restore checks the fingerprint, which is what makes code identity a check'
+
+mutation src/lib.rs \
+  'self.seen.insert(addr, id);' \
+  '' \
+  "$SNAP" \
+  'the encoder shares repeated objects rather than copying them (ADR-043 part 2)'
+
+mutation src/lib.rs \
+  '        let pending = ex
+            .pending
+            .iter()' \
+  '        let pending = ex
+            .pending
+            .iter()
+            .take(0)' \
+  "$SNAP" \
+  'capture keeps the parked unwinds, so a cut mid-cleanup resumes into it'
+
+mutation src/lib.rs \
+  'free_handles: vm.free_handles.clone(),' \
+  'free_handles: Vec::new(),' \
+  "$SNAP" \
+  'capture keeps the free list, so a reopened handle does not reuse a live id'
+
+mutation src/lib.rs \
+  'handle_generations: vm.handles.iter().map(|h| h.generation).collect(),' \
+  'handle_generations: Vec::new(),' \
+  "$SNAP" \
+  'capture keeps the handle generations, so a reused slot hands out a different id'
+
+mutation src/lib.rs \
+  'vm.interner = Interner::restore(img.names.clone());' \
+  '' \
+  "$SNAP" \
+  'restore rebuilds the interner rather than starting a fresh one'
+
+mutation src/lib.rs \
+  'Value::Float(f) => Ref::Float(f.to_bits()),' \
+  'Value::Float(f) => Ref::Float((f + 0.0).to_bits()),' \
+  "$SNAP" \
+  'the encoder keeps a float bit for bit, so -0.0 survives (ADR-032)'
+
+mutation src/lib.rs \
+  'ex.fuel -= 1;' \
+  '' \
+  "$SNAP" \
+  'fuel decrements, without which a fuelled run never suspends'
 
 echo
 echo "=== $flipped of $total flipped, $survived_ok survived as declared"

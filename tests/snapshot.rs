@@ -125,6 +125,17 @@ const PROGRAMS: &[(&str, &str)] = &[
         "a parked unwind mid-cleanup",
         "(try (try (throw :original) (finally (println :running) (throw :from-cleanup))) (catch e e))",
     ),
+    // The same shape with nothing catching, which is what makes the parked
+    // record *observable*. Above, the catch binds the value alone and drops the
+    // suppressed chain (ADR-039 clause 4), so an encoder that discarded
+    // `pending` entirely round-tripped it perfectly — the parked error never
+    // reached the transcript either way. Found by `just mutate` (ADR-055), and
+    // it is milestone 4's hole in a second place: two nested `finally`s and no
+    // `catch` is the smallest program where a parked unwind can be seen at all.
+    (
+        "a parked unwind that reaches the transcript",
+        "(try (try (throw :original) (finally (throw :from-cleanup))) (finally (println :outer)))",
+    ),
     (
         "collections, strings, and shared structure",
         "(def a [1 2 3]) (def b [a a]) (def c {:k b :j b}) (println (count c) (str \"x\" \"y\")) c",

@@ -481,6 +481,34 @@ fn the_editor_shell_still_fits_the_core() {
     // undefined, and the loop turns over and repaints at the new size.
     assert_eq!(run(&mut s, "(read-chord {:type :other})"), "\"other\"");
 
+    // The one piece of arithmetic in the shell, and the worst thing it could get
+    // wrong: a cursor painted at a column the terminal clamps means typing lands
+    // somewhere you cannot see. `paint` writes to a handle, so it paints to a
+    // file here and the escape it emits is checked directly — the only part of
+    // the tty half a test can reach without a tty.
+    #[cfg(feature = "fs")]
+    {
+        let out = std::env::temp_dir().join("apolisp-paint-cursor.txt");
+        let out = out.to_string_lossy().replace('\\', "/");
+        run(
+            &mut s,
+            &format!(
+                r#"(def st (assoc (new-state "d.txt" ["0123456789abcdefghijklmnopqrstuvwxyz"])
+                                  :cursor-row 0 :cursor-col 20))
+                   (with-open [f (io/open "{out}" :write)] (paint f st 12 4))"#
+            ),
+        );
+        let painted = std::fs::read_to_string(&out).expect("paint wrote the frame");
+        // scroll-col lands at 9 for a cursor at 20 in a 12-wide window, so the
+        // cursor belongs at screen column 11 -> ANSI is 1-indexed -> 12.
+        assert!(
+            painted.ends_with("\u{1b}[1;12H"),
+            "cursor escape wrong; frame ended with {:?}",
+            &painted[painted.len().saturating_sub(12)..]
+        );
+        let _ = std::fs::remove_file(&out);
+    }
+
     // What the shell reaches into the core for. Named rather than inferred,
     // because inferring it needs a free-variable analysis and naming it makes
     // deleting one fail here instead of under the user's cursor.

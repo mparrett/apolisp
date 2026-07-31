@@ -37,6 +37,12 @@ C-o >
 demo>
 widths [5 5 1 5 5 5] (each must be 5 or less)
 clip 1 [>]  clip 0 []
+--- horizontal scroll, 36 chars through a 12-column window
+col 0  scroll 0  screen 0  on-screen  [0123456789a>]
+col 11  scroll 0  screen 11  on-screen  [0123456789a>]
+col 12  scroll 1  screen 11  on-screen  [<23456789ab>]
+col 20  scroll 9  screen 11  on-screen  [<abcdefghij>]
+col 36  scroll 25  screen 11  on-screen  [<qrstuvwxyz]
 --- value
 nil
 --- exit

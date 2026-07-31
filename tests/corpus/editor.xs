@@ -58,6 +58,9 @@
    ; `restates-goal`.
    :goal-col 0
    :scroll-row 0
+   ; The leftmost visible column. Without it a cursor past the right edge is
+   ; painted at a column the terminal clamps, so you type where you cannot look.
+   :scroll-col 0
    :filename filename
    :modified? false
    :message nil
@@ -293,14 +296,38 @@
 (defn help-line [state cols]
   (clip cols "C-o save  C-x C-c quit  C-g hide"))
 
-(defn scroll-to-cursor [state rows]
-  (let [row (get state :cursor-row)
-        top (get state :scroll-row)
-        avail (text-rows state rows)]
-    (cond
-      (< row top) (assoc state :scroll-row row)
-      (>= row (+ top avail)) (assoc state :scroll-row (inc (- row avail)))
-      true state)))
+; One axis, as a function, so the two axes cannot drift apart the way
+; `scroll-to-cursor` and `frame` did over the row height.
+(defn scroll-axis [pos start avail]
+  (cond
+    (< pos start) pos
+    (>= pos (+ start avail)) (inc (- pos avail))
+    true start))
+
+; Both axes, in one place. `frame` and `paint` each call this once and then agree
+; by construction — the alternative is two functions deciding what is visible,
+; which is the bug this file has now produced twice.
+(defn scroll-to-cursor [state cols rows]
+  (assoc state
+         :scroll-row (scroll-axis (get state :cursor-row)
+                                  (get state :scroll-row)
+                                  (text-rows state rows))
+         :scroll-col (scroll-axis (get state :cursor-col)
+                                  (get state :scroll-col)
+                                  (max2 1 cols))))
+
+; A line as seen through the horizontal window: `left` scalars skipped, `w` wide.
+;
+; The `<` overwrites the first visible column rather than shifting the text right
+; by one. That keeps the screen column of the cursor exactly
+; `cursor-col - scroll-col`, and an off-by-one there is a cursor that lies about
+; where typing will land — the worst failure this program can have.
+(defn window [left w s]
+  (let [n (str-scalar-len s)
+        vis (clip w (str-scalar-slice s (min2 left n) n))]
+    (if (or (= left 0) (< (str-scalar-len vis) 1))
+      vis
+      (str "<" (str-scalar-slice vis 1 (str-scalar-len vis))))))
 
 (defn status-line [state cols]
   (let [name (if (= (get state :filename) nil) "*scratch*" (get state :filename))
@@ -325,11 +352,12 @@
   (concat xs (repeat (max2 0 (- n (count xs))) "")))
 
 (defn frame [state cols rows]
-  (let [state (scroll-to-cursor state rows)
+  (let [state (scroll-to-cursor state cols rows)
         top (get state :scroll-row)
+        left (get state :scroll-col)
         avail (text-rows state rows)
         page (pad-rows avail (take avail (drop top (get state :lines))))
-        body (join "\n" (map (fn [l] (clip cols l)) page))
+        body (join "\n" (map (fn [l] (window left cols l)) page))
         foot (if (shows-help? state rows)
                (str (help-line state cols) "\n" (status-line state cols))
                (status-line state cols))]
@@ -381,7 +409,7 @@
 ; is the failure the corpus note is about, found here by mutating on purpose.
 ; One row is where `(dec 1)` reaches zero and the invariant used to break.
 (defn geometry [rows]
-  (let [sq (scroll-to-cursor final rows)]
+  (let [sq (scroll-to-cursor final 32 rows)]
     (println (str "rows " rows
                   "  text-rows " (text-rows final rows)
                   "  help " (shows-help? final rows)
@@ -415,12 +443,45 @@
 ; frame above is long enough to clip, so the marker is invisible to the oracle
 ; that exists to catch it. The hint and status lines are marked too, which is
 ; the decision worth pinning rather than the mechanism.
+; Cursor forced home so the horizontal scroll stays out of it: with the cursor at
+; column 6 this frame scrolls right instead, and the `>` markers this block
+; exists to pin disappear. Two behaviours in one assertion is one assertion that
+; pins neither.
+(def home (assoc final :cursor-col 0 :goal-col 0 :scroll-col 0))
 (println "--- frame at 5 columns")
-(println (frame final 5 6))
-(println (str "widths " (str (map (fn [l] (str-scalar-len l)) (split "\n" (frame final 5 6))))
+(println (frame home 5 6))
+(println (str "widths " (str (map (fn [l] (str-scalar-len l)) (split "\n" (frame home 5 6))))
               " (each must be 5 or less)"))
 
 ; The degenerate widths, which no terminal produces and `paint` would die on if
 ; `clip` threw. A zero column is the one that can: `str-scalar-slice` refuses a
 ; negative bound, so without the guard this is a fault inside the render loop.
 (println (str "clip 1 [" (clip 1 "abcdef") "]  clip 0 [" (clip 0 "abcdef") "]"))
+
+; --- Horizontal scrolling ----------------------------------------------------
+;
+; A 36-character line in a 12-column window. The invariant is the last field:
+; the screen column must always land inside 0..11, because `paint` positions the
+; cursor there and a cursor outside the window is one the terminal clamps — you
+; would be typing at a column you cannot see. That is the failure this exists to
+; prevent, and it is why the number is printed rather than the frame alone.
+;
+; `<` and `>` show which directions hold more text. When the cursor sits at the
+; right edge with text beyond it, it lands *on* the `>` — the marker overwrites
+; a column rather than shifting the text, which is what keeps the screen column
+; equal to `cursor-col - scroll-col` with no correction term.
+(def wide-line "0123456789abcdefghijklmnopqrstuvwxyz")
+(def wide-state (new-state "d.txt" [wide-line "short"]))
+(defn at-col [col]
+  (let [st (scroll-to-cursor (assoc wide-state :cursor-col col) 12 4)
+        left (get st :scroll-col)
+        screen (- col left)]
+    (println (str "col " col "  scroll " left "  screen " screen
+                  (if (and (>= screen 0) (< screen 12)) "  on-screen" "  OFF-SCREEN")
+                  "  [" (window left 12 wide-line) "]"))))
+(println "--- horizontal scroll, 36 chars through a 12-column window")
+(at-col 0)
+(at-col 11)
+(at-col 12)
+(at-col 20)
+(at-col 36)

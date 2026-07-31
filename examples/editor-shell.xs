@@ -55,11 +55,14 @@
                :message (str "wrote " (get state :filename))))
 
 (defn paint [tty state cols rows]
-  (let [shown (scroll-to-cursor state rows)]
+  (let [shown (scroll-to-cursor state cols rows)]
     (io/write tty (str clear-home
                        (join "\r\n" (split "\n" (frame shown cols rows)))
+                       ; Both axes offset by the same scroll the frame used, which
+                       ; is why `scroll-to-cursor` normalizes both and is called
+                       ; once here rather than per axis.
                        (move-to (- (get shown :cursor-row) (get shown :scroll-row))
-                                (get shown :cursor-col))))))
+                                (- (get shown :cursor-col) (get shown :scroll-col)))))))
 
 (defn edit [path]
   (let [lines (read-lines path)]

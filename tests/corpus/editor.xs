@@ -244,7 +244,27 @@
 ; sequence is emitted from here — a golden that contained cursor positioning
 ; would pin the terminal protocol rather than the editor.
 
-(defn clip [w s] (if (<= (str-scalar-len s) w) s (str-scalar-slice s 0 w)))
+; A clipped line ends in `>`, so text running past the right edge is visible
+; rather than silently absent. Without it a narrow window and a short file look
+; identical, which is how someone testing a resize concluded the editor was not
+; repainting when it was.
+;
+; It marks the status and hint lines too, not just the buffer, because the claim
+; is the same in all three places: there is more here than fits.
+;
+; What it does *not* do is make the text reachable. The cursor may still sit past
+; the right edge — `paint` positions it in the editor's coordinates and the
+; terminal clamps — so a long line remains hard to edit. That wants horizontal
+; scrolling or soft wrap, and this is deliberately neither.
+;
+; `w` of 1 yields just the marker; `w` of 0 yields nothing, because
+; `str-scalar-slice` refuses a negative bound and a zero-width column is not
+; worth a special case beyond not crashing.
+(defn clip [w s]
+  (cond
+    (<= (str-scalar-len s) w) s
+    (< w 1) ""
+    true (str (str-scalar-slice s 0 (dec w)) ">")))
 
 ; Whether the hint is actually painted. Asked here rather than read off `:help?`
 ; at each site, for the reason `text-rows` exists: `text-rows` reserves two rows
@@ -385,3 +405,22 @@
 (println "--- frame at 10 rows, buffer of 4")
 (println (frame final 32 10))
 (println (str "frame lines " (count (split "\n" (frame final 32 10))) " for 10 rows"))
+
+; --- The frame at a width that cuts ------------------------------------------
+;
+; Five columns, chosen so the frame shows all three cases at once: "hello" is
+; exactly five and must NOT be marked (the `<=` boundary), "longer" and "!world"
+; are over and must be, and "z" is short and untouched. Pinned
+; separately for the same reason as the tall frame: nothing in the 32-column
+; frame above is long enough to clip, so the marker is invisible to the oracle
+; that exists to catch it. The hint and status lines are marked too, which is
+; the decision worth pinning rather than the mechanism.
+(println "--- frame at 5 columns")
+(println (frame final 5 6))
+(println (str "widths " (str (map (fn [l] (str-scalar-len l)) (split "\n" (frame final 5 6))))
+              " (each must be 5 or less)"))
+
+; The degenerate widths, which no terminal produces and `paint` would die on if
+; `clip` threw. A zero column is the one that can: `str-scalar-slice` refuses a
+; negative bound, so without the guard this is a fault inside the render loop.
+(println (str "clip 1 [" (clip 1 "abcdef") "]  clip 0 [" (clip 0 "abcdef") "]"))

@@ -28,6 +28,15 @@ longer
 C-o save  C-x C-c quit  C-g hide
 demo.txt * 2:7
 frame lines 10 for 10 rows
+--- frame at 5 columns
+hello
+!wor>
+z
+long>
+C-o >
+demo>
+widths [5 5 1 5 5 5] (each must be 5 or less)
+clip 1 [>]  clip 0 []
 --- value
 nil
 --- exit

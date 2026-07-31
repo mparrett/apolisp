@@ -61,8 +61,11 @@
                        ; Both axes offset by the same scroll the frame used, which
                        ; is why `scroll-to-cursor` normalizes both and is called
                        ; once here rather than per axis.
-                       (move-to (- (get shown :cursor-row) (get shown :scroll-row))
-                                (- (get shown :cursor-col) (get shown :scroll-col)))))))
+                       ; Both offsets come from `cursor-screen`, which is the same
+                       ; function the frame's geometry is built on — so the cursor
+                       ; cannot disagree with the text about where it is.
+                       (let [at (cursor-screen shown (max2 1 cols))]
+                         (move-to (nth at 0) (nth at 1)))))))
 
 (defn edit [path]
   (let [lines (read-lines path)]
@@ -84,7 +87,7 @@
           ; by making a genuinely unknown key silent too.
           (let [size (term/size)]
             (paint tty state (nth size 0) (nth size 1)))
-          (let [next (dispatch state (read-chord (term/read-key nil)))
+          (let [next (dispatch state (nth (term/size) 0) (read-chord (term/read-key nil)))
                 next (if (get next :save-requested?) (save! next) next)]
             (if (get next :quit?) nil (recur next))))
         (finally

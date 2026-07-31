@@ -43,6 +43,30 @@ col 11  scroll 0  screen 11  on-screen  [0123456789a>]
 col 12  scroll 1  screen 11  on-screen  [<23456789ab>]
 col 20  scroll 9  screen 11  on-screen  [<abcdefghij>]
 col 36  scroll 25  screen 11  on-screen  [<qrstuvwxyz]
+--- wrapped frame, 12 columns
+0123456789ab
+cdefghijklmn
+opqrstuvwxyz
+
+tail
+
+C-o save  C>
+d.txt 1:1
+--- wrapped cursor
+col 0  screen-row 0  screen-col 0  on-screen
+col 11  screen-row 0  screen-col 11  on-screen
+col 12  screen-row 1  screen-col 0  on-screen
+col 25  screen-row 2  screen-col 1  on-screen
+col 36  screen-row 3  screen-col 0  on-screen
+--- wrapped down/up move screen rows, not buffer rows
+start          row 0  col 25
+after down     row 0  col 36
+after down     row 1  col 1
+after down     row 1  col 1
+onto line 2    row 1  col 1
+back up        row 0  col 36
+unwrapped      row 0  col 3
+after down     row 1  col 3
 --- value
 nil
 --- exit

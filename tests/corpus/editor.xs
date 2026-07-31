@@ -58,9 +58,16 @@
    ; `restates-goal`.
    :goal-col 0
    :scroll-row 0
-   ; The leftmost visible column. Without it a cursor past the right edge is
-   ; painted at a column the terminal clamps, so you type where you cannot look.
+   ; The leftmost visible column. Only meaningful with wrap off — wrapped text
+   ; has no horizontal overflow, so `scroll-to-cursor` forces this to 0 there.
    :scroll-col 0
+   ; Which screen row *within* `:scroll-row` the viewport starts at. A wrapped
+   ; line is several screen rows, so a buffer row alone cannot say where the top
+   ; of the window is.
+   :scroll-sub 0
+   ; Soft wrap, on by default. Off gives the clip-and-scroll-horizontally
+   ; geometry, which is what you want for data files and long code lines.
+   :wrap? true
    :filename filename
    :modified? false
    :message nil
@@ -153,15 +160,53 @@
       (< row (dec (line-count state))) (assoc state :cursor-row (inc row) :cursor-col 0)
       true state)))
 
-(defn move-up [state]
-  (if (> (get state :cursor-row) 0)
-    (move-vert state (dec (get state :cursor-row)))
-    state))
+; With wrap on, `up` and `down` move one *screen* row, which inside a long line
+; means one window-width along it. Moving a buffer line instead would leap over
+; every continuation row, which is what makes an editor feel broken with wrap on.
+;
+; `:goal-col` is therefore a *screen* column here, not a buffer column — see
+; `restate-goal`. The two readings never mix, because every horizontal action
+; restates it in whichever one is current.
+(defn wrapped-down [state w]
+  (let [row (get state :cursor-row)
+        line (current-line state)
+        sub (quot (get state :cursor-col) w)
+        goal (get state :goal-col)]
+    (cond
+      (< (inc sub) (wrap-height w line))
+      (assoc state :cursor-col (min2 (str-scalar-len line) (+ (* (inc sub) w) goal)))
+      (< (inc row) (line-count state))
+      (let [nl (line-at state (inc row))]
+        (assoc state :cursor-row (inc row) :cursor-col (min2 (str-scalar-len nl) goal)))
+      true state)))
 
-(defn move-down [state]
-  (if (< (get state :cursor-row) (dec (line-count state)))
-    (move-vert state (inc (get state :cursor-row)))
-    state))
+(defn wrapped-up [state w]
+  (let [row (get state :cursor-row)
+        line (current-line state)
+        sub (quot (get state :cursor-col) w)
+        goal (get state :goal-col)]
+    (cond
+      (> sub 0)
+      (assoc state :cursor-col (min2 (str-scalar-len line) (+ (* (dec sub) w) goal)))
+      (> row 0)
+      (let [pl (line-at state (dec row))
+            start (* (dec (wrap-height w pl)) w)]
+        (assoc state :cursor-row (dec row) :cursor-col (min2 (str-scalar-len pl) (+ start goal))))
+      true state)))
+
+(defn move-up [state w]
+  (if (get state :wrap?)
+    (wrapped-up state w)
+    (if (> (get state :cursor-row) 0)
+      (move-vert state (dec (get state :cursor-row)))
+      state)))
+
+(defn move-down [state w]
+  (if (get state :wrap?)
+    (wrapped-down state w)
+    (if (< (get state :cursor-row) (dec (line-count state)))
+      (move-vert state (inc (get state :cursor-row)))
+      state)))
 
 (defn line-start [state] (assoc state :cursor-col 0))
 (defn line-end [state] (assoc state :cursor-col (line-len state (get state :cursor-row))))
@@ -185,6 +230,7 @@
    "C-a" [:command :line-start]  "C-e" [:command :line-end]
    "RET" [:command :newline]     "DEL" [:command :delete-back]
    "C-o" [:command :save]      "C-g" [:command :toggle-help]
+   "C-w" [:command :toggle-wrap]
    "C-x" [:prefix {"C-c" [:command :quit] "C-s" [:command :save]}]})
 
 ; Which commands restate the goal column. Vertical motion preserves it — that is
@@ -199,34 +245,44 @@
    :line-start true :line-end true
    :newline true    :delete-back true})
 
-(defn restate-goal [state] (assoc state :goal-col (get state :cursor-col)))
+(defn restate-goal [state w]
+  (assoc state :goal-col
+         (if (get state :wrap?) (rem (get state :cursor-col) w) (get state :cursor-col))))
 
-(defn apply-command [state c]
+(defn apply-command [state w c]
   (cond
     (= c :move-left) (move-left state)
     (= c :move-right) (move-right state)
-    (= c :move-up) (move-up state)
-    (= c :move-down) (move-down state)
+    (= c :move-up) (move-up state w)
+    (= c :move-down) (move-down state w)
     (= c :line-start) (line-start state)
     (= c :line-end) (line-end state)
     (= c :newline) (split-line state)
     (= c :delete-back) (delete-back state)
     (= c :quit) (assoc state :quit? true)
     (= c :toggle-help) (assoc state :help? (not (get state :help?)))
+    ; Both scrolls reset: the pair-scroll means nothing with wrap off and the
+    ; horizontal scroll means nothing with it on, so neither survives the switch.
+    (= c :toggle-wrap) (assoc state :wrap? (not (get state :wrap?))
+                              :scroll-col 0 :scroll-sub 0)
     ; `save` is the one command that is not pure, so it does not happen here:
     ; the shell performs it and the core only records the request. That split is
     ; what keeps this whole file testable.
     (= c :save) (assoc state :save-requested? true)
     true (assoc state :message (str "no command " c))))
 
-(defn run-command [state c]
-  (let [next (apply-command state c)]
-    (if (get restates-goal c) (restate-goal next) next)))
+(defn run-command [state w c]
+  (let [next (apply-command state w c)]
+    (if (get restates-goal c) (restate-goal next w) next)))
 
 ; A chord is printable when it is exactly one character and not a named key.
 (defn printable? [chord] (= (str-scalar-len chord) 1))
 
-(defn dispatch [state chord]
+; `dispatch` takes the window width because vertical movement depends on it once
+; lines wrap. Threading it is deliberate over keeping a `:cols` in the state: a
+; movement that silently depended on the last render having happened would be a
+; worse thing to debug than a longer signature.
+(defn dispatch [state w chord]
   (let [pending (get state :pending)
         table (if (= pending nil) global-keymap pending)
         hit (get table chord)
@@ -236,10 +292,10 @@
       ; Typing is a horizontal intent like any other, and it does not go through
       ; `run-command`, so it restates the goal here.
       (if (and (= pending nil) (printable? chord))
-        (restate-goal (insert-str state chord))
+        (restate-goal (insert-str state chord) w)
         (assoc state :message (str chord " is undefined")))
       (= (nth hit 0) :prefix) (assoc state :pending (nth hit 1))
-      true (run-command state (nth hit 1)))))
+      true (run-command state w (nth hit 1)))))
 
 ; --- Render: pure state x cols x rows -> string -------------------------------
 ;
@@ -296,6 +352,58 @@
 (defn help-line [state cols]
   (clip cols "C-o save  C-x C-c quit  C-g hide"))
 
+; --- Soft wrap ---------------------------------------------------------------
+;
+; A buffer line becomes one or more *screen* rows. Everything below measures in
+; screen rows, because that is what the window is made of; the buffer row is no
+; longer a unit the geometry can use.
+
+; One more row than the text strictly needs when the length is an exact multiple
+; of the width, because the cursor can sit *after* the last character and that
+; position has to exist somewhere. A 12-character line in a 12-column window is
+; two screen rows, the second empty — which is what nano does and why.
+;
+; Without it, a cursor at the end of such a line reports a screen row belonging
+; to the *next* buffer line, and `paint` draws it there. The frame would look
+; right and the cursor would lie.
+(defn wrap-height [w s]
+  (inc (quot (str-scalar-len s) w)))
+
+(defn wrap-seg [w s i]
+  (let [n (str-scalar-len s)
+        from (min2 (* i w) n)
+        to (min2 (+ from w) n)]
+    (str-scalar-slice s from to)))
+
+; One buffer row's height in screen rows: its wrapped height, or 1 with wrap off.
+; Rows past the end answer 1 so the viewport can run off the bottom of the file.
+(defn line-height [state w row]
+  (if (>= row (line-count state))
+    1
+    (if (get state :wrap?) (wrap-height w (line-at state row)) 1)))
+
+; Screen rows from one (row, sub) position to another. The walk is bounded by the
+; distance between them, not the file, which is why the scroll is stored as a
+; pair rather than an absolute screen row.
+(defn screen-offset [state w srow ssub crow csub]
+  (if (= srow crow)
+    (- csub ssub)
+    (loop [r (inc srow) acc (- (line-height state w srow) ssub)]
+      (if (>= r crow)
+        (+ acc csub)
+        (recur (inc r) (+ acc (line-height state w r)))))))
+
+; Move a (row, sub) position forward by k screen rows, stopping at the last one.
+(defn screen-advance [state w row sub k]
+  (loop [r row s sub n k]
+    (if (< n 1)
+      [r s]
+      (let [h (line-height state w r)]
+        (cond
+          (< (inc s) h) (recur r (inc s) (dec n))
+          (< (inc r) (line-count state)) (recur (inc r) 0 (dec n))
+          true [r s])))))
+
 ; One axis, as a function, so the two axes cannot drift apart the way
 ; `scroll-to-cursor` and `frame` did over the row height.
 (defn scroll-axis [pos start avail]
@@ -304,17 +412,61 @@
     (>= pos (+ start avail)) (inc (- pos avail))
     true start))
 
-; Both axes, in one place. `frame` and `paint` each call this once and then agree
-; by construction — the alternative is two functions deciding what is visible,
-; which is the bug this file has now produced twice.
+; Everything visible, decided in one place. `frame` and `paint` each call this
+; once and then agree by construction — the alternative is two functions deciding
+; what is on screen, which is the bug this file has now produced three times.
+;
+; Wrap off is two independent axes and the pair-scroll is unused. Wrap on is a
+; single axis measured in screen rows, and horizontal scrolling does not exist
+; because wrapped text has no horizontal overflow.
 (defn scroll-to-cursor [state cols rows]
-  (assoc state
-         :scroll-row (scroll-axis (get state :cursor-row)
-                                  (get state :scroll-row)
-                                  (text-rows state rows))
-         :scroll-col (scroll-axis (get state :cursor-col)
-                                  (get state :scroll-col)
-                                  (max2 1 cols))))
+  (let [w (max2 1 cols)
+        avail (text-rows state rows)]
+    (if (not (get state :wrap?))
+      (assoc state
+             :scroll-sub 0
+             :scroll-row (scroll-axis (get state :cursor-row) (get state :scroll-row) avail)
+             :scroll-col (scroll-axis (get state :cursor-col) (get state :scroll-col) w))
+      (let [state (assoc state :scroll-col 0)
+            crow (get state :cursor-row)
+            csub (quot (get state :cursor-col) w)
+            srow (get state :scroll-row)
+            ssub (get state :scroll-sub)]
+        (if (or (< crow srow) (and (= crow srow) (< csub ssub)))
+          ; Above the window: the cursor's own screen row becomes the top.
+          (assoc state :scroll-row crow :scroll-sub csub)
+          (let [off (screen-offset state w srow ssub crow csub)]
+            (if (< off avail)
+              state
+              (let [adv (screen-advance state w srow ssub (inc (- off avail)))]
+                (assoc state :scroll-row (nth adv 0) :scroll-sub (nth adv 1))))))))))
+
+; The visible text, exactly `avail` screen rows of it, blank-padded past the end
+; of the buffer. This subsumes the old `pad-rows`: a function that knows how many
+; screen rows it owes cannot come up short.
+(defn screen-rows [state w avail]
+  (loop [r (get state :scroll-row) sub (get state :scroll-sub) out []]
+    (if (>= (count out) avail)
+      out
+      (if (>= r (line-count state))
+        (recur r sub (conj out ""))
+        (let [line (line-at state r)]
+          (if (>= sub (line-height state w r))
+            (recur (inc r) 0 out)
+            (recur r (inc sub)
+                   (conj out (if (get state :wrap?)
+                               (wrap-seg w line sub)
+                               (window (get state :scroll-col) w line))))))))))
+
+; Where the cursor lands on screen, in both modes. `paint` positions the terminal
+; cursor from this, so an error here is a cursor that lies about where typing goes.
+(defn cursor-screen [state w]
+  (if (get state :wrap?)
+    [(screen-offset state w (get state :scroll-row) (get state :scroll-sub)
+                    (get state :cursor-row) (quot (get state :cursor-col) w))
+     (rem (get state :cursor-col) w)]
+    [(- (get state :cursor-row) (get state :scroll-row))
+     (- (get state :cursor-col) (get state :scroll-col))]))
 
 ; A line as seen through the horizontal window: `left` scalars skipped, `w` wide.
 ;
@@ -336,28 +488,11 @@
         msg (if (= (get state :message) nil) "" (str "  " (get state :message)))]
     (clip cols (str name flag pos msg))))
 
-; A buffer shorter than the window is padded with blank lines, so the frame is
-; always exactly `rows` tall and the status line sits on the bottom edge.
-;
-; Without this the footer floated directly under the last line of text and the
-; rest of the window was left blank, which is wrong in a way that hid something
-; worse: **the status line moving with the window edge is how a person sees that
-; a resize was noticed at all.** Pinned to the content instead, a correct repaint
-; at a new size is indistinguishable from no repaint, and the resize work looked
-; broken to the one person testing it while being measurably fine.
-;
-; `max2 0` because `repeat` counts up to `n` with `=`, so a negative count does
-; not terminate.
-(defn pad-rows [n xs]
-  (concat xs (repeat (max2 0 (- n (count xs))) "")))
-
 (defn frame [state cols rows]
   (let [state (scroll-to-cursor state cols rows)
-        top (get state :scroll-row)
-        left (get state :scroll-col)
+        w (max2 1 cols)
         avail (text-rows state rows)
-        page (pad-rows avail (take avail (drop top (get state :lines))))
-        body (join "\n" (map (fn [l] (window left cols l)) page))
+        body (join "\n" (screen-rows state w avail))
         foot (if (shows-help? state rows)
                (str (help-line state cols) "\n" (status-line state cols))
                (status-line state cols))]
@@ -382,7 +517,9 @@
    "C-a" "!" "up" "C-e" "?" "DEL" "down"
    "C-e" "RET" "z" "RET" "l" "o" "n" "g" "e" "r" "up" "up"
    "C-x" "C-c"])
-(def final (reduce dispatch (new-state "demo.txt" [""]) script))
+; 32 columns, matching the frame the golden renders, because with wrap on the
+; width is part of what a keystroke means.
+(def final (reduce (fn [st c] (dispatch st 32 c)) (new-state "demo.txt" [""]) script))
 (println "--- frame")
 (println (frame final 32 6))
 (println "--- lines")
@@ -447,7 +584,11 @@
 ; column 6 this frame scrolls right instead, and the `>` markers this block
 ; exists to pin disappear. Two behaviours in one assertion is one assertion that
 ; pins neither.
-(def home (assoc final :cursor-col 0 :goal-col 0 :scroll-col 0))
+; `:wrap? false` is not decoration. With wrap on this frame flows "!world" onto a
+; second row and the `>` markers this block exists to pin disappear — which it
+; did, silently, the moment wrap landed. A pin that does not state its mode is a
+; pin that changes meaning when the default does.
+(def home (assoc final :cursor-col 0 :goal-col 0 :scroll-col 0 :wrap? false))
 (println "--- frame at 5 columns")
 (println (frame home 5 6))
 (println (str "widths " (str (map (fn [l] (str-scalar-len l)) (split "\n" (frame home 5 6))))
@@ -471,7 +612,10 @@
 ; a column rather than shifting the text, which is what keeps the screen column
 ; equal to `cursor-col - scroll-col` with no correction term.
 (def wide-line "0123456789abcdefghijklmnopqrstuvwxyz")
-(def wide-state (new-state "d.txt" [wide-line "short"]))
+; Wrap off, for the same reason: wrapped text has no horizontal overflow, so with
+; the default this pin reported the cursor OFF-SCREEN at every column past the
+; window and was pinning nothing but the absence of the feature.
+(def wide-state (assoc (new-state "d.txt" [wide-line "short"]) :wrap? false))
 (defn at-col [col]
   (let [st (scroll-to-cursor (assoc wide-state :cursor-col col) 12 4)
         left (get st :scroll-col)
@@ -485,3 +629,55 @@
 (at-col 12)
 (at-col 20)
 (at-col 36)
+
+; --- Soft wrap ---------------------------------------------------------------
+;
+; The same 36-character line, wrapped into a 12-column window instead of scrolled
+; through one. Three screen rows where the clip geometry showed one.
+(def wrapped (assoc (new-state "d.txt" [wide-line "tail"]) :wrap? true))
+(println "--- wrapped frame, 12 columns")
+(println (frame wrapped 12 8))
+
+; The cursor's screen position, which is the number `paint` uses. Both fields
+; must stay inside the window at every column, and the row must advance once per
+; window-width along the line — that is what makes it wrap rather than scroll.
+(defn wrapped-at [col]
+  (let [st (scroll-to-cursor (assoc wrapped :cursor-col col) 12 8)
+        at (cursor-screen st 12)]
+    (println (str "col " col "  screen-row " (nth at 0) "  screen-col " (nth at 1)
+                  (if (and (>= (nth at 1) 0) (< (nth at 1) 12)) "  on-screen" "  OFF-SCREEN")))))
+(println "--- wrapped cursor")
+(wrapped-at 0)
+(wrapped-at 11)
+(wrapped-at 12)
+(wrapped-at 25)
+(wrapped-at 36)
+
+; `down` moves one screen row, so inside a wrapped line it advances by the window
+; width and the buffer row does not change. Moving a buffer line here would skip
+; the rest of the line, which is the thing that makes wrap feel broken.
+(println "--- wrapped down/up move screen rows, not buffer rows")
+(defn trace [label st]
+  (println (str label "  row " (get st :cursor-row) "  col " (get st :cursor-col))))
+; Column 25, deliberately past the first segment: its screen column is 1 and its
+; buffer column is 25, so a `:goal-col` that kept the buffer reading would send
+; the next `down` somewhere else entirely. Starting at column 3 hides that, since
+; there the two readings are the same number — which is how the first version of
+; this trace let that mutant live.
+(def w0 (restate-goal (assoc wrapped :cursor-row 0 :cursor-col 25) 12))
+(trace "start        " w0)
+(def w1 (move-down w0 12))
+(trace "after down   " w1)
+(def w2 (move-down w1 12))
+(trace "after down   " w2)
+(def w3 (move-down w2 12))
+(trace "after down   " w3)
+(def w4 (move-down w3 12))
+(trace "onto line 2  " w4)
+(trace "back up      " (move-up w4 12))
+
+; The same three downs with wrap off walk buffer lines instead, and run out of
+; buffer after one. Both geometries, one assertion apart.
+(def u0 (restate-goal (assoc wrapped :wrap? false :cursor-row 0 :cursor-col 3) 12))
+(trace "unwrapped    " u0)
+(trace "after down   " (move-down u0 12))

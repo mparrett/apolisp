@@ -482,30 +482,37 @@ fn the_editor_shell_still_fits_the_core() {
     assert_eq!(run(&mut s, "(read-chord {:type :other})"), "\"other\"");
 
     // The one piece of arithmetic in the shell, and the worst thing it could get
-    // wrong: a cursor painted at a column the terminal clamps means typing lands
-    // somewhere you cannot see. `paint` writes to a handle, so it paints to a
-    // file here and the escape it emits is checked directly — the only part of
-    // the tty half a test can reach without a tty.
+    // wrong: a cursor painted where the text is not means typing lands somewhere
+    // you cannot see. `paint` writes to a handle, so it paints to a file here and
+    // the escape it emits is checked directly — the only part of the tty half a
+    // test can reach without a tty.
+    //
+    // Both geometries, because the editor has two. This test already earned its
+    // keep once: soft wrap changed the default and it failed with the *correct*
+    // new answer, which is what a pinned number is for.
     #[cfg(feature = "fs")]
     {
         let out = std::env::temp_dir().join("apolisp-paint-cursor.txt");
         let out = out.to_string_lossy().replace('\\', "/");
-        run(
-            &mut s,
-            &format!(
-                r#"(def st (assoc (new-state "d.txt" ["0123456789abcdefghijklmnopqrstuvwxyz"])
-                                  :cursor-row 0 :cursor-col 20))
-                   (with-open [f (io/open "{out}" :write)] (paint f st 12 4))"#
-            ),
-        );
-        let painted = std::fs::read_to_string(&out).expect("paint wrote the frame");
-        // scroll-col lands at 9 for a cursor at 20 in a 12-wide window, so the
-        // cursor belongs at screen column 11 -> ANSI is 1-indexed -> 12.
-        assert!(
-            painted.ends_with("\u{1b}[1;12H"),
-            "cursor escape wrong; frame ended with {:?}",
-            &painted[painted.len().saturating_sub(12)..]
-        );
+        // A 36-character line, cursor at column 20, in a 12-column window.
+        //   wrapped: screen row 1, column 8   -> ESC[2;9H   (20/12, 20%12)
+        //   clipped: screen row 0, column 11  -> ESC[1;12H  (scrolled right by 9)
+        for (wrap, want) in [("true", "\u{1b}[2;9H"), ("false", "\u{1b}[1;12H")] {
+            run(
+                &mut s,
+                &format!(
+                    r#"(def st (assoc (new-state "d.txt" ["0123456789abcdefghijklmnopqrstuvwxyz"])
+                                      :cursor-row 0 :cursor-col 20 :wrap? {wrap}))
+                       (with-open [f (io/open "{out}" :write)] (paint f st 12 4))"#
+                ),
+            );
+            let painted = std::fs::read_to_string(&out).expect("paint wrote the frame");
+            assert!(
+                painted.ends_with(want),
+                "wrap?={wrap}: expected the cursor at {want:?}, frame ended with {:?}",
+                &painted[painted.len().saturating_sub(12)..]
+            );
+        }
         let _ = std::fs::remove_file(&out);
     }
 
@@ -520,6 +527,8 @@ fn the_editor_shell_still_fits_the_core() {
         "text-rows",
         "shows-help?",
         "clip",
+        "cursor-screen",
+        "wrap-height",
     ] {
         let id = apolisp::value::SymId(s.vm.interner.intern(name));
         assert!(

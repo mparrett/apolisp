@@ -3315,6 +3315,21 @@ what gets reused. Superseding an entry over a mistaken sentence would be
 ceremony; errata are the cheaper mechanism, and the affected entry carries a
 pointer line. Where a correction changes a decision, it gets an ADR instead.
 
+**E-17 — E-16, a number that should not have been written down.** That erratum
+corrects ADR-055's "eight mutations" to "eighteen", and was stale within the day:
+the set is larger again, and will be larger still. Both entries state an
+inventory in prose, which guarantees a correction per sitting and teaches nobody
+anything. **`mutate.sh` is the count**; neither number below should be read as
+current, and no further erratum will be filed to move one.
+
+What is worth keeping from the seeding is the *shape* of the results rather than
+the total. Milestone 8's ten found one hole and confirmed nine — including all
+four that survived its original pass, which had been closed by adding programs,
+so the rung is now guarding those programs against removal. Milestone 5's five
+found **none**, which is the first pass where nothing was wrong and is worth
+recording as such: the fixes from that pass have held, including the two that
+were corpus additions rather than code changes.
+
 **E-16 — ADR-055, the seeded set and what seeding it found.** The entry's Cost
 clause says eight mutations, seven flipping, and its Open clause says
 "everything ADR-046 through ADR-051 decided is unmutated". Both were true when

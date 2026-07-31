@@ -410,6 +410,60 @@ mutation src/lib.rs \
   "$SNAP" \
   'fuel decrements, without which a fuelled run never suspends'
 
+# --- The expander (milestone 5) ---------------------------------------------
+#
+# Five of that pass's six; the gensym reset is seeded above. All were fixed then,
+# two of them by adding to the corpus rather than to the code — `macros.xs`
+# claimed in a comment to have "a splice, and a tail the splice does not swallow"
+# and did not, and no macro anywhere kept an argument as *data*, which is the only
+# shape that can tell early expansion from late.
+
+EXPAND='--test expand'
+
+mutation src/lib.rs \
+  'if head == self.names.quote {
+                    return Ok(f);
+                }' \
+  '' \
+  "$EXPAND" \
+  'the expander does not walk into quote, which is data rather than code'
+
+mutation src/lib.rs \
+  "if name.len() > 1 && name.ends_with('#') {" \
+  'if false {' \
+  "$EXPAND" \
+  'auto-gensym replaces a trailing # rather than handing back the written name'
+
+mutation src/lib.rs \
+  'if !plain.is_empty() {
+                groups.push(call(Value::Sym(self.names.list), plain));
+            }
+            Ok(Items::Spliced' \
+  'Ok(Items::Spliced' \
+  "$EXPAND" \
+  'a template keeps the items after a splice, which macros.xs once only claimed to cover'
+
+mutation src/lib.rs \
+  'let mut known = HashMap::new();
+            for (v, o) in items[1..].iter().zip(&f.origins.children[1..]) {
+                index_origins(v, o, &mut known);
+            }' \
+  'let known = HashMap::new();' \
+  '--test compile' \
+  'a form the macro passed through keeps its own position instead of the call site'
+
+mutation src/lib.rs \
+  'let args: Vec<Value> = items[1..].to_vec();' \
+  'let mut args: Vec<Value> = Vec::new();
+            for (v, o) in items[1..].iter().zip(&f.origins.children[1..]) {
+                args.push(
+                    self.form(LocatedForm { root: v.clone(), origins: o.clone() })?
+                        .root,
+                );
+            }' \
+  "$EXPAND" \
+  'a macro receives its arguments as written, not already expanded'
+
 echo
 echo "=== $flipped of $total flipped, $survived_ok survived as declared"
 if [ ${#dead[@]} -gt 0 ]; then

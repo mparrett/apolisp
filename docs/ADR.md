@@ -3221,6 +3221,92 @@ is not that program.
 
 ---
 
+### ADR-055 — Mutation as rung 5, hand-listed and opt-in
+
+*(New, 2026-07-31. Resolves Q18, which had been open since milestone 1 with the
+rung itself never in doubt — only its shape. Adds `mutate.sh` and `just mutate`.)*
+
+**Decision.** A fifth rung: `just mutate`, a hand-listed set of mutations, each
+breaking one load-bearing line and asserting the named test flips from pass to
+fail. Not a framework, not part of `verify`.
+
+**1. Why a list and not a tool.** Every general mutation tool answers "what
+fraction of mutants die", which is a number nobody acts on. What has actually
+paid here, eight milestones running, is a handful of mutations chosen because
+someone believed a specific line was load-bearing. The value is in the choosing;
+automating the choosing removes it.
+
+**2. Three assertions, separately, because every way this rots is silent.** That
+the edit changed the file; that the mutant still builds; that the test failed —
+the last from the exit status, never from grepping output for a word.
+
+`../reg-lisp` learned all three the hard way and had **twenty of its eighty-two
+checks go quiet without it showing**, because the verdict came from a grep plus
+an unconditional "a FAIL above is expected". It also found one dead check hiding
+behind a live one under a shared description, which is why descriptions are
+checked for duplicates here.
+
+This entry earned its own first assertion immediately: the first run reported all
+eight mutants as "does not build", because the build check matched `^error:` and
+cargo prints `error: test failed` for exactly the outcome the script wants. A
+harness that only said "no flip" would have sent someone looking at the mutants.
+
+**3. Survivors may be declared, with a reason.** Two kinds are legitimate and
+neither is a hole: a claim no test can separate — a *performance* claim is the
+recorded example (Q18, milestone 6, erratum E-13) — and a guard against a failure
+severe enough to enforce twice on purpose. The one declared survivor here is
+`str-scalar-slice`'s `f <= t`, unreachable while the scan's early `break` stands,
+and kept because reaching `s[f..t]` backwards is a **panic** where ADR-039
+requires a throw.
+
+Declaring is not excusing. **A declared survivor that starts dying is reported**,
+because that means the reason stopped being true. And it must be written in
+advance: milestones 4, 7 and 8 each predicted every survivor, and Q18 already
+records why that matters — filled in afterwards they would have read as
+discoveries.
+
+**4. Opt-in, not in `verify`.** Every mutation is a rebuild. A gate measured in
+minutes is a gate people learn to skip, and a skipped gate is worse than an
+absent one because it still reads as coverage.
+
+**5. What the rung finds, which nothing else does.** Q18 recorded four kinds over
+eight milestones: a dead test; **duplicated enforcement**, where the fix is to
+delete the redundancy rather than add a test; a defect that is real and
+*unobservable*, where the honest response is to remove the way to write it; and a
+hole in the corpus rather than a defect in the code, which scales worst because
+no amount of strengthening a property fixes it.
+
+The session that produced this entry adds a fifth: **a correct check that stops
+covering its subject when a later change moves the ground under it.** Three
+instances in one day — a two-row pin that stopped exercising the clamp it was
+written for once the hint gave up its row, and two pins that silently began
+testing soft wrap instead of clipping when wrap became the default. Each was
+still passing, still correct, and no longer about anything. The mitigation is
+narrow: **a pin states the mode it assumes**, because a pin that does not is one
+that stops pinning the moment the default moves.
+
+**6. And the timing, which is the actionable part.** Of the six checks this
+session caught testing the wrong thing, three were caught at the moment they were
+written and three had been believed for days. The habit costs least when the
+assertion is fresh and most after it has been green a while, which is exactly
+backwards from when it feels necessary. `AGENTS.md` carries the rule; this rung
+carries the ones worth re-running.
+
+**Rejected.** *A general mutation-testing framework* — see part 1; also
+Q18's own long-standing position. *Running it in `verify`* — part 4. *Recording
+mutants as a coverage percentage* — a number that goes up is a number people
+optimise, and the finding here has never once been the ratio.
+
+**Cost.** `mutate.sh`, outside the line budget as tooling. Eight seeded
+mutations: seven flip, one survives as declared.
+
+**Open.** The seeded set covers `str-scalar-slice`, `vec-slice`, `take`, and four
+of the editor's geometry rules. Everything ADR-046 through ADR-051 decided is
+unmutated, and the four earlier milestone passes live only in their notes rather
+than in a runnable list.
+
+---
+
 ## Errata
 
 Factual corrections to entries whose **decision still stands**. A wrong reason is

@@ -12,7 +12,8 @@ Q3 (→ADR-025), Q4 (→ADR-028), Q7 (→ADR-029), Q9 (→ADR-029), Q10 (→ADR-
 Q11 (→ADR-027), Q13 (→ADR-041), Q17 (→ADR-027), Q21 (→ADR-030), Q23 (→ADR-039),
 Q24 (→ADR-038), Q25 (→ADR-038), Q26 (→ADR-041), Q6 (→ADR-041), Q27 (→ADR-042),
 Q8 (→ADR-043), Q22 (→ADR-043), Q1 (→ADR-044), Q5 (→ADR-047), Q29 (→ADR-048),
-Q34 (→ADR-052), Q36 (→ADR-053), Q35 (→ADR-054, which resolves it as a refusal).*
+Q34 (→ADR-052), Q36 (→ADR-053), Q35 (→ADR-054, which resolves it as a
+refusal), Q18 (→ADR-055, after eight milestones of evidence).*
 
 ---
 
@@ -269,90 +270,6 @@ source because that is the only file it can name, and every terminal program
 takes an argument.
 
 ## No milestone — decide when evidence arrives
-
-**Q18 — Mutation checks as an oracle rung.** *(Evidence arrived eight times —
-milestones 1, 2, 4, 5, 6, 7, 8, and 9. At this point the rung is not in
-question; what remains open is only its shape — and milestone 9 found that the
-shape has a failure mode of its own, see below.)*
-Run against milestone 1's own span tests, two of three mutants survived: every
-origin could be `Unknown`, or every span could start at byte 0, with the suite
-staying green. Only arity was actually checked. Fixed by adding `.spans`
-goldens, which ADR-026 had already specified and the implementation had skipped.
-See `docs/notes/milestone-1-pilot.md`.
-
-Milestone 2 ran four mutants against the compiler and one survived — and it
-found something different in kind. ADR-028 rule 2 was enforced *twice*, by the
-`tail` flag and by the region counter, so deleting either left the suite green
-and no test could say which was doing the work. The fix was to delete the
-redundancy, not to add a test. See `docs/notes/milestone-2-mutants.md`.
-
-Milestone 4 ran five against the handler stack and one survived, predicted to:
-unwinding that drops frames but keeps their slots is a real leak that **no test
-can observe** — bounded, so no high-water mark moves, and nil-filled, so no
-value is wrong. The test written for it was dead too. Fixed by making the
-release of a frame one shared mechanism rather than two that agree, so the
-mutation stops being expressible. See `docs/notes/milestone-4-mutants.md`.
-
-Milestone 5 ran six against the expander. The interesting one was not a
-survivor at first: a mutant that dropped everything after a splice expanded the
-whole corpus correctly, because every splice in it happened to be last — the
-corpus claimed in a comment to cover the case and did not. The survivor was
-worse. **A macro receiving *expanded* arguments instead of the forms as written
-passed all 75 tests**, because every macro in the suite used its arguments as
-code, where expanding early and expanding late agree. See
-`docs/notes/milestone-5-mutants.md`.
-
-Milestone 6 ran eight. Seven died; the eighth could not have done anything
-else — it mutated a *performance* claim (`Rc::make_mut` versus an unconditional
-clone), and the two are behaviourally identical, so no test can separate them.
-The interesting result came from instrumentation instead, and refuted ADR-041's
-own rationale (erratum E-13). Worth naming as a limit of the rung: **a mutation
-check answers behavioural claims only.**
-
-Milestones 7 and 8 found a fourth kind, twice, and it is the one that scales
-worst: **a hole in the corpus rather than a defect in the code**. Seven's read
-path could ignore the handle generation entirely, because nothing ever read
-*through* a stale handle; eight dropped four separate fields from an `Image`
-and the strongest property in the project — cutting at every instruction
-boundary, over nine programs, in two forms — noticed none of them. Nothing was
-wrong with the implementation either time. What was wrong was the belief that
-the suite was checking it, and no amount of strengthening a property fixes
-that, because a property only sees the state its inputs create.
-
-Both passes also predicted every survivor, which is the argument for
-pre-registration rather than for mutation testing: writing the table down is
-when the holes became visible. Filled in afterwards they would have read as
-discoveries.
-
-Milestone 9 found the rung's own failure mode, and it argues for keeping this
-hand-rolled rather than for building the framework. **A substitution that does
-not match leaves a green suite, which is exactly what a surviving mutant
-leaves.** Two of twelve were no-ops and were recorded as survivors until one of
-them — predicted to survive for a specific reason — was checked against the
-file. Whatever shape this rung ends up taking has to assert that the mutation
-happened; `../reg-lisp`'s `verify.sh mutate` deletes a named line, which fails
-loudly when the line has moved, and that is one more argument for its shape
-over a pattern-matching script.
-
-**So the finding is broader than "tests can be dead."** A mutation check also
-finds duplicated enforcement, which nothing else in this loop looks for, and
-which a test written to pin the rule will happily pass while the mechanism it
-was written for is dead. It finds a third thing too: a defect that is real and
-*unobservable*, where the honest response is to remove the way to write it
-rather than to add a test that cannot fail. Three milestones, three kinds of
-finding, nothing else caught any of them. The remaining question is only what shape the rung takes — `../reg-lisp`
-uses a `verify.sh mutate` over a hand-listed set of load-bearing lines, and that
-still looks right here: worth doing for a handful of lines per milestone, not
-worth a general framework.
-
-`../reg-lisp` found a mutant that never restored the compiler's line counter and
-*passed its entire suite*, because every test program had subexpressions on the
-same line as the enclosing form. Green corpus, dead mechanism. Its answer is a
-`verify.sh mutate` that deletes the load-bearing line and shows the test
-flipping. Our review-gated rule keeps golden files honest about changes; it says
-nothing about whether a test can fail at all. Worth doing for a handful of
-load-bearing lines — the span-restore path is the obvious first one. Not worth a
-general mutation-testing framework.
 
 **Q30 — Is `Proto.lines` the wrong shape?** *(Filed 2026-07-27 from
 <https://tidefield.dev/bytecode-to-source-mapping/>. Nothing has measured a

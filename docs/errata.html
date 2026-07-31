@@ -1,0 +1,598 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>apolisp — the decision was right and the reason was wrong</title>
+<meta name="description" content="An append-only decision log with 55 entries, 4 of them superseded and 17 carrying factual corrections. What goes wrong in a decision record is almost never the decision — and the corrections need correcting too.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%9C%8E%3C/text%3E%3C/svg%3E">
+<style>
+  :root {
+    color-scheme: light dark;
+
+    --ground:    #edf0f3;
+    --panel:     #f8fafb;
+    --panel-2:   #e2e7ec;
+    --ink:       #14181d;
+    --muted:     #525c68;
+    --faint:     #7f8996;
+    --accent:    #1f5f7a;
+    --accent-w:  #d7e6ed;
+    --dead:      #9c3327;
+    --dead-w:    #f3ddd9;
+    --live:      #14614f;
+    --live-w:    #d6eae4;
+    --hair:      #ccd4db;
+    --hair-2:    #b0bac4;
+
+    --serif: "Charter", "Bitstream Charter", "Iowan Old Style", Georgia, ui-serif, serif;
+    --util:  "Avenir Next", Avenir, Futura, Optima, ui-sans-serif, system-ui, sans-serif;
+    --mono:  ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+
+    --measure: 64ch;
+    --rule: 1px solid var(--hair);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground:   #131619;
+      --panel:    #191d21;
+      --panel-2:  #22272d;
+      --ink:      #e3e7ec;
+      --muted:    #98a2ae;
+      --faint:    #6b7581;
+      --accent:   #6cb6d4;
+      --accent-w: #14313d;
+      --dead:     #e0837a;
+      --dead-w:   #38201d;
+      --live:     #5cc0a8;
+      --live-w:   #123029;
+      --hair:     #2a3037;
+      --hair-2:   #3a424b;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:#131619; --panel:#191d21; --panel-2:#22272d; --ink:#e3e7ec;
+    --muted:#98a2ae; --faint:#6b7581; --accent:#6cb6d4; --accent-w:#14313d;
+    --dead:#e0837a; --dead-w:#38201d; --live:#5cc0a8; --live-w:#123029;
+    --hair:#2a3037; --hair-2:#3a424b;
+  }
+  :root[data-theme="light"] {
+    --ground:#edf0f3; --panel:#f8fafb; --panel-2:#e2e7ec; --ink:#14181d;
+    --muted:#525c68; --faint:#7f8996; --accent:#1f5f7a; --accent-w:#d7e6ed;
+    --dead:#9c3327; --dead-w:#f3ddd9; --live:#14614f; --live-w:#d6eae4;
+    --hair:#ccd4db; --hair-2:#b0bac4;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--serif);
+    font-size: 1.0625rem;
+    line-height: 1.62;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  .wrap {
+    max-width: calc(var(--measure) + 4rem);
+    margin: 0 auto;
+    padding: 3.5rem 2rem 6rem;
+  }
+
+  header { border-bottom: var(--rule); padding-bottom: 2rem; margin-bottom: 2.5rem; }
+
+  h1 {
+    font-size: clamp(1.9rem, 5.2vw, 2.7rem);
+    line-height: 1.12;
+    letter-spacing: -0.018em;
+    margin: 0 0 0.9rem;
+    font-weight: 600;
+  }
+
+  .dek { font-size: 1.15rem; line-height: 1.5; color: var(--muted); margin: 0 0 1.4rem; }
+
+  .byline {
+    font-family: var(--util);
+    font-size: 0.775rem;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--faint);
+    margin: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+  }
+  .byline span { white-space: nowrap; }
+  .byline .sep { margin: 0 0.55rem; opacity: 0.5; }
+
+  section { margin: 0 0 3rem; }
+
+  .eyebrow {
+    display: block;
+    font-family: var(--util);
+    font-size: 0.7rem;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 0.5rem;
+  }
+
+  h2 {
+    font-size: clamp(1.3rem, 3.4vw, 1.6rem);
+    line-height: 1.22;
+    letter-spacing: -0.012em;
+    margin: 0 0 1rem;
+    font-weight: 600;
+  }
+
+  h3 {
+    font-family: var(--util);
+    font-size: 0.95rem;
+    letter-spacing: 0.01em;
+    margin: 1.8rem 0 0.6rem;
+    font-weight: 600;
+  }
+
+  p { margin: 0 0 1.05rem; max-width: var(--measure); }
+
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+  code {
+    font-family: var(--mono);
+    font-size: 0.86em;
+    background: var(--panel-2);
+    padding: 0.08em 0.32em;
+    border-radius: 3px;
+  }
+
+  pre {
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    line-height: 1.55;
+    background: var(--panel);
+    border: var(--rule);
+    border-left: 3px solid var(--hair-2);
+    border-radius: 4px;
+    padding: 0.95rem 1.1rem;
+    overflow-x: auto;
+    margin: 0 0 1.2rem;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; }
+  pre .dim { color: var(--faint); }
+  pre .hi { color: var(--dead); }
+
+  .note {
+    border: var(--rule);
+    border-left: 3px solid var(--hair-2);
+    background: var(--panel);
+    border-radius: 4px;
+    padding: 1rem 1.15rem 0.4rem;
+    margin: 0 0 1.3rem;
+    max-width: var(--measure);
+  }
+  .note p { font-size: 0.965rem; }
+  .note .tag {
+    display: block;
+    font-family: var(--util);
+    font-size: 0.7rem;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+  }
+  .note.found { border-left-color: var(--dead); background: var(--dead-w); }
+  .note.found .tag { color: var(--dead); }
+  .note.clean { border-left-color: var(--live); background: var(--live-w); }
+  .note.clean .tag { color: var(--live); }
+
+  /* --- the three things that can happen to a past entry ------------------ */
+
+  .moves {
+    display: grid;
+    /* 11rem so all three fit one row at the page measure. A width that fits
+       two leaves the third beside an empty cell. */
+    grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+    gap: 1px;
+    background: var(--hair);
+    border: var(--rule);
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 1.6rem 0 0;
+  }
+  .move { background: var(--panel); padding: 0.85rem 0.95rem 0.9rem; }
+  .move b {
+    font-family: var(--util);
+    font-size: 0.8rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    font-weight: 600;
+    display: block;
+    margin-bottom: 0.3rem;
+  }
+  .move .n {
+    font-family: var(--util);
+    font-size: 1.5rem;
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: -0.02em;
+    display: block;
+    margin-bottom: 0.4rem;
+  }
+  .move span.d {
+    display: block;
+    font-family: var(--util);
+    font-size: 0.78rem;
+    line-height: 1.45;
+    color: var(--muted);
+  }
+  .move.sup b, .move.sup .n { color: var(--accent); }
+  .move.err b, .move.err .n { color: var(--live); }
+  .move.never b, .move.never .n { color: var(--dead); }
+
+  /* --- the kinds -------------------------------------------------------- */
+
+  .kinds { margin: 0 0 1.4rem; }
+  .kind {
+    border-top: var(--rule);
+    padding: 0.9rem 0 0.95rem;
+    display: grid;
+    grid-template-columns: 3.4rem 1fr;
+    gap: 0 1rem;
+    align-items: baseline;
+  }
+  .kind:last-child { border-bottom: var(--rule); }
+  .kind .e {
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    color: var(--accent);
+    font-weight: 600;
+  }
+  .kind h3 { margin: 0 0 0.3rem; font-size: 0.93rem; }
+  .kind p { margin: 0; font-size: 0.93rem; color: var(--muted); max-width: none; }
+
+  /* --- the correction chains: an erratum is a claim like any other ------- */
+
+  .chain {
+    font-family: var(--util);
+    font-size: 0.85rem;
+    border: var(--rule);
+    background: var(--panel);
+    border-radius: 4px;
+    padding: 1rem 1.15rem;
+    margin: 0 0 1.3rem;
+  }
+  .chain + .chain { margin-top: -0.5rem; }
+  .link {
+    display: grid;
+    grid-template-columns: 5.5rem 1fr;
+    gap: 0 0.9rem;
+    padding: 0.4rem 0;
+    align-items: baseline;
+  }
+  .link .id {
+    font-family: var(--mono);
+    font-size: 0.76rem;
+    font-weight: 600;
+    color: var(--accent);
+    white-space: nowrap;
+  }
+  .link .said { color: var(--muted); line-height: 1.45; }
+  /* Only the clause a later erratum killed is struck, never the whole line —
+     both of these entries have a standing half and a stale half, and striking
+     the line would misreport which is which. */
+  .link .said s { text-decoration-color: var(--dead); color: var(--faint); }
+  .arrow {
+    font-family: var(--mono);
+    color: var(--faint);
+    font-size: 0.8rem;
+    padding-left: 0.4rem;
+  }
+
+  /* --- the ledger ------------------------------------------------------- */
+
+  .tablewrap { overflow-x: auto; margin: 0 0 1.2rem; }
+  table {
+    border-collapse: collapse;
+    font-family: var(--util);
+    font-size: 0.83rem;
+    width: 100%;
+    min-width: 32rem;
+  }
+  th, td { text-align: left; padding: 0.45rem 0.8rem 0.45rem 0; border-bottom: var(--rule); vertical-align: top; }
+  thead th {
+    font-size: 0.68rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--faint);
+    font-weight: 600;
+    border-bottom: 1px solid var(--hair-2);
+  }
+  td.e { font-family: var(--mono); font-size: 0.76rem; color: var(--accent); font-weight: 600; white-space: nowrap; }
+  td.a { font-family: var(--mono); font-size: 0.76rem; color: var(--muted); white-space: nowrap; }
+  td.k { white-space: nowrap; color: var(--faint); font-size: 0.75rem; letter-spacing: 0.03em; text-transform: uppercase; }
+  thead th:nth-child(3) { width: 54%; }
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+    gap: 1px;
+    margin: 0 0 1.5rem;
+  }
+  .stat {
+    background: var(--panel);
+    padding: 0.85rem 0.95rem;
+    box-shadow: 0 0 0 1px var(--hair);
+  }
+  .stat b {
+    display: block;
+    font-family: var(--util);
+    font-size: 1.35rem;
+    letter-spacing: -0.02em;
+    font-weight: 600;
+    line-height: 1.1;
+  }
+  .stat span {
+    font-family: var(--util);
+    font-size: 0.68rem;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+
+  blockquote {
+    margin: 0 0 1.2rem;
+    padding-left: 1.1rem;
+    border-left: 2px solid var(--accent);
+    color: var(--muted);
+    font-style: italic;
+    max-width: var(--measure);
+  }
+  blockquote p { margin-bottom: 0; }
+
+  ul { max-width: var(--measure); padding-left: 1.15rem; margin: 0 0 1.1rem; }
+  li { margin-bottom: 0.45rem; }
+
+  .next {
+    margin-top: 1.7rem;
+    padding-top: 1.1rem;
+    border-top: var(--rule);
+    font-family: var(--util);
+    font-size: 0.85rem;
+    line-height: 1.65;
+    color: var(--muted);
+  }
+
+  footer {
+    border-top: var(--rule);
+    padding-top: 1.6rem;
+    color: var(--faint);
+    font-family: var(--util);
+    font-size: 0.8rem;
+    line-height: 1.6;
+  }
+  footer p { max-width: var(--measure); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>The decision was right and the reason was wrong</h1>
+  <p class="dek">apolisp keeps an append-only decision log: 55 entries, and the only edit a past entry ever receives is a one-line pointer. Four have been superseded. Seventeen carry a factual correction &mdash; because what turns out to be wrong in a decision record is almost never the decision.</p>
+  <p class="byline">
+    <span>ADR.md</span><span class="sep">/</span><span>append-only</span><span class="sep">/</span><span>55 decisions</span><span class="sep">/</span><span>4 superseded</span><span class="sep">/</span><span>17 errata</span>
+  </p>
+
+  <div class="moves">
+    <div class="move sup">
+      <span class="n">4</span>
+      <b>Supersede</b>
+      <span class="d">The decision changed. A new entry replaces it; the old one gets a <code>Superseded by</code> line and stays where it is.</span>
+    </div>
+    <div class="move err">
+      <span class="n">17</span>
+      <b>Erratum</b>
+      <span class="d">The decision stands and a stated fact does not. Filed at the end, with a pointer line on the entry it corrects.</span>
+    </div>
+    <div class="move never">
+      <span class="n">0</span>
+      <b>Edit in place</b>
+      <span class="d">Never. Not for a typo&rsquo;s worth of reasoning, not for a number that moved.</span>
+    </div>
+  </div>
+</header>
+
+<section>
+  <span class="eyebrow">The mechanism</span>
+  <h2>One file, appended to, with exactly one editable line</h2>
+
+  <p>The rule is stated in the log itself, as an entry about the log:</p>
+
+  <blockquote><p>To change a decision, add a new entry that supersedes the old one and add a <code>Superseded by ADR-NNN</code> line to the old entry &mdash; that line is the only edit a past entry ever receives. No version bumps, no amendment procedure, no approval step.</p></blockquote>
+
+  <p>The reasoning is about what the log is for. This is a project with one user and an explicit freedom clause: the language may break on a Tuesday and be rebuilt on Wednesday, and that costs nothing. What is <em>not</em> free is silently losing why Monday&rsquo;s version existed &mdash; that costs a re-derivation every time the question resurfaces, and the re-derivation is usually worse than the original because the pressure that produced it is gone.</p>
+
+  <p>Supersession keeps that trail without acquiring a governance process. The rejected alternatives are named: a <code>decisions/NNN-*.md</code> directory (more files than decisions, and a directory walk to answer anything spanning two of them), amending entries in place (loses the trail, which is the only thing the log is for), and version bumps (governance language written for a language with users, of which there are none).</p>
+
+  <p>But supersession is a heavy instrument. It is for a decision that changed. It is the wrong tool for an entry whose decision is fine and whose third paragraph contains a false sentence &mdash; and that turns out to be the common case by a factor of four.</p>
+</section>
+
+<section>
+  <span class="eyebrow">Why correct a reason at all</span>
+  <h2>The reason is what gets reused</h2>
+
+  <p>The errata section opens with its own justification, and it is the whole argument in three lines:</p>
+
+  <blockquote><p>Factual corrections to entries whose <strong>decision still stands</strong>. A wrong reason is worth fixing even when it reaches the right conclusion, because the reason is what gets reused. Superseding an entry over a mistaken sentence would be ceremony; errata are the cheaper mechanism, and the affected entry carries a pointer line. Where a correction changes a decision, it gets an ADR instead.</p></blockquote>
+
+  <p>The first erratum filed is the clearest case. ADR-019 chose to ship the VM as a wasm module with values in linear memory rather than compiling the language to WasmGC, and gave as its reason that WasmGC &ldquo;puts frames back on the wasm stack and forfeits constraint #2&rdquo; &mdash; the constraint that a running computation stays plain data, suspendable and serializable.</p>
+
+  <p>That is simply false. WasmGC provides managed struct and array references; an interpreter can hold explicit frames in GC-managed arrays exactly as it can in linear memory. Linear memory stands as the decision, on entirely different grounds: Rust toolchain support, control over layout, ease of producing a canonical byte-oriented image, and not depending on host GC behaviour.</p>
+
+  <p>Leave the false reason standing and it is what a future reader picks up. It generalises so nicely &mdash; <em>managed runtime, therefore no explicit stack, therefore no snapshot</em> &mdash; that it would get applied to the next three targets without anyone re-checking it. The conclusion was never in danger. The sentence underneath it was load-bearing for everything that came after.</p>
+</section>
+
+<section>
+  <span class="eyebrow">The kinds</span>
+  <h2>Five things that go wrong in a decision record, none of which is the decision</h2>
+
+  <div class="kinds">
+    <div class="kind">
+      <span class="e">E-3</span>
+      <div>
+        <h3>A reason that was never load-bearing</h3>
+        <p>&ldquo;TinyGo drags in Asyncify&rdquo; is too categorical &mdash; TinyGo uses it for goroutines on wasm, and its scheduler can be disabled. The decision stands because Rust is the working toolchain and the legibility argument is independent. This was never the reason it rested on, and stating it as though it were invites someone to defend it.</p>
+      </div>
+    </div>
+    <div class="kind">
+      <span class="e">E-4, E-6</span>
+      <div>
+        <h3>A number nobody measured, written as if measured</h3>
+        <p>&ldquo;~30% more lines than Go&rdquo; is a projection; no comparable pair has been built. &ldquo;Transducers are faster&rdquo; is inherited folklore, not something measured on this implementation. Both read like evidence and neither is.</p>
+      </div>
+    </div>
+    <div class="kind">
+      <span class="e">E-8, E-9</span>
+      <div>
+        <h3>A code sketch that could not survive being implemented</h3>
+        <p>The predicted 24-byte <code>Value</code> measured <strong>16</strong>, because the sketch assumed <code>Rc&lt;str&gt;</code> and <code>Rc&lt;[T]&gt;</code> &mdash; fat pointers &mdash; and the implementation uses thin pointers to sized structs. Worse, ADR-026&rsquo;s carrier sketch reads <code>LocatedForm { root, origin }</code>, one origin, directly alongside prose saying &ldquo;every aggregate holds one origin per syntactic child&rdquo;. Those cannot both be one struct. The prose survived two reviews; the code block did not survive first contact.</p>
+      </div>
+    </div>
+    <div class="kind">
+      <span class="e">E-14</span>
+      <div>
+        <h3>A cost predicted and never paid</h3>
+        <p>ADR-043 warned that preserving structural sharing would make decoding two passes rather than one, because an object could name an id it had not reached yet. Written before the encoder was. The encoder builds an object&rsquo;s children before pushing the object itself, so every id is strictly lower than its own, the table comes out topologically ordered by construction, and the decoder is a single forward loop with no fixups. Sharing cost a map on the encode side and nothing at all on the decode side.</p>
+      </div>
+    </div>
+    <div class="kind">
+      <span class="e">E-13</span>
+      <div>
+        <h3>A win claimed in the present tense that has not arrived</h3>
+        <p>The one below, which is the sharpest of the seventeen because it was settled by measurement rather than by argument.</p>
+      </div>
+    </div>
+  </div>
+
+  <p>Two more that do not fit the pattern but are worth having: E-7 corrects a <em>word</em> (&ldquo;hygiene&rdquo; overstates what read-time resolution plus gensym provides &mdash; read it as Clojure-style capture avoidance), and E-10 corrects a claim the log made about <em>itself</em> &mdash; a split described as the second step of a stated progression is the third, because the intermediate step was skipped rather than taken.</p>
+</section>
+
+<section>
+  <span class="eyebrow">E-13</span>
+  <h2>The optimisation that was indistinguishable from not having it</h2>
+
+  <p>ADR-041 chose flat vectors with copy-on-write and no transients. Its reasoning said <code>Rc::make_mut</code> removes the obvious cost &mdash; a fresh accumulator has one reference, so the loop mutates a buffer it already owns.</p>
+
+  <p>Measured, it never does. At a native call the collection is live in the caller&rsquo;s argument window <em>and</em> in the clone the primitive takes, so the strong count is at least two and <code>make_mut</code> copies every time. In a <code>conj</code> loop the accumulator is additionally still bound to a live local. Instrumenting <code>conj</code> over a five-element build printed <code>copied=true</code> on every iteration.</p>
+
+  <div class="note found">
+    <span class="tag">And then the part that makes it a finding</span>
+    <p>Replacing <code>make_mut</code> with an <strong>unconditional clone</strong> survived the entire suite. The two are indistinguishable today &mdash; which means the claim in the entry was not merely optimistic, it was unobservable.</p>
+    <p>That is a mutation, run by hand and long before there was a harness for running them. The habit that later became <code>mutate.sh</code> shows up here first, aimed at a sentence in a document rather than at a line of code.</p>
+  </div>
+
+  <p>The decision stands unchanged: flat <code>Vec</code>, copy-on-write, no transients is still the right shape, and <code>make_mut</code> is still the correct way to write it. What is wrong is the tense. The quadratic behaviour the open question named is still there, and removing it needs either a compiler pass that kills a slot on its last use or a call protocol where a primitive consumes its arguments &mdash; both pre-registered as experiments, neither a collections question.</p>
+
+  <p>One win <em>is</em> real, and the erratum says so rather than retreating entirely: a multi-pair <code>assoc</code> or multi-item <code>conj</code> copies once rather than once per pair, because the mutable borrow is taken outside the loop.</p>
+</section>
+
+<section>
+  <span class="eyebrow">The recursion</span>
+  <h2>An erratum is a claim like any other, and nothing tests it</h2>
+
+  <p>Two of the seventeen correct earlier errata. That is not a defect in the mechanism; it is the mechanism working on itself. But each one arrived for a different reason, and the reasons are the useful part.</p>
+
+  <div class="chain">
+    <div class="link"><span class="id">ADR-034</span><span class="said">A <code>finally</code> body is duplicated, so the code array doubles under nesting.</span></div>
+    <div class="arrow">&darr;</div>
+    <div class="link"><span class="id">E-12</span><span class="said">Adds: the proto table doubles with it, which is a size statement rather than a correctness one. <s>And it matters because <code>Chunk.protos</code> is what an <code>Image</code> serializes, so the duplication reaches the snapshot.</s></span></div>
+    <div class="arrow">&darr;</div>
+    <div class="link"><span class="id">E-15</span><span class="said">True when written, false since ADR-043: an <code>Image</code> carries a chunk <em>fingerprint</em> and takes the chunk from its caller. No <code>Chunk</code> is serialized at all. The duplication reaches the compiler&rsquo;s output and stops there.</span></div>
+  </div>
+
+  <p>E-12&rsquo;s substance is untouched &mdash; the proto table really does double, and that is a size statement rather than a correctness one. What went stale is the <em>consequence</em>, and E-15 says plainly why that is worth more than the correction:</p>
+
+  <blockquote><p>ADR-043 changed what an <code>Image</code> contains, and nothing walked the errata to see what had been asserted about it.</p></blockquote>
+
+  <p>A decision record has a status line and a supersession trail. An erratum has neither. It is a free-floating factual claim about a system that keeps moving, and there is no test anywhere that fails when one of them stops being true. This one was caught by a person reading; that is the entire mechanism, and it is worth being honest that it does not scale.</p>
+</section>
+
+<section>
+  <span class="eyebrow">E-17</span>
+  <h2>The erratum that abolishes its own category</h2>
+
+  <p>The second chain is shorter and ends better. ADR-055 created the mutation harness and its cost clause said &ldquo;eight mutations, seven flipping&rdquo;. E-16 corrected that to eighteen. E-16 was stale within the day.</p>
+
+  <div class="chain">
+    <div class="link"><span class="id">ADR-055</span><span class="said">Cost: eight mutations, seven flip, one survives as declared.</span></div>
+    <div class="arrow">&darr;</div>
+    <div class="link"><span class="id">E-16</span><span class="said"><s>The set is eighteen, seventeen flipping.</s> The decision stands unchanged; only the inventory moved.</span></div>
+    <div class="arrow">&darr;</div>
+    <div class="link"><span class="id">E-17</span><span class="said">Both entries state an inventory in prose, which guarantees a correction per sitting and teaches nobody anything. <strong><code>mutate.sh</code> is the count.</strong> Neither number should be read as current, and no further erratum will be filed to move one.</span></div>
+  </div>
+
+  <p>The set is forty-five now, which is exactly the point: that sentence is already the wrong kind of sentence to have written, and it is safe here only because this page is a description rather than a record anything defers to.</p>
+
+  <p>E-17 does something the other sixteen do not. Rather than correct a fact, it withdraws a <em>kind</em> of fact from the log &mdash; and gives the reason in terms of what the log is for. An entry exists to carry reasoning that would otherwise be re-derived badly. A count of things in a file is not reasoning; it is a cache of something the file already knows, and a cache with no invalidation is a bug wearing documentation&rsquo;s clothes.</p>
+
+  <p>What E-17 keeps instead is the part a file cannot hold: not how many mutations there are, but that milestone 8&rsquo;s ten found one hole and confirmed nine &mdash; including all four survivors from its original pass, which had been closed by adding programs, so the rung now guards those programs against removal. And that milestone 5&rsquo;s five found <strong>nothing</strong>, which is the first pass where nothing was wrong and is worth recording as such.</p>
+
+  <div class="note clean">
+    <span class="tag">The rule that falls out</span>
+    <p>Do not write a number into prose when an artifact already holds it. Point at the artifact. The corollary is uncomfortable and correct: every inventory, every count, and every &ldquo;currently N&rdquo; in a document you are not going to re-read is a correction you have already scheduled.</p>
+  </div>
+</section>
+
+<section>
+  <span class="eyebrow">The ledger</span>
+  <h2>All seventeen</h2>
+
+  <div class="stats">
+    <div class="stat"><b>55</b><span>decisions</span></div>
+    <div class="stat"><b>4</b><span>superseded</span></div>
+    <div class="stat"><b>17</b><span>errata</span></div>
+    <div class="stat"><b>2</b><span>errata on errata</span></div>
+  </div>
+
+  <div class="tablewrap">
+  <table>
+    <thead>
+      <tr><th>Erratum</th><th>Corrects</th><th>What was wrong</th><th>Kind</th></tr>
+    </thead>
+    <tbody>
+      <tr><td class="e">E-1</td><td class="a">ADR-019</td><td>WasmGC does not inherently forfeit serializable state; the rejection stands on toolchain, layout control, and a canonical byte image.</td><td class="k">reason</td></tr>
+      <tr><td class="e">E-2</td><td class="a">ADR-001</td><td>The ~2MB wasm floor is the standard Go toolchain&rsquo;s, not TinyGo&rsquo;s &mdash; the gap is against one of Go&rsquo;s two toolchains.</td><td class="k">number</td></tr>
+      <tr><td class="e">E-3</td><td class="a">ADR-001</td><td>&ldquo;TinyGo drags in Asyncify&rdquo; is too categorical, and was never the load-bearing reason.</td><td class="k">reason</td></tr>
+      <tr><td class="e">E-4</td><td class="a">ADR-001</td><td>&ldquo;~30% more lines than Go&rdquo; is a projection, not a measurement. No comparable pair was built.</td><td class="k">number</td></tr>
+      <tr><td class="e">E-5</td><td class="a">ADR-006</td><td>Monotonic slots can <em>widen</em> the operand encoding rather than avoid it, by raising the maximum live index.</td><td class="k">reason</td></tr>
+      <tr><td class="e">E-6</td><td class="a">ADR-012</td><td>&ldquo;Transducers are faster&rdquo; is inherited folklore, not measured on this implementation.</td><td class="k">number</td></tr>
+      <tr><td class="e">E-7</td><td class="a">ADR-024</td><td>&ldquo;Hygiene&rdquo; overstates read-time resolution plus gensym; read it as Clojure-style capture avoidance.</td><td class="k">terms</td></tr>
+      <tr><td class="e">E-8</td><td class="a">ADR-010/025</td><td>The predicted 24-byte <code>Value</code> is 16; the sketch assumed fat pointers and the implementation uses thin ones.</td><td class="k">sketch</td></tr>
+      <tr><td class="e">E-9</td><td class="a">ADR-026</td><td>The one-origin carrier cannot coexist with &ldquo;one origin per syntactic child&rdquo;. The real carrier is a tree mirroring the value tree.</td><td class="k">sketch</td></tr>
+      <tr><td class="e">E-10</td><td class="a">ADR-031</td><td>The library/driver split is the third step of the stated progression, not the second &mdash; file modules were skipped, not taken.</td><td class="k">history</td></tr>
+      <tr><td class="e">E-11</td><td class="a">ADR-033</td><td>Accepting <code>nil</code> later is not a widening, and the load-bearing reason is nil-punning rather than one-parameter-one-type.</td><td class="k">reason</td></tr>
+      <tr><td class="e">E-12</td><td class="a">ADR-034</td><td><code>finally</code> duplicates the proto table as well as the code array &mdash; a size statement, not a correctness one.</td><td class="k">scope</td></tr>
+      <tr><td class="e">E-13</td><td class="a">ADR-041</td><td><code>make_mut</code> never avoids the copy today; an unconditional clone is indistinguishable from it under the whole suite.</td><td class="k">claim</td></tr>
+      <tr><td class="e">E-14</td><td class="a">ADR-043</td><td>The two-pass decode was predicted and is not needed; the object table is topologically ordered by construction.</td><td class="k">cost</td></tr>
+      <tr><td class="e">E-15</td><td class="a">E-12</td><td>E-12&rsquo;s consequence went stale: since ADR-043 no <code>Chunk</code> is serialized, so the duplication never reaches a snapshot.</td><td class="k">stale</td></tr>
+      <tr><td class="e">E-16</td><td class="a">ADR-055</td><td>The mutation inventory moved &mdash; and seeding it immediately found a correct assertion aimed at the wrong subject.</td><td class="k">number</td></tr>
+      <tr><td class="e">E-17</td><td class="a">E-16</td><td>Stop stating inventories in prose. <code>mutate.sh</code> is the count, and no further erratum will be filed to move one.</td><td class="k">stale</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>Seventeen corrections against four reversals. The ratio is the finding: a decision that took real thought tends to survive, and the material around it &mdash; the numbers quoted, the sketches, the costs projected, the reasons that sounded general &mdash; is where the errors live. A log that could only supersede would have recorded none of this, because none of it was ever grounds for changing course.</p>
+
+  <p class="next">The harnesses: <a href="mutations.html">Breaking the line is the easy half</a> (mutation) and <a href="subtraction.html">A seam nothing compiles is a seam nobody can trust</a> (subtraction).<br>
+  The findings, in four parts: <a href="oracle.html">The tests were green and two of them were dead</a> (milestones 1&ndash;3) &middot; <a href="limits.html">What a mutation check cannot find</a> (4&ndash;6) &middot; <a href="instrument.html">The instrument that can lie</a> (7&ndash;10) &middot; <a href="programs.html">Nobody had written a program in it</a>.</p>
+</section>
+
+<footer>
+  <p>apolisp is a personal project with one user and no stability promise. Everything on this page is quoted or counted from <code>docs/ADR.md</code>, which is append-only: 55 entries, four carrying a supersession line, seventeen carrying a pointer to a correction filed at the end. Two of those corrections correct earlier corrections, and one of them exists to stop a category of correction being filed again.</p>
+</footer>
+
+</div>
+</body>
+</html>

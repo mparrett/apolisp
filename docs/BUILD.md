@@ -142,6 +142,25 @@ and passed with a call to a function ADR-052 had deleted still sitting in it.
 Anything in `examples/` needs a check that runs, or it is a file nobody notices
 has rotted.
 
+**Rung 5 — the checks can fail.** `just mutate` (ADR-055). Rungs 1 to 4 answer
+"is the code right"; this one answers "would we know if it were not". Each entry
+breaks one load-bearing line and asserts the named test flips from pass to fail.
+
+It is opt-in rather than part of `verify`, because every mutation is a rebuild
+and a gate measured in minutes is a gate people learn to skip. Run it when
+touching something a check is supposed to hold.
+
+Three things are asserted separately, because every way a mutation rots is
+silent: that the edit changed the file, that the mutant still builds, and that
+the test failed — the last from the exit status rather than from grepping output
+for a word. `../reg-lisp` had twenty of eighty-two checks go quiet without it
+showing, for exactly that reason.
+
+A mutation may declare that it *should* survive, with a reason. Two kinds of
+survivor are legitimate: a claim no test can separate, and a guard against a
+failure severe enough to enforce twice on purpose. A declared survivor that
+starts dying is reported too — that means the reason stopped being true.
+
 **Rung 4 — behavior is specified.** A test suite written **in the language
 itself** wherever possible, so it survives implementation churn and doubles as a
 dogfooding pass. Keep it independent of the internals it tests.

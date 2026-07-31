@@ -112,6 +112,12 @@ edit FILE:
     @printf '\n(edit "%s")\n' '{{FILE}}' >> target/examples/editor.xs
     @./target/release/apolisp run target/examples/editor.xs
 
+# Rung 5 (ADR-055): does a check actually check anything? Each mutation breaks
+# one load-bearing line and asserts the named test flips. Deliberately not in
+# `verify` — every mutation is a rebuild, and a gate that slow gets skipped.
+mutate:
+    ./mutate.sh
+
 # Regenerate golden files. Deliberately not part of `test`: a golden update is
 # a behavioural change, and the review-gated rule (BUILD.md) means a human reads
 # the diff and says why. Generating is what *creates* the diff — so generate

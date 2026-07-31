@@ -60,6 +60,43 @@ be larger than one taken at the same point without it — and ADR-029's whole
 claim is that machine state is a function of the computation. Worth checking
 there rather than instrumenting for it now.
 
+## Both open ends closed, 2026-07-31
+
+**M5 is observable now, and the reason the note gave was nearly right.** It
+predicted milestone 8: "an `Image` carries the slot vector, so a snapshot taken
+after a caught throw would be larger than one taken at the same point without
+it." Milestone 8 is what made it possible, but not through the `Image` — through
+*fuelled execution*, which lets a test sample the machine mid-run. The leak is
+invisible at the end of a run and plain in the middle of one.
+
+`unwinding_gives_the_slots_back` asserts depth-independence rather than a number:
+after a catch, the slot stack must not remember how far the throw came from. Flat
+at 11 for depths 2, 8 and 24; 42, 108 and 284 with the release removed.
+
+**And the structural fix's justification was wrong.** This note concluded that
+making `drop_frame` the only release path meant the leak could no longer be
+written without breaking returning too, "and that is caught by eight tests". It
+is not: deleting the truncation outright, which breaks *both* paths, passed all
+118 tests. The fix was right and the reason was false, and only a mutation said
+so — the same shape as milestone 2's finding, one level up. The comment on
+`drop_frame` has been corrected.
+
+**M4 was also weaker than recorded.** The row says it "failed (2), indirectly,
+exactly as predicted", and that is true of the mutation as written — one that
+leaves a record parked trips the end-of-run assertion. But `unwind` suppresses in
+*two* places, and only one was reached: draining when the handler stack runs out,
+which `a_cleanup_error_wins_and_keeps_the_original_as_suppressed` covers, and
+displacing a parked record whose cleanup this unwind escaped, which nothing did.
+Removing the suppression from the second left the suite green.
+
+Reaching it needs a shape neither that test nor `errors.xs` has: the displacing
+unwind must escape **uncaught**, because a catch binds the value alone and drops
+the chain by ADR-039 clause 4 — so every case that did reach the branch threw the
+evidence away in the next step. Two nested `finally`s and no `catch`.
+`a_displaced_parked_error_is_merged_into_the_one_that_displaced_it` is that test.
+
+Both are in `mutate.sh` now (ADR-055), which is how they were found.
+
 ## Method
 
 Commit first, then mutate, then `git checkout -- src/lib.rs`. Milestone 2's note

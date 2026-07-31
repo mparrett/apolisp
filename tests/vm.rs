@@ -422,6 +422,30 @@ fn a_cleanup_error_wins_and_keeps_the_original_as_suppressed() {
     assert!(!err.contains("suppressing"), "got {err:?}");
 }
 
+/// The *other* place `unwind` suppresses, and until ADR-055 nothing reached it.
+///
+/// There are two: draining the parked records when the handler stack runs out,
+/// which the test above covers, and displacing a parked record whose cleanup
+/// this unwind has escaped — `p.depth > ex.handlers.len()`. Removing the
+/// suppression from the second left the whole suite green.
+///
+/// It needs a shape neither the test above nor `errors.xs` has. The parked error
+/// must be displaced *and* the displacing one must escape uncaught: a catch binds
+/// the value alone and drops the chain by decision (ADR-039 clause 4), so every
+/// existing case that reaches this branch throws the evidence away immediately.
+/// Two nested `finally`s and no `catch` anywhere is the smallest thing that both
+/// displaces and still reports.
+#[test]
+fn a_displaced_parked_error_is_merged_into_the_one_that_displaced_it() {
+    let err = run(
+        "(try (try (throw :original) (finally (throw :from-cleanup)))
+                        (finally (println :outer-cleanup)))",
+    )
+    .expect_err("should throw");
+    assert!(err.starts_with("threw :from-cleanup"), "got {err:?}");
+    assert!(err.contains("suppressing :original"), "got {err:?}");
+}
+
 /// Unwinding is what drops the frames between the throw and the handler. The
 /// run continues afterwards, which is the part that would break if the slot
 /// stack were left where the throw abandoned it.
@@ -595,4 +619,61 @@ fn a_closed_handle_returns_its_slot_and_a_stale_id_cannot_reach_it() {
 
     assert!(vm.close_handle(b) && vm.close_handle(c));
     assert_eq!(vm.open_handles(), base);
+}
+
+/// The slot stack at the last suspension, for a program that throws from
+/// `depth` frames down and catches at the top, then runs a tail loop so the
+/// sample lands well after the unwinding is over.
+fn slots_after_catch(depth: i32) -> usize {
+    let src = format!(
+        "(def g (fn g [n] (if (< n 1) (throw :deep) (+ 1 (g (- n 1))))))
+         (try (g {depth}) (catch e 0))
+         (loop [i 0] (if (= i 40) :done (recur (+ i 1))))"
+    );
+    let mut machine = Vm::new();
+    let forms = reader::read_all(&src, &mut machine.interner).expect("the probe reads");
+    let forms = apolisp::expand::expand_all(forms, &mut machine).expect("the probe expands");
+    let chunk = compile::compile(&forms, &mut machine.interner).expect("the probe compiles");
+    let mut ex = vm::start(&chunk);
+    let mut last = 0usize;
+    loop {
+        let (outcome, next, _) = vm::run_fueled(&mut machine, &chunk, ex, 1);
+        ex = next;
+        if !matches!(outcome, Outcome::Suspended) {
+            break;
+        }
+        last = ex.slot_count();
+    }
+    last
+}
+
+/// Milestone 4's M5, observable at last.
+///
+/// *Unwinding drops the frames but keeps their slots* survived that pass and
+/// every test since: the leak is bounded, so no high-water mark moves, and slots
+/// above a callee's arguments are nil-filled, so no value is ever wrong.
+/// `notes/milestone-4-mutants.md` concluded there was no cheap test to add and
+/// predicted where one would become possible — "the first place this becomes
+/// visible is milestone 8". This is that test, and the prediction was right for
+/// a reason it did not name: fuelled execution lets a test sample the machine
+/// *mid-run*, and the leak is invisible at the end of one.
+///
+/// The claim is depth-independence rather than a number. After the catch, the
+/// slot stack must not remember how far the throw came from — flat at 11 for
+/// every depth here, against 42, 108 and 284 when the release is removed.
+///
+/// This also refutes the comment `drop_frame` used to carry. It said sharing one
+/// release path meant the leak could not be written without breaking returning
+/// too, "and that is caught by eight tests". Deleting the truncation outright —
+/// breaking both paths — passed all 118.
+#[test]
+fn unwinding_gives_the_slots_back() {
+    let shallow = slots_after_catch(2);
+    for depth in [8, 24] {
+        assert_eq!(
+            slots_after_catch(depth),
+            shallow,
+            "a throw caught from {depth} frames down left more slots behind than one from 2"
+        );
+    }
 }

@@ -3565,12 +3565,19 @@ pub mod vm {
     /// Pop one frame and give its slots back.
     ///
     /// The only place a frame is released, so returning and unwinding cannot
-    /// disagree about what that means — and the milestone-4 mutation pass says
-    /// that sharing is the *only* thing keeping the unwinding side honest.
-    /// Dropping the frames while keeping their slots leaves every test green:
-    /// the leak is bounded, never reaches a value, and cannot move a high-water
-    /// mark. It is visible only as dead slots carried into later frames and
-    /// into an `Image` (ADR-029, `notes/milestone-4-mutants.md`).
+    /// disagree about what that means.
+    ///
+    /// This used to claim that sharing one path was what kept the unwinding side
+    /// honest, because writing the leak meant breaking returning too "and that is
+    /// caught by eight tests". **It was not.** Deleting the truncation outright,
+    /// which breaks both paths, passed all 118 tests — the leak is bounded, never
+    /// reaches a value, and cannot move a high-water mark, in either direction.
+    /// The structural fix was right and its justification was wrong, and only
+    /// `just mutate` said so (ADR-055, `notes/milestone-4-mutants.md`).
+    ///
+    /// What holds it now is `unwinding_gives_the_slots_back`, which samples the
+    /// machine mid-run and asserts the slot stack after a catch does not depend
+    /// on how deep the throw was.
     fn drop_frame(ex: &mut Execution) -> Frame {
         let f = ex.frames.pop().expect("a frame to drop");
         ex.slots.truncate(f.ret_len);

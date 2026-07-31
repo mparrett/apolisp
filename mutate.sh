@@ -261,6 +261,58 @@ mutation src/lib.rs \
   '--test compile' \
   'emit records the origin it was given rather than Unknown'
 
+# --- The handler stack (milestone 4) ----------------------------------------
+#
+# `notes/milestone-4-mutants.md` ran five of these and predicted every outcome.
+# Four are here. The fifth — unwinding drops the frames but keeps their slots —
+# **cannot be written any more**, and that is the finding rather than an
+# omission: it survived the whole suite when it was expressible, because the leak
+# is bounded, never reaches a value and cannot move a high-water mark. The
+# response was structural, not another test. `drop_frame` became the only place a
+# frame is released, so writing the unwinding half alone means breaking returning
+# too. The mutation below is what is left of it, and it dies loudly.
+
+VM='--test vm'
+
+mutation src/lib.rs \
+  'while ex.frames.len() > h.frame + 1 {
+            drop_frame(ex);
+        }' \
+  '' \
+  "$VM" \
+  'unwind drops the frames above the handler owner, through the same call a return uses'
+
+mutation src/lib.rs \
+  'ex.slots.truncate(f.ret_len);' \
+  '' \
+  "$VM" \
+  'drop_frame gives the slots back, which nothing observed until ADR-055 found it'
+
+mutation src/lib.rs \
+  '                    .expect("ENDFINALLY outside an unwinding cleanup");
+                return Err(p.unwind);' \
+  '                    .expect("ENDFINALLY outside an unwinding cleanup");
+                let _ = p.unwind;' \
+  "$VM" \
+  'ENDFINALLY re-raises the parked unwind rather than carrying on'
+
+mutation src/lib.rs \
+  'let h = ex
+                    .handlers
+                    .pop()
+                    .expect("POPHANDLER with no open handler region");
+                debug_assert_eq!(h.frame, fi, "a handler record outlived its frame");' \
+  '' \
+  "$VM" \
+  'POPHANDLER pops, so a region does not outlive the code it guards'
+
+mutation src/lib.rs \
+  'let p = ex.pending.pop().expect("just checked");
+            u.suppress(p.unwind);' \
+  'let _p = ex.pending.pop().expect("just checked");' \
+  "$VM" \
+  'a displaced parked unwind is merged into the one that displaced it (ADR-028 invariant 3)'
+
 echo
 echo "=== $flipped of $total flipped, $survived_ok survived as declared"
 if [ ${#dead[@]} -gt 0 ]; then

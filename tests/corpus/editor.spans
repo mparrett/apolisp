@@ -1215,224 +1215,276 @@
         12835..12839 symbol flag
         12840..12843 symbol pos
         12844..12847 symbol msg
-12853..13279 list (defn frame [state cols rows] (let [state (scroll-to-cursor state rows) top (get state :scroll-row) page (take (text-rows state rows) (drop top (get state :lines))) body (join "\n" (map (fn [l] (clip cols l)) page)) foot (if (shows-help? state rows) (str (help-line state cols) "\n" (status-line state cols)) (status-line state cols))] (str body "\n" foot)))
-  12854..12858 symbol defn
-  12859..12864 symbol frame
-  12865..12882 vector [state cols rows]
-    12866..12871 symbol state
-    12872..12876 symbol cols
-    12877..12881 symbol rows
-  12885..13278 list (let [state (scroll-to-cursor state rows) top (get state :scroll-row) page (take (text-rows state rows) (drop top (get state :lines))) body (join "\n" (map (fn [l] (clip cols l)) page)) foot (if (shows-help? state rows) (str (help-line state cols) "\n" (status-line state cols)) (status-line state cols))] (str body "\n" foot))
-    12886..12889 symbol let
-    12890..13252 vector [state (scroll-to-cursor state rows) top (get state :scroll-row) page (take (text-rows state rows) (drop top (get state :lines))) body (join "\n" (map (fn [l] (clip cols l)) page)) foot (if (shows-help? state rows) (str (help-line state cols) "\n" (status-line state cols)) (status-line state cols))]
-      12891..12896 symbol state
-      12897..12926 list (scroll-to-cursor state rows)
-        12898..12914 symbol scroll-to-cursor
-        12915..12920 symbol state
-        12921..12925 symbol rows
-      12935..12938 symbol top
-      12939..12962 list (get state :scroll-row)
-        12940..12943 symbol get
-        12944..12949 symbol state
-        12950..12961 keyword :scroll-row
-      12971..12975 symbol page
-      12976..13035 list (take (text-rows state rows) (drop top (get state :lines)))
-        12977..12981 symbol take
-        12982..13004 list (text-rows state rows)
-          12983..12992 symbol text-rows
-          12993..12998 symbol state
-          12999..13003 symbol rows
-        13005..13034 list (drop top (get state :lines))
-          13006..13010 symbol drop
-          13011..13014 symbol top
-          13015..13033 list (get state :lines)
-            13016..13019 symbol get
-            13020..13025 symbol state
-            13026..13032 keyword :lines
-      13044..13048 symbol body
-      13049..13094 list (join "\n" (map (fn [l] (clip cols l)) page))
-        13050..13054 symbol join
-        13055..13059 string "\n"
-        13060..13093 list (map (fn [l] (clip cols l)) page)
-          13061..13064 symbol map
-          13065..13087 list (fn [l] (clip cols l))
-            13066..13068 symbol fn
-            13069..13072 vector [l]
-              13070..13071 symbol l
-            13073..13086 list (clip cols l)
-              13074..13078 symbol clip
-              13079..13083 symbol cols
-              13084..13085 symbol l
-          13088..13092 symbol page
-      13103..13107 symbol foot
-      13108..13251 list (if (shows-help? state rows) (str (help-line state cols) "\n" (status-line state cols)) (status-line state cols))
-        13109..13111 symbol if
-        13112..13136 list (shows-help? state rows)
-          13113..13124 symbol shows-help?
-          13125..13130 symbol state
-          13131..13135 symbol rows
-        13152..13210 list (str (help-line state cols) "\n" (status-line state cols))
-          13153..13156 symbol str
-          13157..13179 list (help-line state cols)
-            13158..13167 symbol help-line
-            13168..13173 symbol state
-            13174..13178 symbol cols
-          13180..13184 string "\n"
-          13185..13209 list (status-line state cols)
-            13186..13197 symbol status-line
-            13198..13203 symbol state
-            13204..13208 symbol cols
-        13226..13250 list (status-line state cols)
-          13227..13238 symbol status-line
-          13239..13244 symbol state
-          13245..13249 symbol cols
-    13257..13277 list (str body "\n" foot)
-      13258..13261 symbol str
-      13262..13266 symbol body
-      13267..13271 string "\n"
-      13272..13276 symbol foot
-14160..14337 list (def script ["h" "e" "l" "l" "o" "RET" "w" "o" "r" "l" "d" "C-a" "!" "up" "C-e" "?" "DEL" "down" "C-e" "RET" "z" "RET" "l" "o" "n" "g" "e" "r" "up" "up" "C-x" "C-c"])
-  14161..14164 symbol def
-  14165..14171 symbol script
-  14174..14336 vector ["h" "e" "l" "l" "o" "RET" "w" "o" "r" "l" "d" "C-a" "!" "up" "C-e" "?" "DEL" "down" "C-e" "RET" "z" "RET" "l" "o" "n" "g" "e" "r" "up" "up" "C-x" "C-c"]
-    14175..14178 string "h"
-    14179..14182 string "e"
-    14183..14186 string "l"
-    14187..14190 string "l"
-    14191..14194 string "o"
-    14195..14200 string "RET"
-    14201..14204 string "w"
-    14205..14208 string "o"
-    14209..14212 string "r"
-    14213..14216 string "l"
-    14217..14220 string "d"
-    14224..14229 string "C-a"
-    14230..14233 string "!"
-    14234..14238 string "up"
-    14239..14244 string "C-e"
-    14245..14248 string "?"
-    14249..14254 string "DEL"
-    14255..14261 string "down"
-    14265..14270 string "C-e"
-    14271..14276 string "RET"
-    14277..14280 string "z"
-    14281..14286 string "RET"
-    14287..14290 string "l"
-    14291..14294 string "o"
-    14295..14298 string "n"
-    14299..14302 string "g"
-    14303..14306 string "e"
-    14307..14310 string "r"
-    14311..14315 string "up"
-    14316..14320 string "up"
-    14324..14329 string "C-x"
-    14330..14335 string "C-c"
-14338..14402 list (def final (reduce dispatch (new-state "demo.txt" [""]) script))
-  14339..14342 symbol def
-  14343..14348 symbol final
-  14349..14401 list (reduce dispatch (new-state "demo.txt" [""]) script)
-    14350..14356 symbol reduce
-    14357..14365 symbol dispatch
-    14366..14393 list (new-state "demo.txt" [""])
-      14367..14376 symbol new-state
-      14377..14387 string "demo.txt"
-      14388..14392 vector [""]
-        14389..14391 string ""
-    14394..14400 symbol script
-14403..14424 list (println "--- frame")
-  14404..14411 symbol println
-  14412..14423 string "--- frame"
-14425..14453 list (println (frame final 32 6))
-  14426..14433 symbol println
-  14434..14452 list (frame final 32 6)
-    14435..14440 symbol frame
-    14441..14446 symbol final
-    14447..14449 int 32
-    14450..14451 int 6
-14454..14475 list (println "--- lines")
-  14455..14462 symbol println
-  14463..14474 string "--- lines"
-14476..14510 list (println (str (get final :lines)))
-  14477..14484 symbol println
-  14485..14509 list (str (get final :lines))
-    14486..14489 symbol str
-    14490..14508 list (get final :lines)
-      14491..14494 symbol get
-      14495..14500 symbol final
-      14501..14507 keyword :lines
-14511..14592 list (println (str "quit? " (get final :quit?) "  modified? " (get final :modified?)))
-  14512..14519 symbol println
-  14520..14591 list (str "quit? " (get final :quit?) "  modified? " (get final :modified?))
-    14521..14524 symbol str
-    14525..14533 string "quit? "
-    14534..14552 list (get final :quit?)
-      14535..14538 symbol get
-      14539..14544 symbol final
-      14545..14551 keyword :quit?
-    14553..14567 string "  modified? "
-    14568..14590 list (get final :modified?)
-      14569..14572 symbol get
-      14573..14578 symbol final
-      14579..14589 keyword :modified?
-15277..15308 list (println "--- frame at 2 rows")
-  15278..15285 symbol println
-  15286..15307 string "--- frame at 2 rows"
-15309..15337 list (println (frame final 32 2))
-  15310..15317 symbol println
-  15318..15336 list (frame final 32 2)
-    15319..15324 symbol frame
-    15325..15330 symbol final
-    15331..15333 int 32
-    15334..15335 int 2
-15734..16051 list (defn geometry [rows] (let [sq (scroll-to-cursor final rows)] (println (str "rows " rows "  text-rows " (text-rows final rows) "  help " (shows-help? final rows) "  scroll-row " (get sq :scroll-row) "  cursor-row " (get sq :cursor-row)))))
-  15735..15739 symbol defn
-  15740..15748 symbol geometry
-  15749..15755 vector [rows]
-    15750..15754 symbol rows
-  15758..16050 list (let [sq (scroll-to-cursor final rows)] (println (str "rows " rows "  text-rows " (text-rows final rows) "  help " (shows-help? final rows) "  scroll-row " (get sq :scroll-row) "  cursor-row " (get sq :cursor-row))))
-    15759..15762 symbol let
-    15763..15797 vector [sq (scroll-to-cursor final rows)]
-      15764..15766 symbol sq
-      15767..15796 list (scroll-to-cursor final rows)
-        15768..15784 symbol scroll-to-cursor
-        15785..15790 symbol final
-        15791..15795 symbol rows
-    15802..16049 list (println (str "rows " rows "  text-rows " (text-rows final rows) "  help " (shows-help? final rows) "  scroll-row " (get sq :scroll-row) "  cursor-row " (get sq :cursor-row)))
-      15803..15810 symbol println
-      15811..16048 list (str "rows " rows "  text-rows " (text-rows final rows) "  help " (shows-help? final rows) "  scroll-row " (get sq :scroll-row) "  cursor-row " (get sq :cursor-row))
-        15812..15815 symbol str
-        15816..15823 string "rows "
-        15824..15828 symbol rows
-        15847..15861 string "  text-rows "
-        15862..15884 list (text-rows final rows)
-          15863..15872 symbol text-rows
-          15873..15878 symbol final
-          15879..15883 symbol rows
-        15903..15912 string "  help "
-        15913..15937 list (shows-help? final rows)
-          15914..15925 symbol shows-help?
-          15926..15931 symbol final
-          15932..15936 symbol rows
-        15956..15971 string "  scroll-row "
-        15972..15992 list (get sq :scroll-row)
-          15973..15976 symbol get
-          15977..15979 symbol sq
-          15980..15991 keyword :scroll-row
-        16011..16026 string "  cursor-row "
-        16027..16047 list (get sq :cursor-row)
-          16028..16031 symbol get
-          16032..16034 symbol sq
-          16035..16046 keyword :cursor-row
-16052..16100 list (println "--- geometry as the height collapses")
-  16053..16060 symbol println
-  16061..16099 string "--- geometry as the height collapses"
-16101..16113 list (geometry 3)
-  16102..16110 symbol geometry
-  16111..16112 int 3
-16114..16126 list (geometry 2)
-  16115..16123 symbol geometry
-  16124..16125 int 2
-16127..16139 list (geometry 1)
-  16128..16136 symbol geometry
-  16137..16138 int 1
+13577..13651 list (defn pad-rows [n xs] (concat xs (repeat (max2 0 (- n (count xs))) "")))
+  13578..13582 symbol defn
+  13583..13591 symbol pad-rows
+  13592..13598 vector [n xs]
+    13593..13594 symbol n
+    13595..13597 symbol xs
+  13601..13650 list (concat xs (repeat (max2 0 (- n (count xs))) ""))
+    13602..13608 symbol concat
+    13609..13611 symbol xs
+    13612..13649 list (repeat (max2 0 (- n (count xs))) "")
+      13613..13619 symbol repeat
+      13620..13645 list (max2 0 (- n (count xs)))
+        13621..13625 symbol max2
+        13626..13627 int 0
+        13628..13644 list (- n (count xs))
+          13629..13630 symbol -
+          13631..13632 symbol n
+          13633..13643 list (count xs)
+            13634..13639 symbol count
+            13640..13642 symbol xs
+      13646..13648 string ""
+13653..14116 list (defn frame [state cols rows] (let [state (scroll-to-cursor state rows) top (get state :scroll-row) avail (text-rows state rows) page (pad-rows avail (take avail (drop top (get state :lines)))) body (join "\n" (map (fn [l] (clip cols l)) page)) foot (if (shows-help? state rows) (str (help-line state cols) "\n" (status-line state cols)) (status-line state cols))] (str body "\n" foot)))
+  13654..13658 symbol defn
+  13659..13664 symbol frame
+  13665..13682 vector [state cols rows]
+    13666..13671 symbol state
+    13672..13676 symbol cols
+    13677..13681 symbol rows
+  13685..14115 list (let [state (scroll-to-cursor state rows) top (get state :scroll-row) avail (text-rows state rows) page (pad-rows avail (take avail (drop top (get state :lines)))) body (join "\n" (map (fn [l] (clip cols l)) page)) foot (if (shows-help? state rows) (str (help-line state cols) "\n" (status-line state cols)) (status-line state cols))] (str body "\n" foot))
+    13686..13689 symbol let
+    13690..14089 vector [state (scroll-to-cursor state rows) top (get state :scroll-row) avail (text-rows state rows) page (pad-rows avail (take avail (drop top (get state :lines)))) body (join "\n" (map (fn [l] (clip cols l)) page)) foot (if (shows-help? state rows) (str (help-line state cols) "\n" (status-line state cols)) (status-line state cols))]
+      13691..13696 symbol state
+      13697..13726 list (scroll-to-cursor state rows)
+        13698..13714 symbol scroll-to-cursor
+        13715..13720 symbol state
+        13721..13725 symbol rows
+      13735..13738 symbol top
+      13739..13762 list (get state :scroll-row)
+        13740..13743 symbol get
+        13744..13749 symbol state
+        13750..13761 keyword :scroll-row
+      13771..13776 symbol avail
+      13777..13799 list (text-rows state rows)
+        13778..13787 symbol text-rows
+        13788..13793 symbol state
+        13794..13798 symbol rows
+      13808..13812 symbol page
+      13813..13872 list (pad-rows avail (take avail (drop top (get state :lines))))
+        13814..13822 symbol pad-rows
+        13823..13828 symbol avail
+        13829..13871 list (take avail (drop top (get state :lines)))
+          13830..13834 symbol take
+          13835..13840 symbol avail
+          13841..13870 list (drop top (get state :lines))
+            13842..13846 symbol drop
+            13847..13850 symbol top
+            13851..13869 list (get state :lines)
+              13852..13855 symbol get
+              13856..13861 symbol state
+              13862..13868 keyword :lines
+      13881..13885 symbol body
+      13886..13931 list (join "\n" (map (fn [l] (clip cols l)) page))
+        13887..13891 symbol join
+        13892..13896 string "\n"
+        13897..13930 list (map (fn [l] (clip cols l)) page)
+          13898..13901 symbol map
+          13902..13924 list (fn [l] (clip cols l))
+            13903..13905 symbol fn
+            13906..13909 vector [l]
+              13907..13908 symbol l
+            13910..13923 list (clip cols l)
+              13911..13915 symbol clip
+              13916..13920 symbol cols
+              13921..13922 symbol l
+          13925..13929 symbol page
+      13940..13944 symbol foot
+      13945..14088 list (if (shows-help? state rows) (str (help-line state cols) "\n" (status-line state cols)) (status-line state cols))
+        13946..13948 symbol if
+        13949..13973 list (shows-help? state rows)
+          13950..13961 symbol shows-help?
+          13962..13967 symbol state
+          13968..13972 symbol rows
+        13989..14047 list (str (help-line state cols) "\n" (status-line state cols))
+          13990..13993 symbol str
+          13994..14016 list (help-line state cols)
+            13995..14004 symbol help-line
+            14005..14010 symbol state
+            14011..14015 symbol cols
+          14017..14021 string "\n"
+          14022..14046 list (status-line state cols)
+            14023..14034 symbol status-line
+            14035..14040 symbol state
+            14041..14045 symbol cols
+        14063..14087 list (status-line state cols)
+          14064..14075 symbol status-line
+          14076..14081 symbol state
+          14082..14086 symbol cols
+    14094..14114 list (str body "\n" foot)
+      14095..14098 symbol str
+      14099..14103 symbol body
+      14104..14108 string "\n"
+      14109..14113 symbol foot
+14997..15174 list (def script ["h" "e" "l" "l" "o" "RET" "w" "o" "r" "l" "d" "C-a" "!" "up" "C-e" "?" "DEL" "down" "C-e" "RET" "z" "RET" "l" "o" "n" "g" "e" "r" "up" "up" "C-x" "C-c"])
+  14998..15001 symbol def
+  15002..15008 symbol script
+  15011..15173 vector ["h" "e" "l" "l" "o" "RET" "w" "o" "r" "l" "d" "C-a" "!" "up" "C-e" "?" "DEL" "down" "C-e" "RET" "z" "RET" "l" "o" "n" "g" "e" "r" "up" "up" "C-x" "C-c"]
+    15012..15015 string "h"
+    15016..15019 string "e"
+    15020..15023 string "l"
+    15024..15027 string "l"
+    15028..15031 string "o"
+    15032..15037 string "RET"
+    15038..15041 string "w"
+    15042..15045 string "o"
+    15046..15049 string "r"
+    15050..15053 string "l"
+    15054..15057 string "d"
+    15061..15066 string "C-a"
+    15067..15070 string "!"
+    15071..15075 string "up"
+    15076..15081 string "C-e"
+    15082..15085 string "?"
+    15086..15091 string "DEL"
+    15092..15098 string "down"
+    15102..15107 string "C-e"
+    15108..15113 string "RET"
+    15114..15117 string "z"
+    15118..15123 string "RET"
+    15124..15127 string "l"
+    15128..15131 string "o"
+    15132..15135 string "n"
+    15136..15139 string "g"
+    15140..15143 string "e"
+    15144..15147 string "r"
+    15148..15152 string "up"
+    15153..15157 string "up"
+    15161..15166 string "C-x"
+    15167..15172 string "C-c"
+15175..15239 list (def final (reduce dispatch (new-state "demo.txt" [""]) script))
+  15176..15179 symbol def
+  15180..15185 symbol final
+  15186..15238 list (reduce dispatch (new-state "demo.txt" [""]) script)
+    15187..15193 symbol reduce
+    15194..15202 symbol dispatch
+    15203..15230 list (new-state "demo.txt" [""])
+      15204..15213 symbol new-state
+      15214..15224 string "demo.txt"
+      15225..15229 vector [""]
+        15226..15228 string ""
+    15231..15237 symbol script
+15240..15261 list (println "--- frame")
+  15241..15248 symbol println
+  15249..15260 string "--- frame"
+15262..15290 list (println (frame final 32 6))
+  15263..15270 symbol println
+  15271..15289 list (frame final 32 6)
+    15272..15277 symbol frame
+    15278..15283 symbol final
+    15284..15286 int 32
+    15287..15288 int 6
+15291..15312 list (println "--- lines")
+  15292..15299 symbol println
+  15300..15311 string "--- lines"
+15313..15347 list (println (str (get final :lines)))
+  15314..15321 symbol println
+  15322..15346 list (str (get final :lines))
+    15323..15326 symbol str
+    15327..15345 list (get final :lines)
+      15328..15331 symbol get
+      15332..15337 symbol final
+      15338..15344 keyword :lines
+15348..15429 list (println (str "quit? " (get final :quit?) "  modified? " (get final :modified?)))
+  15349..15356 symbol println
+  15357..15428 list (str "quit? " (get final :quit?) "  modified? " (get final :modified?))
+    15358..15361 symbol str
+    15362..15370 string "quit? "
+    15371..15389 list (get final :quit?)
+      15372..15375 symbol get
+      15376..15381 symbol final
+      15382..15388 keyword :quit?
+    15390..15404 string "  modified? "
+    15405..15427 list (get final :modified?)
+      15406..15409 symbol get
+      15410..15415 symbol final
+      15416..15426 keyword :modified?
+16114..16145 list (println "--- frame at 2 rows")
+  16115..16122 symbol println
+  16123..16144 string "--- frame at 2 rows"
+16146..16174 list (println (frame final 32 2))
+  16147..16154 symbol println
+  16155..16173 list (frame final 32 2)
+    16156..16161 symbol frame
+    16162..16167 symbol final
+    16168..16170 int 32
+    16171..16172 int 2
+16571..16888 list (defn geometry [rows] (let [sq (scroll-to-cursor final rows)] (println (str "rows " rows "  text-rows " (text-rows final rows) "  help " (shows-help? final rows) "  scroll-row " (get sq :scroll-row) "  cursor-row " (get sq :cursor-row)))))
+  16572..16576 symbol defn
+  16577..16585 symbol geometry
+  16586..16592 vector [rows]
+    16587..16591 symbol rows
+  16595..16887 list (let [sq (scroll-to-cursor final rows)] (println (str "rows " rows "  text-rows " (text-rows final rows) "  help " (shows-help? final rows) "  scroll-row " (get sq :scroll-row) "  cursor-row " (get sq :cursor-row))))
+    16596..16599 symbol let
+    16600..16634 vector [sq (scroll-to-cursor final rows)]
+      16601..16603 symbol sq
+      16604..16633 list (scroll-to-cursor final rows)
+        16605..16621 symbol scroll-to-cursor
+        16622..16627 symbol final
+        16628..16632 symbol rows
+    16639..16886 list (println (str "rows " rows "  text-rows " (text-rows final rows) "  help " (shows-help? final rows) "  scroll-row " (get sq :scroll-row) "  cursor-row " (get sq :cursor-row)))
+      16640..16647 symbol println
+      16648..16885 list (str "rows " rows "  text-rows " (text-rows final rows) "  help " (shows-help? final rows) "  scroll-row " (get sq :scroll-row) "  cursor-row " (get sq :cursor-row))
+        16649..16652 symbol str
+        16653..16660 string "rows "
+        16661..16665 symbol rows
+        16684..16698 string "  text-rows "
+        16699..16721 list (text-rows final rows)
+          16700..16709 symbol text-rows
+          16710..16715 symbol final
+          16716..16720 symbol rows
+        16740..16749 string "  help "
+        16750..16774 list (shows-help? final rows)
+          16751..16762 symbol shows-help?
+          16763..16768 symbol final
+          16769..16773 symbol rows
+        16793..16808 string "  scroll-row "
+        16809..16829 list (get sq :scroll-row)
+          16810..16813 symbol get
+          16814..16816 symbol sq
+          16817..16828 keyword :scroll-row
+        16848..16863 string "  cursor-row "
+        16864..16884 list (get sq :cursor-row)
+          16865..16868 symbol get
+          16869..16871 symbol sq
+          16872..16883 keyword :cursor-row
+16889..16937 list (println "--- geometry as the height collapses")
+  16890..16897 symbol println
+  16898..16936 string "--- geometry as the height collapses"
+16938..16950 list (geometry 3)
+  16939..16947 symbol geometry
+  16948..16949 int 3
+16951..16963 list (geometry 2)
+  16952..16960 symbol geometry
+  16961..16962 int 2
+16964..16976 list (geometry 1)
+  16965..16973 symbol geometry
+  16974..16975 int 1
+17546..17591 list (println "--- frame at 10 rows, buffer of 4")
+  17547..17554 symbol println
+  17555..17590 string "--- frame at 10 rows, buffer of 4"
+17592..17621 list (println (frame final 32 10))
+  17593..17600 symbol println
+  17601..17620 list (frame final 32 10)
+    17602..17607 symbol frame
+    17608..17613 symbol final
+    17614..17616 int 32
+    17617..17619 int 10
+17622..17708 list (println (str "frame lines " (count (split "\n" (frame final 32 10))) " for 10 rows"))
+  17623..17630 symbol println
+  17631..17707 list (str "frame lines " (count (split "\n" (frame final 32 10))) " for 10 rows")
+    17632..17635 symbol str
+    17636..17650 string "frame lines "
+    17651..17691 list (count (split "\n" (frame final 32 10)))
+      17652..17657 symbol count
+      17658..17690 list (split "\n" (frame final 32 10))
+        17659..17664 symbol split
+        17665..17669 string "\n"
+        17670..17689 list (frame final 32 10)
+          17671..17676 symbol frame
+          17677..17682 symbol final
+          17683..17685 int 32
+          17686..17688 int 10
+    17692..17706 string " for 10 rows"
 ok: span invariants hold

@@ -289,10 +289,26 @@
         msg (if (= (get state :message) nil) "" (str "  " (get state :message)))]
     (clip cols (str name flag pos msg))))
 
+; A buffer shorter than the window is padded with blank lines, so the frame is
+; always exactly `rows` tall and the status line sits on the bottom edge.
+;
+; Without this the footer floated directly under the last line of text and the
+; rest of the window was left blank, which is wrong in a way that hid something
+; worse: **the status line moving with the window edge is how a person sees that
+; a resize was noticed at all.** Pinned to the content instead, a correct repaint
+; at a new size is indistinguishable from no repaint, and the resize work looked
+; broken to the one person testing it while being measurably fine.
+;
+; `max2 0` because `repeat` counts up to `n` with `=`, so a negative count does
+; not terminate.
+(defn pad-rows [n xs]
+  (concat xs (repeat (max2 0 (- n (count xs))) "")))
+
 (defn frame [state cols rows]
   (let [state (scroll-to-cursor state rows)
         top (get state :scroll-row)
-        page (take (text-rows state rows) (drop top (get state :lines)))
+        avail (text-rows state rows)
+        page (pad-rows avail (take avail (drop top (get state :lines))))
         body (join "\n" (map (fn [l] (clip cols l)) page))
         foot (if (shows-help? state rows)
                (str (help-line state cols) "\n" (status-line state cols))
@@ -355,3 +371,17 @@
 (geometry 3)
 (geometry 2)
 (geometry 1)
+
+; --- The frame fills a window taller than the buffer -------------------------
+;
+; Four lines of text in a ten-row window. The blanks are the assertion: without
+; them the footer floats under the last line of text and the bottom of the window
+; is left as it was, which is how a correct repaint at a new size becomes
+; indistinguishable from no repaint at all.
+;
+; Pinned separately because the frame above cannot see it — at 32x6 the buffer is
+; exactly as tall as the space, so no padding happens and the fix is invisible to
+; the oracle that exists to catch it.
+(println "--- frame at 10 rows, buffer of 4")
+(println (frame final 32 10))
+(println (str "frame lines " (count (split "\n" (frame final 32 10))) " for 10 rows"))

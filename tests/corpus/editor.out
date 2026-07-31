@@ -16,6 +16,18 @@ demo.txt * 2:7
 rows 3  text-rows 1  help true  scroll-row 1  cursor-row 1
 rows 2  text-rows 1  help false  scroll-row 1  cursor-row 1
 rows 1  text-rows 1  help false  scroll-row 1  cursor-row 1
+--- frame at 10 rows, buffer of 4
+hello
+!world
+z
+longer
+
+
+
+
+C-o save  C-x C-c quit  C-g hide
+demo.txt * 2:7
+frame lines 10 for 10 rows
 --- value
 nil
 --- exit

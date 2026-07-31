@@ -1,0 +1,815 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>apolisp — how the mutation harness works</title>
+<meta name="description" content="Rung 5 of a Lisp VM's oracle, in mechanical detail: what one mutation is made of, the three gates every run passes through, and the five verdicts that keep a caught mutant from being confused with a mutation that never happened.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%A7%AA%3C/text%3E%3C/svg%3E">
+<style>
+  :root {
+    color-scheme: light dark;
+
+    --ground:    #edf0f3;
+    --panel:     #f8fafb;
+    --panel-2:   #e2e7ec;
+    --ink:       #14181d;
+    --muted:     #525c68;
+    --faint:     #7f8996;
+    --accent:    #1f5f7a;
+    --accent-w:  #d7e6ed;
+    --dead:      #9c3327;
+    --dead-w:    #f3ddd9;
+    --live:      #14614f;
+    --live-w:    #d6eae4;
+    /* A third outcome colour the earlier pages did not need. They report a
+       mutant as caught or not; this one has to show a survivor that was
+       *declared*, which is neither a failure nor a pass. */
+    --warn:      #8a5a12;
+    --warn-w:    #f4e6cc;
+    --hair:      #ccd4db;
+    --hair-2:    #b0bac4;
+
+    --serif: "Charter", "Bitstream Charter", "Iowan Old Style", Georgia, ui-serif, serif;
+    --util:  "Avenir Next", Avenir, Futura, Optima, ui-sans-serif, system-ui, sans-serif;
+    --mono:  ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+
+    --measure: 64ch;
+    --rule: 1px solid var(--hair);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground:   #131619;
+      --panel:    #191d21;
+      --panel-2:  #22272d;
+      --ink:      #e3e7ec;
+      --muted:    #98a2ae;
+      --faint:    #6b7581;
+      --accent:   #6cb6d4;
+      --accent-w: #14313d;
+      --dead:     #e0837a;
+      --dead-w:   #38201d;
+      --live:     #5cc0a8;
+      --live-w:   #123029;
+      --warn:     #d3a95c;
+      --warn-w:   #332714;
+      --hair:     #2a3037;
+      --hair-2:   #3a424b;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:#131619; --panel:#191d21; --panel-2:#22272d; --ink:#e3e7ec;
+    --muted:#98a2ae; --faint:#6b7581; --accent:#6cb6d4; --accent-w:#14313d;
+    --dead:#e0837a; --dead-w:#38201d; --live:#5cc0a8; --live-w:#123029;
+    --warn:#d3a95c; --warn-w:#332714;
+    --hair:#2a3037; --hair-2:#3a424b;
+  }
+  :root[data-theme="light"] {
+    --ground:#edf0f3; --panel:#f8fafb; --panel-2:#e2e7ec; --ink:#14181d;
+    --muted:#525c68; --faint:#7f8996; --accent:#1f5f7a; --accent-w:#d7e6ed;
+    --dead:#9c3327; --dead-w:#f3ddd9; --live:#14614f; --live-w:#d6eae4;
+    --warn:#8a5a12; --warn-w:#f4e6cc;
+    --hair:#ccd4db; --hair-2:#b0bac4;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--serif);
+    font-size: 1.0625rem;
+    line-height: 1.62;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  .wrap {
+    max-width: calc(var(--measure) + 4rem);
+    margin: 0 auto;
+    padding: 3.5rem 2rem 6rem;
+  }
+
+  header { border-bottom: var(--rule); padding-bottom: 2rem; margin-bottom: 2.5rem; }
+
+  h1 {
+    font-size: clamp(1.9rem, 5.2vw, 2.7rem);
+    line-height: 1.12;
+    letter-spacing: -0.018em;
+    margin: 0 0 0.9rem;
+    font-weight: 600;
+  }
+
+  .dek { font-size: 1.15rem; line-height: 1.5; color: var(--muted); margin: 0 0 1.4rem; }
+
+  .byline {
+    font-family: var(--util);
+    font-size: 0.775rem;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--faint);
+    margin: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+  }
+  .byline span { white-space: nowrap; }
+  .byline .sep { margin: 0 0.55rem; opacity: 0.5; }
+
+  section { margin: 0 0 3rem; }
+
+  .eyebrow {
+    display: block;
+    font-family: var(--util);
+    font-size: 0.7rem;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 0.5rem;
+  }
+
+  h2 {
+    font-size: clamp(1.3rem, 3.4vw, 1.6rem);
+    line-height: 1.22;
+    letter-spacing: -0.012em;
+    margin: 0 0 1rem;
+    font-weight: 600;
+  }
+
+  h3 {
+    font-family: var(--util);
+    font-size: 0.95rem;
+    letter-spacing: 0.01em;
+    margin: 1.8rem 0 0.6rem;
+    font-weight: 600;
+  }
+
+  p { margin: 0 0 1.05rem; max-width: var(--measure); }
+
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+  code {
+    font-family: var(--mono);
+    font-size: 0.86em;
+    background: var(--panel-2);
+    padding: 0.08em 0.32em;
+    border-radius: 3px;
+  }
+
+  pre {
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    line-height: 1.55;
+    background: var(--panel);
+    border: var(--rule);
+    border-left: 3px solid var(--hair-2);
+    border-radius: 4px;
+    padding: 0.95rem 1.1rem;
+    overflow-x: auto;
+    margin: 0 0 1.2rem;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; }
+  pre .hi { color: var(--dead); }
+  pre .ok { color: var(--live); }
+  pre .dim { color: var(--faint); }
+
+  .note {
+    border: var(--rule);
+    border-left: 3px solid var(--hair-2);
+    background: var(--panel);
+    border-radius: 4px;
+    padding: 1rem 1.15rem 0.4rem;
+    margin: 0 0 1.3rem;
+    max-width: var(--measure);
+  }
+  .note p { font-size: 0.965rem; }
+  .note .tag {
+    display: block;
+    font-family: var(--util);
+    font-size: 0.7rem;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+  }
+  .note.found { border-left-color: var(--dead); background: var(--dead-w); }
+  .note.found .tag { color: var(--dead); }
+  .note.clean { border-left-color: var(--live); background: var(--live-w); }
+  .note.clean .tag { color: var(--live); }
+
+  /* --- the verdict board in the header --------------------------------- */
+
+  .verdicts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+    gap: 1px;
+    background: var(--hair);
+    border: var(--rule);
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 1.6rem 0 0;
+  }
+  .verdict { background: var(--panel); padding: 0.8rem 0.9rem 0.85rem; }
+  .verdict b {
+    display: block;
+    font-family: var(--mono);
+    font-size: 0.76rem;
+    letter-spacing: 0.02em;
+    font-weight: 600;
+    margin-bottom: 0.3rem;
+  }
+  .verdict span {
+    font-family: var(--util);
+    font-size: 0.76rem;
+    line-height: 1.45;
+    color: var(--muted);
+    display: block;
+  }
+  .verdict.bad b  { color: var(--dead); }
+  .verdict.good b { color: var(--live); }
+  .verdict.dec b  { color: var(--warn); }
+
+  /* --- the anatomy block ----------------------------------------------- */
+
+  .anatomy { margin: 0 0 1.4rem; }
+  .anatomy pre { margin-bottom: 0; border-radius: 4px 4px 0 0; border-bottom: 0; }
+  .anatomy pre .arg { color: var(--accent); }
+  .args {
+    border: var(--rule);
+    border-radius: 0 0 4px 4px;
+    background: var(--panel);
+    margin: 0;
+    padding: 0.2rem 0 0.3rem;
+    font-family: var(--util);
+    font-size: 0.83rem;
+  }
+  .args div {
+    display: grid;
+    grid-template-columns: 1.6rem 8.5rem 1fr;
+    gap: 0.6rem;
+    padding: 0.42rem 1.1rem;
+    border-top: var(--rule);
+    align-items: baseline;
+  }
+  .args div:first-child { border-top: 0; }
+  .args dt { font-family: var(--mono); font-size: 0.78rem; color: var(--accent); }
+  .args .n { font-family: var(--mono); font-size: 0.72rem; color: var(--faint); }
+  .args dd { margin: 0; color: var(--muted); line-height: 1.45; }
+
+  /* --- the gate ladder: the page's one structural device ---------------- */
+
+  .gates { list-style: none; margin: 0 0 1.5rem; padding: 0; }
+  .gate {
+    display: grid;
+    grid-template-columns: 1.9rem minmax(0, 1fr) minmax(0, 15rem);
+    gap: 0 1rem;
+    align-items: start;
+    padding-bottom: 1.5rem;
+    position: relative;
+  }
+  /* The trunk. Every gate but the last continues downward, which is the
+     claim the diagram is making: these run in order and each one can end it. */
+  .gate:not(:last-child)::before {
+    content: "";
+    position: absolute;
+    left: 0.9rem;
+    top: 1.9rem;
+    bottom: 0;
+    border-left: 1px solid var(--hair-2);
+  }
+  .g-n {
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    line-height: 1;
+    color: var(--faint);
+    border: 1px solid var(--hair-2);
+    border-radius: 50%;
+    width: 1.9rem;
+    height: 1.9rem;
+    display: grid;
+    place-items: center;
+    background: var(--ground);
+    position: relative;
+    z-index: 1;
+  }
+  .g-q {
+    font-family: var(--util);
+    font-weight: 600;
+    font-size: 0.95rem;
+    margin: 0.22rem 0 0.35rem;
+  }
+  .g-body p { font-size: 0.93rem; color: var(--muted); margin: 0 0 0.5rem; max-width: none; }
+  .g-body p:last-child { margin-bottom: 0; }
+  .g-out {
+    border: 1px solid var(--dead);
+    background: var(--dead-w);
+    border-radius: 4px;
+    padding: 0.55rem 0.7rem;
+    font-family: var(--util);
+    font-size: 0.8rem;
+    line-height: 1.4;
+    color: var(--muted);
+    margin-top: 0.2rem;
+  }
+  .g-out b {
+    display: block;
+    font-family: var(--mono);
+    font-size: 0.73rem;
+    color: var(--dead);
+    margin-bottom: 0.22rem;
+  }
+  .g-out.good { border-color: var(--live); background: var(--live-w); }
+  .g-out.good b { color: var(--live); }
+  .g-out.dec { border-color: var(--warn); background: var(--warn-w); }
+  .g-out.dec b { color: var(--warn); }
+  .g-out + .g-out { margin-top: 0.5rem; }
+  .g-fork { grid-column: 3; }
+
+  @media (max-width: 46rem) {
+    .gate { grid-template-columns: 1.9rem minmax(0, 1fr); }
+    .g-out, .g-fork { grid-column: 2; }
+  }
+
+  /* --- the inventory ---------------------------------------------------- */
+
+  .filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin: 0 0 1rem;
+  }
+  .filters button {
+    font-family: var(--util);
+    font-size: 0.76rem;
+    letter-spacing: 0.02em;
+    color: var(--muted);
+    background: var(--panel);
+    border: var(--rule);
+    border-radius: 999px;
+    padding: 0.3rem 0.75rem;
+    cursor: pointer;
+  }
+  .filters button:hover { border-color: var(--hair-2); color: var(--ink); }
+  .filters button[aria-pressed="true"] {
+    background: var(--accent-w);
+    border-color: var(--accent);
+    color: var(--accent);
+    font-weight: 600;
+  }
+  .filters button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .tablewrap { overflow-x: auto; margin: 0 0 1rem; }
+  table {
+    border-collapse: collapse;
+    font-family: var(--util);
+    font-size: 0.84rem;
+    width: 100%;
+    min-width: 34rem;
+  }
+  th, td { text-align: left; padding: 0.45rem 0.85rem 0.45rem 0; border-bottom: var(--rule); vertical-align: top; }
+  thead th {
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--faint);
+    font-weight: 600;
+    border-bottom: 1px solid var(--hair-2);
+  }
+  /* The two right-hand columns are unwrappable monospace, so without this the
+     description column gets whatever is left and wraps to four lines. */
+  thead th:first-child { width: 52%; }
+  td code { background: none; padding: 0; color: var(--muted); font-size: 0.78rem; }
+  tr.sec th {
+    font-family: var(--util);
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--faint);
+    font-weight: 600;
+    border-bottom: 1px solid var(--hair-2);
+    padding-top: 1.15rem;
+  }
+  td.f, td.t { white-space: nowrap; }
+  .badge {
+    font-size: 0.68rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--warn);
+    border: 1px solid var(--warn);
+    border-radius: 3px;
+    padding: 0.05rem 0.3rem;
+    white-space: nowrap;
+  }
+  tr[hidden] { display: none; }
+
+  /* Six cells into a row that fits four leaves two empty grid areas. The
+     hairlines come from each cell's own shadow rather than from a darker
+     container showing through the gaps, so a short last row ends cleanly
+     instead of trailing a grey block. */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+    gap: 1px;
+    margin: 0 0 1.5rem;
+  }
+  .stat {
+    background: var(--panel);
+    padding: 0.85rem 0.95rem;
+    box-shadow: 0 0 0 1px var(--hair);
+  }
+  .stat b {
+    display: block;
+    font-family: var(--util);
+    font-size: 1.35rem;
+    letter-spacing: -0.02em;
+    font-weight: 600;
+    line-height: 1.1;
+  }
+  .stat span {
+    font-family: var(--util);
+    font-size: 0.68rem;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+
+  blockquote {
+    margin: 0 0 1.2rem;
+    padding-left: 1.1rem;
+    border-left: 2px solid var(--accent);
+    color: var(--muted);
+    font-style: italic;
+    max-width: var(--measure);
+  }
+  blockquote p { margin-bottom: 0; }
+
+  ul { max-width: var(--measure); padding-left: 1.15rem; margin: 0 0 1.1rem; }
+  li { margin-bottom: 0.45rem; }
+
+  .next {
+    margin-top: 1.7rem;
+    padding-top: 1.1rem;
+    border-top: var(--rule);
+    font-family: var(--util);
+    font-size: 0.85rem;
+    line-height: 1.65;
+    color: var(--muted);
+  }
+
+  footer {
+    border-top: var(--rule);
+    padding-top: 1.6rem;
+    color: var(--faint);
+    font-family: var(--util);
+    font-size: 0.8rem;
+    line-height: 1.6;
+  }
+  footer p { max-width: var(--measure); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>Breaking the line is the easy half</h1>
+  <p class="dek">apolisp&rsquo;s fifth verification rung is a shell script that damages its own source on purpose, forty-five times, and checks that a named test notices each time. Everything else it does is the other half of the job: telling a mutant the suite caught apart from a mutation that never happened. From outside they are identical, and the wrong reading is the flattering one.</p>
+  <p class="byline">
+    <span><code>just mutate</code></span><span class="sep">/</span><span>45 mutations</span><span class="sep">/</span><span>3 files</span><span class="sep">/</span><span>6 test targets</span><span class="sep">/</span><span>ADR-055</span>
+  </p>
+
+  <div class="verdicts">
+    <div class="verdict good"><b>killed</b><span>The mutation applied, built, and the named test failed. The only outcome that means the check works.</span></div>
+    <div class="verdict bad"><b>SURVIVED</b><span>The mutation applied and the suite stayed green. A hole.</span></div>
+    <div class="verdict dec"><b>survived, as declared</b><span>Predicted in advance, with a written reason.</span></div>
+    <div class="verdict bad"><b>DECLARED SURVIVOR DIED</b><span>Also reported. The reason it could not flip has stopped being true.</span></div>
+    <div class="verdict bad"><b>PROVES NOTHING</b><span>Three ways: the pattern no longer matches, the mutant does not build, or it never finished.</span></div>
+    <div class="verdict bad"><b>DUPLICATE DESCRIPTION</b><span>Two checks calling themselves the same thing. That is how a dead one hides behind a live one.</span></div>
+  </div>
+</header>
+
+<section>
+  <span class="eyebrow">The rung</span>
+  <h2>Rungs 1 to 4 ask whether the code is right. This one asks whether we would know if it were not</h2>
+
+  <p>The oracle is a ladder: <code>cargo check</code>, a smoke script, a golden corpus with one snapshot per compilation phase, and a test suite written in the language itself. Rung 5 is <code>just mutate</code>, and it does not test the VM. It tests the other four rungs.</p>
+
+  <p>It is a hand-written list rather than a framework, and <a href="ADR.md">ADR-055</a> is blunt about why:</p>
+
+  <blockquote><p>Every general mutation tool answers &ldquo;what fraction of mutants die&rdquo;, which is a number nobody acts on. What has actually paid here, eight milestones running, is a handful of mutations chosen because someone believed a specific line was load-bearing. The value is in the choosing; automating the choosing removes it.</p></blockquote>
+
+  <p>It is also deliberately outside <code>just verify</code>. Every mutation is a full rebuild, so a run is minutes rather than seconds, and a gate that slow is a gate people learn to skip — which is worse than no gate, because a skipped gate still reads as coverage. Run it when touching something a check is supposed to hold.</p>
+</section>
+
+<section>
+  <span class="eyebrow">The unit</span>
+  <h2>One mutation is six arguments</h2>
+
+  <p>There is no DSL and no config file. Every entry is a call to one shell function, and the entry <em>is</em> the documentation of what the line was believed to be holding.</p>
+
+  <div class="anatomy">
+<pre><code>mutation <span class="arg">src/lib.rs</span> \
+  <span class="arg">'string(&amp;a[0], "str-scalar-len")?.chars().count() as i64'</span> \
+  <span class="arg">'string(&amp;a[0], "str-scalar-len")?.len() as i64'</span> \
+  <span class="arg">"$LANG"</span> \
+  <span class="arg">'str-scalar-len counts scalars, not bytes — the whole of ADR-049'</span>
+</code></pre>
+    <dl class="args">
+      <div><span class="n">1</span><dt>file</dt><dd>One of three: the VM, the prelude written in the language, or a corpus program.</dd></div>
+      <div><span class="n">2</span><dt>old</dt><dd>The exact text to break. It must occur <strong>exactly once</strong> — zero matches and two matches are both errors.</dd></div>
+      <div><span class="n">3</span><dt>new</dt><dd>What to put there. A plausible wrong implementation, not a syntax error.</dd></div>
+      <div><span class="n">4</span><dt>check</dt><dd>The cargo test selector that is supposed to catch it. Naming one test rather than running the suite is the point: the claim is about a specific check.</dd></div>
+      <div><span class="n">5</span><dt>desc</dt><dd>The behaviour the line carries, in a sentence. Printed as the heading and checked for duplicates.</dd></div>
+      <div><span class="n">6</span><dt>survive</dt><dd>Optional. Present means &ldquo;this one should <em>not</em> flip&rdquo;, and its value is the reason.</dd></div>
+    </dl>
+  </div>
+
+  <p>Substitution is done by an inlined Python snippet rather than <code>sed</code> or <code>perl -0pi</code>, because it counts the matches first and refuses on anything but one. That is not fussiness; it is the finding from milestone 9, below.</p>
+</section>
+
+<section>
+  <span class="eyebrow">The verdict &middot; the shape of the whole script</span>
+  <h2>Three gates, and the names they print</h2>
+
+  <p>A mutation run has one desired outcome and five ways of failing to produce it, and four of the five look like success if nobody is checking. So each is asserted separately, in order, and each one prints a different word.</p>
+
+  <ol class="gates">
+    <li class="gate">
+      <div class="g-n">0</div>
+      <div class="g-body">
+        <p class="g-q">Is this description already taken?</p>
+        <p>Checked before anything is touched. A sibling project found a dead check hiding behind a live one under a shared description — the run reported a pass, and the pass belonged to the other check.</p>
+      </div>
+      <div class="g-out">
+        <b>!! DUPLICATE DESCRIPTION</b>
+        another check already calls itself this
+      </div>
+    </li>
+
+    <li class="gate">
+      <div class="g-n">1</div>
+      <div class="g-body">
+        <p class="g-q">Did the edit change the file?</p>
+        <p>A pattern that no longer matches leaves the tree untouched and the suite green. That is indistinguishable from a survivor, and reads as the flattering one.</p>
+      </div>
+      <div class="g-out">
+        <b>!! PROVES NOTHING</b>
+        the pattern no longer matches
+      </div>
+    </li>
+
+    <li class="gate">
+      <div class="g-n">2</div>
+      <div class="g-body">
+        <p class="g-q">Did it finish inside 120 seconds?</p>
+        <p>A mutant can hang rather than fail. Milestone 8 has one that stops decrementing fuel and terminated only because a step counter happened to carry a guard. The bound is a <code>perl</code> fork with an <code>alarm</code>, so &ldquo;it never finished&rdquo; is its own outcome rather than a hung terminal.</p>
+      </div>
+      <div class="g-out">
+        <b>!! PROVES NOTHING</b>
+        the mutant did not finish inside 120s
+      </div>
+    </li>
+
+    <li class="gate">
+      <div class="g-n">3</div>
+      <div class="g-body">
+        <p class="g-q">Did the mutant build?</p>
+        <p>A mutant that does not compile runs no test at all. Detected by matching <code>could not compile</code> and <code>error[E….]</code> — <em>not</em> a bare <code>^error:</code>, because cargo prints <code>error: test failed</code> for exactly the outcome this script wants. The first run of the harness reported all eight of its mutants as broken builds for that reason.</p>
+      </div>
+      <div class="g-out">
+        <b>!! PROVES NOTHING</b>
+        the mutant does not build, so no test ran
+      </div>
+    </li>
+
+    <li class="gate">
+      <div class="g-n">4</div>
+      <div class="g-body">
+        <p class="g-q">Did the named test fail?</p>
+        <p>From the exit status, never from grepping output for a word. A sibling project took the verdict from a grep plus an unconditional &ldquo;a FAIL above is expected&rdquo; message, and had twenty of its eighty-two checks go quiet without it showing.</p>
+        <p>The answer forks against argument six.</p>
+      </div>
+      <div class="g-fork">
+        <div class="g-out good">
+          <b>killed</b>
+          failed, and no survival was declared
+        </div>
+        <div class="g-out dec">
+          <b>survived, as declared</b>
+          passed, and a reason was written in advance
+        </div>
+        <div class="g-out">
+          <b>!! SURVIVED</b>
+          passed, and nothing predicted that
+        </div>
+        <div class="g-out">
+          <b>!! DECLARED SURVIVOR DIED</b>
+          failed, so the declared reason has stopped being true
+        </div>
+      </div>
+    </li>
+  </ol>
+
+  <p>The script exits non-zero if any entry landed anywhere except <code>killed</code> or <code>survived, as declared</code>, and prints the offenders under the heading <strong>&ldquo;checks that proved nothing&rdquo;</strong> — which is the phrase the whole design is organised around.</p>
+
+  <div class="note found">
+    <span class="tag">Where gate 1 came from</span>
+    <p>Milestone 9 ran twelve mutations through <code>perl -0pi</code> with a pattern containing <code>\\n</code>, meaning to match the literal backslash-n inside a Rust string. Under single quotes the shell passed it through unchanged, so perl saw a regex matching <em>two</em> backslashes where the file has one. Two substitutions never fired. Both runs reported a green suite, which is precisely what a surviving mutant reports.</p>
+    <p>It was caught only because one of the two had been <em>predicted</em> to survive for a specific reason, and checking that reason meant opening the file. Every note in <code>docs/notes/</code> written before that pass used unchecked substitutions, and its survivor counts should be read with that in mind.</p>
+  </div>
+</section>
+
+<section>
+  <span class="eyebrow">Argument six</span>
+  <h2>A survivor written down in advance is evidence; the same survivor found afterwards is a discovery</h2>
+
+  <p>Two kinds of survivor are legitimate, and neither is a hole. The first is a claim no test can separate — a performance claim is the recorded example. The second is a guard against a failure so severe that it is enforced twice on purpose.</p>
+
+  <p>The one declared survivor in the tree is the second kind. <code>str-scalar-slice</code> guards <code>from &lt;= to</code>, and the guard is unreachable while the scan&rsquo;s early <code>break</code> stands, so deleting it changes nothing observable:</p>
+
+<pre><code>mutation src/lib.rs \
+  '(Some(f), Some(t)) if f &lt;= t =&gt;' \
+  '(Some(f), Some(t)) if true =&gt;' \
+  "$LANG" \
+  'str-scalar-slice: the f&lt;=t guard, without which a backwards slice panics' \
+  <span class="dim">'the scan breaks at `to`, so with `from &gt; to` it never finds `from` and the
+   missing-bound error fires first. The guard is unreachable while the break
+   stands, and both exist because reaching `s[f..t]` backwards is a panic where
+   ADR-039 requires a throw — a process abort is worth enforcing twice.'</span>
+</code></pre>
+
+  <p>Declaring is not excusing. A declared survivor that <em>starts dying</em> is reported as loudly as an undeclared one that lives, because a mutation that now flips means the reason it could not has stopped being true — the <code>break</code> moved, or someone reached the branch another way.</p>
+
+  <p>And the declaration has to be written before the run. Milestones 4, 7 and 8 each predicted every survivor they got, which is the only reason those passes count as results rather than as fishing.</p>
+</section>
+
+<section>
+  <span class="eyebrow">The working tree</span>
+  <h2>For the length of a run, the checkout is a mutant</h2>
+
+  <p>The script edits <code>src/</code> in place and restores after each mutation. That is the cheapest thing that works, and it has three consequences the script has to handle rather than document.</p>
+
+  <h3>A lock, because two runs would restore each other&rsquo;s mutations</h3>
+  <p>An <code>mkdir</code> lock under <code>$TMPDIR</code>. A second <code>mutate.sh</code> would produce nothing trustworthy — every result noise. A <code>just verify</code> started alongside a run failed once and looked like a real regression until the timing was noticed.</p>
+
+  <h3>One trap handler, not two</h3>
+  <p>Restoring the files and removing the lock are combined into a single <code>trap</code>, because a second <code>trap</code> on the same signals <em>replaces</em> the first rather than adding to it. Set separately, whichever came last would run and the other would silently never fire.</p>
+
+  <h3>File copies, not <code>git stash</code></h3>
+  <p>The originals are copied to <code>/tmp</code> and restored from there. The stash stack is repo-global and shared across worktrees, so a <code>pop</code> can retrieve somebody else&rsquo;s entry.</p>
+
+  <div class="note found">
+    <span class="tag">The procedural scar</span>
+    <p>Milestone 2&rsquo;s fix was written <em>while a mutant was still applied</em>, and the <code>git checkout</code> that reverted the mutant reverted the fix along with it. Mutate against a clean tree, always.</p>
+  </div>
+</section>
+
+<section>
+  <span class="eyebrow">The set</span>
+  <h2>Forty-five mutations, and what each one is aimed at</h2>
+
+  <div class="stats">
+    <div class="stat"><b>45</b><span>mutations</span></div>
+    <div class="stat"><b>1</b><span>declared survivor</span></div>
+    <div class="stat"><b>6</b><span>test targets</span></div>
+    <div class="stat"><b>9</b><span>recorded passes</span></div>
+  </div>
+
+  <p>Seven of them do not touch Rust at all. Three break the prelude, which is written in apolisp, and four break a corpus program — the editor, whose entire screen geometry is pinned by one golden transcript. A mutation against a test input is the same question asked from the other side: does the corpus <em>distinguish</em> a correct implementation from a plausible wrong one?</p>
+
+  <p>The third column is the cargo <code>--test</code> target the entry names. It is a claim, not a description: an entry that dies to a different rung than the one it named is worth knowing about.</p>
+
+  <div class="filters" role="group" aria-label="Filter by the test that must catch the mutation">
+    <button type="button" data-f="all" aria-pressed="true">All 45</button>
+    <button type="button" data-f="lang" aria-pressed="false">lang &middot; 12</button>
+    <button type="button" data-f="vm" aria-pressed="false">vm &middot; 10</button>
+    <button type="button" data-f="snapshot" aria-pressed="false">snapshot &middot; 10</button>
+    <button type="button" data-f="expand" aria-pressed="false">expand &middot; 5</button>
+    <button type="button" data-f="golden" aria-pressed="false">golden &middot; 4</button>
+    <button type="button" data-f="compile" aria-pressed="false">compile &middot; 4</button>
+  </div>
+
+  <div class="tablewrap">
+  <table id="inventory">
+    <thead>
+      <tr><th>What the mutation breaks</th><th>File</th><th>Test target that must flip</th></tr>
+    </thead>
+    <tbody>
+<tr class="sec"><th colspan="3">ADR-052: str-scalar-slice</th></tr>
+<tr data-t="lang"><td>str-scalar-slice: the f&lt;=t guard, without which a backwards slice panics <span class="badge">declared survivor</span></td><td class="f"><code>src/lib.rs</code></td><td class="t"><code>lang</code></td></tr>
+<tr data-t="lang"><td>str-scalar-slice: off by one on the upper bound</td><td class="f"><code>src/lib.rs</code></td><td class="t"><code>lang</code></td></tr>
+<tr class="sec"><th colspan="3">ADR-053: vec-slice, and take/drop on top of it</th></tr>
+<tr data-t="lang"><td>vec-slice: the out-of-range bound check</td><td class="f"><code>src/lib.rs</code></td><td class="t"><code>lang</code></td></tr>
+<tr data-t="lang"><td>take: the clamp that makes a negative count mean none</td><td class="f"><code>src/prelude.xs</code></td><td class="t"><code>lang</code></td></tr>
+<tr class="sec"><th colspan="3">The editor, whose geometry is held by one golden</th></tr>
+<tr data-t="golden"><td>wrap-height: the row that holds the append cursor at an exact multiple</td><td class="f"><code>tests/corpus/editor.xs</code></td><td class="t"><code>vm</code> <code>out_transcripts_match</code></td></tr>
+<tr data-t="golden"><td>text-rows: the floor that keeps the scroll from passing the cursor</td><td class="f"><code>tests/corpus/editor.xs</code></td><td class="t"><code>vm</code> <code>out_transcripts_match</code></td></tr>
+<tr data-t="golden"><td>clip: the marker that makes truncation visible</td><td class="f"><code>tests/corpus/editor.xs</code></td><td class="t"><code>vm</code> <code>out_transcripts_match</code></td></tr>
+<tr data-t="golden"><td>cursor-screen: the wrapped cursor position paint depends on</td><td class="f"><code>tests/corpus/editor.xs</code></td><td class="t"><code>vm</code> <code>out_transcripts_match</code></td></tr>
+<tr class="sec"><th colspan="3">Semantics the VM decides (milestones 3, 6)</th></tr>
+<tr data-t="lang"><td>falsiness: only nil and false are falsy, so false must not become truthy</td><td class="f"><code>src/lib.rs</code></td><td class="t"><code>lang</code></td></tr>
+<tr data-t="lang"><td>float equality is IEEE, not bit patterns: -0.0 equals 0.0 and NaN equals nothing</td><td class="f"><code>src/lib.rs</code></td><td class="t"><code>lang</code></td></tr>
+<tr data-t="lang"><td>conj adds at the back of a vector and the front of a list</td><td class="f"><code>src/lib.rs</code></td><td class="t"><code>lang</code></td></tr>
+<tr class="sec"><th colspan="3">The string surface ADR-049 named</th></tr>
+<tr data-t="lang"><td>str-scalar-len counts scalars, not bytes — the whole of ADR-049</td><td class="f"><code>src/lib.rs</code></td><td class="t"><code>lang</code></td></tr>
+<tr data-t="lang"><td>str-index-of honours its from offset, which is what keeps split linear</td><td class="f"><code>src/lib.rs</code></td><td class="t"><code>lang</code></td></tr>
+<tr class="sec"><th colspan="3">ADR-050: ordering, and the stability sort-by rests on</th></tr>
+<tr data-t="lang"><td>merge takes from the left on a tie, which is what makes the sort stable</td><td class="f"><code>src/prelude.xs</code></td><td class="t"><code>lang</code></td></tr>
+<tr data-t="lang"><td>drop: the clamp above the count, without which it raises instead of emptying</td><td class="f"><code>src/prelude.xs</code></td><td class="t"><code>lang</code></td></tr>
+<tr class="sec"><th colspan="3">ADR-053: vec-slice returns a vector whatever it was given</th></tr>
+<tr data-t="lang"><td>vec-slice returns a vector, which is what take and drop promise their callers</td><td class="f"><code>src/lib.rs</code></td><td class="t"><code>lang</code></td></tr>
+<tr class="sec"><th colspan="3">The expander (milestone 5)</th></tr>
+<tr data-t="expand"><td>expand_all resets the gensym counter, so a unit expands the same way twice</td><td class="f"><code>src/lib.rs</code></td><td class="t"><code>expand</code></td></tr>
+<tr data-t="expand"><td>the expander does not walk into quote, which is data rather than code</td><td class="f"><code>src/lib.rs</code></td><td class="t"><code>expand</code></td></tr>
+<tr data-t="expand"><td>auto-gensym replaces a trailing # rather than handing back the written name</td><td class="f"><code>src/lib.rs</code></td><td class="t"><code>expand</code></td></tr>
+<tr data-t="expand"><td>a template keeps the items after a splice, which macros.xs once only claimed to cover</td><td class="f"><code>src/lib.rs</code></td><td class="t"><code>expand</code></td></tr>
+<tr data-t="compile"><td>a form the macro passed through keeps its own position instead of the call site</td><td class="f"><code>src/lib.rs</code></td><td class="t"><code>compile</code></td></tr>
+<tr data-t="expand"><td>a macro receives its arguments as written, not already expanded</td><td class="f"><code>src/lib.rs</code></td><td class="t"><code>expand</code></td></tr>
+<tr class="sec"><th colspan="3">The compiler (milestone 2)</th></tr>
+<tr data-t="compile"><td>emit records the origin it was given rather than Unknown</td><td class="f"><code>src/lib.rs</code></td><td class="t"><code>compile</code></td></tr>
+<tr data-t="compile"><td>a tail call is suppressed inside a handler region (ADR-028 rule 2)</td><td class="f"><code>src/lib.rs</code></td><td class="t"><code>compile</code></td></tr>
+<tr data-t="compile"><td>a capture is registered at every level it crosses, not assumed to be the first</td><td class="f"><code>src/lib.rs</code></td><td class="t"><code>compile</code></td></tr>
+<tr class="sec"><th colspan="3">The handler stack (milestone 4)</th></tr>
+<tr data-t="vm"><td>unwind drops the frames above the handler owner, through the same call a return uses</td><td class="f"><code>src/lib.rs</code></td><td class="t"><code>vm</code></td></tr>
+<tr data-t="vm"><td>drop_frame gives the slots back, which nothing observed until ADR-055 found it</td><td class="f"><code>src/lib.rs</code></td><td class="t"><code>vm</code></td></tr>
+<tr data-t="vm"><td>ENDFINALLY re-raises the parked unwind rather than carrying on</td><td class="f"><code>src/lib.rs</code></td><td class="t"><code>vm</code></td></tr>
+<tr data-t="vm"><td>POPHANDLER pops, so a region does not outlive the code it guards</td><td class="f"><code>src/lib.rs</code></td><td class="t"><code>vm</code></td></tr>
+<tr data-t="vm"><td>a displaced parked unwind is merged into the one that displaced it (ADR-028 invariant 3)</td><td class="f"><code>src/lib.rs</code></td><td class="t"><code>vm</code></td></tr>
+<tr class="sec"><th colspan="3">The snapshot (milestone 8)</th></tr>
+<tr data-t="snapshot"><td>capture keeps the output buffer, which is what the transcript compares</td><td class="f"><code>src/lib.rs</code></td><td class="t"><code>snapshot</code></td></tr>
+<tr data-t="snapshot"><td>capture keeps the gensym counter, so a resume cannot reissue a name it handed out</td><td class="f"><code>src/lib.rs</code></td><td class="t"><code>snapshot</code></td></tr>
+<tr data-t="snapshot"><td>restore checks the fingerprint, which is what makes code identity a check</td><td class="f"><code>src/lib.rs</code></td><td class="t"><code>snapshot</code></td></tr>
+<tr data-t="snapshot"><td>the encoder shares repeated objects rather than copying them (ADR-043 part 2)</td><td class="f"><code>src/lib.rs</code></td><td class="t"><code>snapshot</code></td></tr>
+<tr data-t="snapshot"><td>capture keeps the parked unwinds, so a cut mid-cleanup resumes into it</td><td class="f"><code>src/lib.rs</code></td><td class="t"><code>snapshot</code></td></tr>
+<tr data-t="snapshot"><td>capture keeps the free list, so a reopened handle does not reuse a live id</td><td class="f"><code>src/lib.rs</code></td><td class="t"><code>snapshot</code></td></tr>
+<tr data-t="snapshot"><td>capture keeps the handle generations, so a reused slot hands out a different id</td><td class="f"><code>src/lib.rs</code></td><td class="t"><code>snapshot</code></td></tr>
+<tr data-t="snapshot"><td>restore rebuilds the interner rather than starting a fresh one</td><td class="f"><code>src/lib.rs</code></td><td class="t"><code>snapshot</code></td></tr>
+<tr data-t="snapshot"><td>the encoder keeps a float bit for bit, so -0.0 survives (ADR-032)</td><td class="f"><code>src/lib.rs</code></td><td class="t"><code>snapshot</code></td></tr>
+<tr data-t="snapshot"><td>fuel decrements, without which a fuelled run never suspends</td><td class="f"><code>src/lib.rs</code></td><td class="t"><code>snapshot</code></td></tr>
+<tr class="sec"><th colspan="3">The VM (milestone 3)</th></tr>
+<tr data-t="vm"><td>the callee prologue checks arity, at call time and in the callee (ADR-033)</td><td class="f"><code>src/lib.rs</code></td><td class="t"><code>vm</code></td></tr>
+<tr data-t="vm"><td>an empty rest parameter is an empty list, never nil (ADR-033, E-11)</td><td class="f"><code>src/lib.rs</code></td><td class="t"><code>vm</code></td></tr>
+<tr data-t="vm"><td>returning restores the callers slot length, not the callees base — the bug that shipped</td><td class="f"><code>src/lib.rs</code></td><td class="t"><code>vm</code></td></tr>
+<tr data-t="vm"><td>GetSelf yields the running closure, which is what makes self-recursion identity</td><td class="f"><code>src/lib.rs</code></td><td class="t"><code>vm</code></td></tr>
+<tr data-t="vm"><td>tail calls are emitted, without which a tail loop grows the frame stack</td><td class="f"><code>src/lib.rs</code></td><td class="t"><code>vm</code></td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>The grouping is the script&rsquo;s own section comments, and it reads as a history of the project rather than a map of it: the set grew a milestone at a time, each pass seeding the mutations its notes had already run by hand. It is not complete, and the gaps are the honest kind — milestones 6, 7 and 10 ran their passes and live only in <code>docs/notes/</code>, so nothing re-runs them.</p>
+</section>
+
+<section>
+  <span class="eyebrow">Adding one</span>
+  <h2>The routine, which is four steps and one rule</h2>
+
+  <ul>
+    <li><strong>Pick a line you believe is load-bearing</strong>, and say what it carries in a sentence. If the sentence is hard to write, the mutation is not aimed at anything.</li>
+    <li><strong>Write the prediction down first</strong> — caught or survived, and why. Two lines in a commit message is enough. The refutations are the interesting part, and a prediction filled in afterwards always reads as a discovery.</li>
+    <li><strong>Name the single test</strong> that should catch it, not the whole suite. Milestone 7 is the reason this matters: the in-language suite is the only rung that catches a semantic mutation, and an invariant no program can observe needs a Rust test instead. A mutation that dies to the wrong rung is worth knowing about.</li>
+    <li><strong>Run it against a clean tree</strong>, and record whether the prediction held in <code>docs/notes/milestone-N-mutants.md</code>.</li>
+  </ul>
+
+  <p>The rule is that a survivor is not fixed by adding an assertion about the mutant. Four of the nine recorded passes found a hole in the <em>corpus</em> rather than a defect in the code, and those were closed by adding programs. One was closed by deleting a redundant enforcement, and one by removing the way to write the bug at all — milestone 4&rsquo;s fifth mutation cannot be expressed any more, because frames are released in exactly one place now, and that is the finding rather than an omission.</p>
+
+  <div class="note clean">
+    <span class="tag">What it caught the day it was written</span>
+    <p>A mutation making <code>vec-slice</code> return a <em>list</em> instead of a vector survived the entire suite, including three assertions written the day before whose comment claimed &ldquo;a list in, a vector out — the conversion is the point&rdquo;. <code>=</code> crosses representations here, so <code>(is= [1 2] &hellip;)</code> is equally true of a list and could not see the thing it said it was checking. Fixed by asserting through <code>str</code>, which prints <code>[1 2]</code> for a vector and <code>(1 2)</code> for a list.</p>
+    <p>A correct assertion about the wrong subject. Nothing else in the loop asks that question.</p>
+  </div>
+
+  <p class="next">The findings themselves, in four parts: <a href="oracle.html">The tests were green and two of them were dead</a> (milestones 1&ndash;3) &middot; <a href="limits.html">What a mutation check cannot find</a> (4&ndash;6) &middot; <a href="instrument.html">The instrument that can lie</a> (7&ndash;10) &middot; <a href="programs.html">Nobody had written a program in it</a>.</p>
+</section>
+
+<footer>
+  <p>apolisp is a personal project with one user and no stability promise. <code>mutate.sh</code> sits outside the line budget as tooling; the decision behind it is ADR-055, and the numbers on this page are read out of the script rather than from a run. Its three assertions were all learned from a sibling project that had twenty of eighty-two checks quietly stop checking anything.</p>
+</footer>
+
+</div>
+
+<script>
+  // Filtering only ever hides rows that are already in the document, so the
+  // table is complete with JS off. Section headers follow their group: a
+  // header is shown when any row under it survived the filter.
+  const table = document.getElementById('inventory');
+  const buttons = [...document.querySelectorAll('.filters button')];
+
+  function apply(f) {
+    let header = null, shown = 0;
+    for (const row of table.tBodies[0].rows) {
+      if (row.classList.contains('sec')) {
+        if (header) header.hidden = shown === 0;
+        header = row; shown = 0;
+        continue;
+      }
+      const keep = f === 'all' || row.dataset.t === f;
+      row.hidden = !keep;
+      if (keep) shown++;
+    }
+    if (header) header.hidden = shown === 0;
+    for (const b of buttons) b.setAttribute('aria-pressed', String(b.dataset.f === f));
+  }
+
+  for (const b of buttons) b.addEventListener('click', () => apply(b.dataset.f));
+</script>
+</body>
+</html>

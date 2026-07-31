@@ -3315,6 +3315,29 @@ what gets reused. Superseding an entry over a mistaken sentence would be
 ceremony; errata are the cheaper mechanism, and the affected entry carries a
 pointer line. Where a correction changes a decision, it gets an ADR instead.
 
+**E-16 — ADR-055, the seeded set and what seeding it found.** The entry's Cost
+clause says eight mutations, seven flipping, and its Open clause says
+"everything ADR-046 through ADR-051 decided is unmutated". Both were true when
+written and neither is now: the set is **eighteen**, seventeen flipping and one
+surviving as declared, and it reaches falsiness, float equality, `conj` order,
+`str-scalar-len`, `str-index-of`'s `from` offset, merge stability, `take`/`drop`,
+`vec-slice`'s return type, the gensym reset, and `emit`'s origin. The decision
+stands unchanged; only the inventory moved.
+
+Worth recording rather than quietly updating, because seeding it paid
+immediately and in the way ADR-055 argues for. A mutation making `vec-slice`
+return a **list** instead of a vector survived the entire suite — including three
+assertions written the day before whose comment claimed "a list in, a vector out
+— the conversion is the point". ADR-041 makes `=` cross representations, so
+`(is= [1 2] ...)` is equally true of a list and could not see the thing it said
+it was checking. The same hole covered `take` and `drop`, whose contract is that
+they hand back a vector.
+
+Fixed by asserting through `str`, which prints `[1 2]` for a vector and `(1 2)`
+for a list. This is the fifth kind ADR-055 names — a correct assertion about the
+wrong subject — found by the rung the entry created, one day after the tests were
+written and by nothing else in the loop.
+
 **E-1 — ADR-019, WasmGC.** The stated reason is false. WasmGC provides managed
 struct and array references; it does not require lowering guest calls onto the
 WebAssembly call stack, and an interpreter can hold explicit frames in

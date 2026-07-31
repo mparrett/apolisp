@@ -192,6 +192,9 @@
 ; the primitive had to stay lenient about its input.
 (is= [1 2] (take 2 (concat [1 2] [3 4])))
 (is= [3 4] (drop 2 (concat [1 2] [3 4])))
+; And that they hand back a vector, which the `=` above cannot see either.
+(is= "[1 2]" (str (take 2 (concat [1 2] [3 4]))))
+(is= "[3 4]" (str (drop 2 (concat [1 2] [3 4]))))
 
 ; --- vec-slice (ADR-053) ------------------------------------------------------
 ; Half-open, like `str-slice` and `str-scalar-slice`. Not `subvec`: Clojure's is
@@ -204,7 +207,15 @@
 (is= [] (vec-slice [] 0 0))
 (is= [2 3] (vec-slice (concat [1 2] [3 4]) 1 3))
 ; A list in, a vector out — the conversion is the point, not an accident.
-(is= [1 2] (vec-slice (concat [1 2]) 0 2))
+;
+; Asserted through `str` because `=` crosses representations (ADR-041), so
+; `(is= [1 2] ...)` is true of a list too and cannot see this at all. The first
+; version of these three lines used `=` and a mutation that made `vec-slice`
+; return a list survived the whole suite: the assertion was right, and about
+; something else.
+(is= "[1 2]" (str (vec-slice (concat [1 2]) 0 2)))
+(is= "[2 3]" (str (vec-slice [1 2 3 4] 1 3)))
+(is= "[]" (str (vec-slice [1 2 3] 1 1)))
 ; Unlike take/drop it raises, because a primitive should refuse a bound it cannot
 ; honour and let the clamping live in the two functions that promise clamping.
 (is (throws? (vec-slice [1 2 3] 0 4)))

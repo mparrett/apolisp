@@ -186,6 +186,81 @@ mutation tests/corpus/editor.xs \
   "$GOLDEN" \
   'cursor-screen: the wrapped cursor position paint depends on'
 
+# --- Semantics the VM decides (milestones 3, 6) -----------------------------
+
+mutation src/lib.rs \
+  'ex.slots[base + cond as usize],
+                    Value::Nil | Value::Bool(false)' \
+  'ex.slots[base + cond as usize],
+                    Value::Nil' \
+  "$LANG" \
+  'falsiness: only nil and false are falsy, so false must not become truthy'
+
+mutation src/lib.rs \
+  '(Value::Float(x), Value::Float(y)) => x == y,' \
+  '(Value::Float(x), Value::Float(y)) => x.to_bits() == y.to_bits(),' \
+  "$LANG" \
+  'float equality is IEEE, not bit patterns: -0.0 equals 0.0 and NaN equals nothing'
+
+mutation src/lib.rs \
+  'Rc::make_mut(&mut out).0.extend(rest.iter().cloned());' \
+  'for v in rest { Rc::make_mut(&mut out).0.insert(0, v.clone()); }' \
+  "$LANG" \
+  'conj adds at the back of a vector and the front of a list'
+
+# --- The string surface ADR-049 named ---------------------------------------
+
+mutation src/lib.rs \
+  'string(&a[0], "str-scalar-len")?.chars().count() as i64' \
+  'string(&a[0], "str-scalar-len")?.len() as i64' \
+  "$LANG" \
+  'str-scalar-len counts scalars, not bytes — the whole of ADR-049'
+
+mutation src/lib.rs \
+  'let from = index(&a[2], "str-index-of")?;' \
+  'let from = index(&a[2], "str-index-of")? * 0;' \
+  "$LANG" \
+  'str-index-of honours its from offset, which is what keeps split linear'
+
+# --- ADR-050: ordering, and the stability sort-by rests on ------------------
+
+mutation src/prelude.xs \
+  '(if (less? (first b) (first a))' \
+  '(if (not (less? (first a) (first b)))' \
+  "$LANG" \
+  'merge takes from the left on a tie, which is what makes the sort stable'
+
+mutation src/prelude.xs \
+  '(vec-slice xs (if (< n 0) 0 (if (> n c) c n)) c)' \
+  '(vec-slice xs (if (< n 0) 0 n) c)' \
+  "$LANG" \
+  'drop: the clamp above the count, without which it raises instead of emptying'
+
+# --- ADR-053: vec-slice returns a vector whatever it was given ---------------
+
+mutation src/lib.rs \
+  'Ok(Value::Vec(Rc::new(VecObj(items[from..to].to_vec()))))' \
+  'Ok(Value::List(Rc::new(ListObj(items[from..to].to_vec()))))' \
+  "$LANG" \
+  'vec-slice returns a vector, which is what take and drop promise their callers'
+
+# --- The expander (milestone 5) ---------------------------------------------
+
+mutation src/lib.rs \
+  '// this (ADR-044 part 1).
+        vm.reset_gensym();' \
+  '// this (ADR-044 part 1).' \
+  '--test expand' \
+  'expand_all resets the gensym counter, so a unit expands the same way twice'
+
+# --- The compiler (milestone 2) ---------------------------------------------
+
+mutation src/lib.rs \
+  'self.lines.push(o);' \
+  'self.lines.push(SpanOrigin::Unknown);' \
+  '--test compile' \
+  'emit records the origin it was given rather than Unknown'
+
 echo
 echo "=== $flipped of $total flipped, $survived_ok survived as declared"
 if [ ${#dead[@]} -gt 0 ]; then

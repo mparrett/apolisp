@@ -1,0 +1,517 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>apolisp — a seam nothing compiles is a seam nobody can trust</title>
+<meta name="description" content="A Lisp VM whose Cargo features exist for nobody: they are a test harness for cutting a host capability out and finding the language untouched. Four build points, why the two in the middle carry the argument, and the one thing the harness cannot see.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%9C%82%3C/text%3E%3C/svg%3E">
+<style>
+  :root {
+    color-scheme: light dark;
+
+    --ground:    #edf0f3;
+    --panel:     #f8fafb;
+    --panel-2:   #e2e7ec;
+    --ink:       #14181d;
+    --muted:     #525c68;
+    --faint:     #7f8996;
+    --accent:    #1f5f7a;
+    --accent-w:  #d7e6ed;
+    --dead:      #9c3327;
+    --dead-w:    #f3ddd9;
+    --live:      #14614f;
+    --live-w:    #d6eae4;
+    --hair:      #ccd4db;
+    --hair-2:    #b0bac4;
+
+    --serif: "Charter", "Bitstream Charter", "Iowan Old Style", Georgia, ui-serif, serif;
+    --util:  "Avenir Next", Avenir, Futura, Optima, ui-sans-serif, system-ui, sans-serif;
+    --mono:  ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+
+    --measure: 64ch;
+    --rule: 1px solid var(--hair);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground:   #131619;
+      --panel:    #191d21;
+      --panel-2:  #22272d;
+      --ink:      #e3e7ec;
+      --muted:    #98a2ae;
+      --faint:    #6b7581;
+      --accent:   #6cb6d4;
+      --accent-w: #14313d;
+      --dead:     #e0837a;
+      --dead-w:   #38201d;
+      --live:     #5cc0a8;
+      --live-w:   #123029;
+      --hair:     #2a3037;
+      --hair-2:   #3a424b;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:#131619; --panel:#191d21; --panel-2:#22272d; --ink:#e3e7ec;
+    --muted:#98a2ae; --faint:#6b7581; --accent:#6cb6d4; --accent-w:#14313d;
+    --dead:#e0837a; --dead-w:#38201d; --live:#5cc0a8; --live-w:#123029;
+    --hair:#2a3037; --hair-2:#3a424b;
+  }
+  :root[data-theme="light"] {
+    --ground:#edf0f3; --panel:#f8fafb; --panel-2:#e2e7ec; --ink:#14181d;
+    --muted:#525c68; --faint:#7f8996; --accent:#1f5f7a; --accent-w:#d7e6ed;
+    --dead:#9c3327; --dead-w:#f3ddd9; --live:#14614f; --live-w:#d6eae4;
+    --hair:#ccd4db; --hair-2:#b0bac4;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--serif);
+    font-size: 1.0625rem;
+    line-height: 1.62;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  .wrap {
+    max-width: calc(var(--measure) + 4rem);
+    margin: 0 auto;
+    padding: 3.5rem 2rem 6rem;
+  }
+
+  header { border-bottom: var(--rule); padding-bottom: 2rem; margin-bottom: 2.5rem; }
+
+  h1 {
+    font-size: clamp(1.9rem, 5.2vw, 2.7rem);
+    line-height: 1.12;
+    letter-spacing: -0.018em;
+    margin: 0 0 0.9rem;
+    font-weight: 600;
+  }
+
+  .dek { font-size: 1.15rem; line-height: 1.5; color: var(--muted); margin: 0 0 1.4rem; }
+
+  .byline {
+    font-family: var(--util);
+    font-size: 0.775rem;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--faint);
+    margin: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+  }
+  .byline span { white-space: nowrap; }
+  .byline .sep { margin: 0 0.55rem; opacity: 0.5; }
+
+  section { margin: 0 0 3rem; }
+
+  .eyebrow {
+    display: block;
+    font-family: var(--util);
+    font-size: 0.7rem;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 0.5rem;
+  }
+
+  h2 {
+    font-size: clamp(1.3rem, 3.4vw, 1.6rem);
+    line-height: 1.22;
+    letter-spacing: -0.012em;
+    margin: 0 0 1rem;
+    font-weight: 600;
+  }
+
+  h3 {
+    font-family: var(--util);
+    font-size: 0.95rem;
+    letter-spacing: 0.01em;
+    margin: 1.8rem 0 0.6rem;
+    font-weight: 600;
+  }
+
+  p { margin: 0 0 1.05rem; max-width: var(--measure); }
+
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+  code {
+    font-family: var(--mono);
+    font-size: 0.86em;
+    background: var(--panel-2);
+    padding: 0.08em 0.32em;
+    border-radius: 3px;
+  }
+
+  pre {
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    line-height: 1.55;
+    background: var(--panel);
+    border: var(--rule);
+    border-left: 3px solid var(--hair-2);
+    border-radius: 4px;
+    padding: 0.95rem 1.1rem;
+    overflow-x: auto;
+    margin: 0 0 1.2rem;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; }
+  pre .cut { color: var(--dead); }
+  pre .dim { color: var(--faint); }
+
+  .note {
+    border: var(--rule);
+    border-left: 3px solid var(--hair-2);
+    background: var(--panel);
+    border-radius: 4px;
+    padding: 1rem 1.15rem 0.4rem;
+    margin: 0 0 1.3rem;
+    max-width: var(--measure);
+  }
+  .note p { font-size: 0.965rem; }
+  .note .tag {
+    display: block;
+    font-family: var(--util);
+    font-size: 0.7rem;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+  }
+  .note.found { border-left-color: var(--dead); background: var(--dead-w); }
+  .note.found .tag { color: var(--dead); }
+  .note.clean { border-left-color: var(--live); background: var(--live-w); }
+  .note.clean .tag { color: var(--live); }
+
+  /* --- the four build points -------------------------------------------- */
+
+  .points {
+    display: grid;
+    /* 14rem so four cards land as 2×2 at the page measure and 1×4 on a phone.
+       A width that fits three leaves the fourth alone beside an empty cell. */
+    grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+    gap: 1px;
+    background: var(--hair);
+    border: var(--rule);
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 1.6rem 0 0;
+  }
+  .point { background: var(--panel); padding: 0.85rem 0.95rem 0.9rem; }
+  .point b {
+    display: block;
+    font-family: var(--mono);
+    font-size: 0.74rem;
+    color: var(--accent);
+    font-weight: 600;
+    margin-bottom: 0.35rem;
+    overflow-wrap: anywhere;
+  }
+  .point span {
+    display: block;
+    font-family: var(--util);
+    font-size: 0.78rem;
+    line-height: 1.45;
+    color: var(--muted);
+  }
+  .point.mid { background: var(--accent-w); }
+
+  /* --- the truth table: the crux of why four and not two ----------------- */
+
+  .truth {
+    border-collapse: collapse;
+    font-family: var(--util);
+    font-size: 0.85rem;
+    width: 100%;
+    margin: 0 0 0.6rem;
+  }
+  .truth th, .truth td {
+    text-align: left;
+    padding: 0.5rem 0.9rem 0.5rem 0;
+    border-bottom: var(--rule);
+    vertical-align: baseline;
+  }
+  .truth thead th {
+    font-size: 0.68rem;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--faint);
+    font-weight: 600;
+    border-bottom: 1px solid var(--hair-2);
+  }
+  .truth td.b { font-family: var(--mono); font-size: 0.76rem; white-space: nowrap; }
+  .truth td.v { font-family: var(--mono); font-weight: 600; width: 5.5rem; }
+  .truth .yes { color: var(--live); }
+  .truth .no  { color: var(--dead); }
+  .truth tr.same td { color: var(--faint); }
+  .truth tr.same td.v { opacity: 0.75; }
+  .truth tr.differs td:first-child {
+    box-shadow: inset 3px 0 0 var(--accent);
+    padding-left: 0.7rem;
+  }
+  .truth td.why {
+    font-size: 0.79rem;
+    color: var(--muted);
+    line-height: 1.4;
+  }
+  .tablewrap { overflow-x: auto; margin: 0 0 1.4rem; }
+  .tablewrap .truth { min-width: 30rem; }
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+    gap: 1px;
+    margin: 0 0 1.5rem;
+  }
+  .stat {
+    background: var(--panel);
+    padding: 0.85rem 0.95rem;
+    box-shadow: 0 0 0 1px var(--hair);
+  }
+  .stat b {
+    display: block;
+    font-family: var(--util);
+    font-size: 1.35rem;
+    letter-spacing: -0.02em;
+    font-weight: 600;
+    line-height: 1.1;
+  }
+  .stat span {
+    font-family: var(--util);
+    font-size: 0.68rem;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+
+  blockquote {
+    margin: 0 0 1.2rem;
+    padding-left: 1.1rem;
+    border-left: 2px solid var(--accent);
+    color: var(--muted);
+    font-style: italic;
+    max-width: var(--measure);
+  }
+  blockquote p { margin-bottom: 0; }
+
+  ul { max-width: var(--measure); padding-left: 1.15rem; margin: 0 0 1.1rem; }
+  li { margin-bottom: 0.45rem; }
+
+  .next {
+    margin-top: 1.7rem;
+    padding-top: 1.1rem;
+    border-top: var(--rule);
+    font-family: var(--util);
+    font-size: 0.85rem;
+    line-height: 1.65;
+    color: var(--muted);
+  }
+
+  footer {
+    border-top: var(--rule);
+    padding-top: 1.6rem;
+    color: var(--faint);
+    font-family: var(--util);
+    font-size: 0.8rem;
+    line-height: 1.6;
+  }
+  footer p { max-width: var(--measure); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>A seam nothing compiles is a seam nobody can trust</h1>
+  <p class="dek">apolisp has four Cargo features and no users, which means the features are not for turning anything on. They exist so a host capability can be cut out and the language found untouched &mdash; and the claim only stays true because a command builds and tests four points of the feature lattice. The two in the middle are the ones carrying the argument.</p>
+  <p class="byline">
+    <span><code>just subtract</code></span><span class="sep">/</span><span>4 features</span><span class="sep">/</span><span>4 build points</span><span class="sep">/</span><span>6 cargo invocations</span><span class="sep">/</span><span>ADR-013</span>
+  </p>
+
+  <div class="points">
+    <div class="point"><b>--no-default-features</b><span>No filesystem, no sockets, no terminal, no JSON. Still a Lisp: closures, macros, exceptions, tail calls.</span></div>
+    <div class="point mid"><b>--features fs</b><span>Files and nothing else. Compiles the <code>Host::File</code> variant through one of its two owners.</span></div>
+    <div class="point mid"><b>--features term</b><span>A terminal and no filesystem. The only build that reaches the other owner.</span></div>
+    <div class="point"><b>default</b><span>All four, which is what <code>just verify</code> already runs. Free, and proves nothing on its own.</span></div>
+  </div>
+</header>
+
+<section>
+  <span class="eyebrow">The rule</span>
+  <h2>Seams exist for subtraction, not for organisation</h2>
+
+  <p>The project&rsquo;s ethos file states the boundary rule in a way that rules out most of the reasons people draw boundaries:</p>
+
+  <blockquote><p>A boundary earns its place when a subsystem can be <strong>deleted or lifted out</strong>. That is a different driver from modularity, and it is the one that applies here: needing a home for code is not a reason. The test is mechanical &mdash; cut the subsystem out and see whether it still builds.</p></blockquote>
+
+  <p>Which raises the obvious question about a claim like that: who ever runs the cut? A seam described in a design document and never compiled without its other half is a seam that has already rotted, and nothing will say so. So the features exist to run it. <a href="ADR.md">ADR-013</a> is explicit that they are a harness and not a product surface:</p>
+
+  <blockquote><p>The features are not there for users &mdash; there are none. They are the <strong>subtraction test harness</strong>: building with a host adapter cut out is how &ldquo;seams exist for subtraction&rdquo; stays a fact rather than a feeling.</p></blockquote>
+
+  <p>The same entry draws the line that keeps this from becoming a configuration matrix. Features gate <em>host capability</em> &mdash; filesystem, sockets, terminal, JSON. They never gate macros, metadata, or exceptions. Feature-gating core semantics turns one system into 2<sup>n</sup> systems, which is a direct assault on the constraint everything else defers to: the whole core has to be holdable in one reading. The VM knows exactly one generic <code>HostCall</code> opcode, so which host functions exist is a registry question rather than a compilation question.</p>
+</section>
+
+<section>
+  <span class="eyebrow">What a cut removes</span>
+  <h2>One capability, one edge</h2>
+
+  <p>An adapter&rsquo;s entire attachment to the VM is one line in one function. The comment above it is the design constraint stated as a fact about the code:</p>
+
+<pre><code><span class="dim">/// Every adapter enabled in this build. The single edge each one has on the
+/// VM: cut the module and the matching line here is all that stops compiling.</span>
+pub fn install(vm: &amp;mut Vm) {
+    #[cfg(feature = "tcp")]
+    tcp::install(vm);
+    #[cfg(feature = "term")]
+    term::install(vm);
+    #[cfg(feature = "json")]
+    json::install(vm);
+    let _ = vm;
+}
+</code></pre>
+
+  <p>Below that, a capability owns a variant of the live-resource enum, and cutting the feature takes the variant, the primitives that construct it, and every arm that reads it. Nothing in the VM changes. That is the shape the whole arrangement is trying to preserve, and it is why the enum carries its own note about it:</p>
+
+<pre><code>pub enum Host {
+    <span class="dim">/// ADR-013's subtraction harness, and the first place it is real: build
+    /// without `fs` *or* `term` and this variant, the primitives that
+    /// construct it, and the three arms that read it all go.</span>
+    #[cfg(any(feature = "fs", feature = "term"))]
+    File(std::fs::File),
+    Stdin,
+    Stdout,
+    #[cfg(feature = "tcp")]
+    Tcp(std::net::TcpStream),
+    #[cfg(feature = "tcp")]
+    Listener(std::net::TcpListener),
+}
+</code></pre>
+
+  <p><code>Stdout</code> has no gate because it is not a descriptor. It is the buffered in-memory host: a write goes into a buffer the snapshot serializes, not out to the process. With <code>fs</code>, <code>tcp</code> and <code>term</code> all cut, nothing in that module writes to the outside world at all &mdash; which is the subtraction working rather than a special case for it.</p>
+</section>
+
+<section>
+  <span class="eyebrow">The lattice &middot; why the command is six invocations and not two</span>
+  <h2>Four points, and the two that carry the argument</h2>
+
+  <p>Four features is sixteen possible builds. The harness builds four of them, and the choice is the interesting part &mdash; because the two obvious ones, everything on and everything off, cannot tell the two most likely <code>#[cfg]</code> mistakes apart.</p>
+
+  <p><code>Host::File</code> is gated <code>any(feature = "fs", feature = "term")</code>. Suppose someone writes <code>all</code> instead, or narrows it back to <code>fs</code> alone. Here is what each build point observes:</p>
+
+  <div class="tablewrap">
+  <table class="truth">
+    <thead>
+      <tr><th>Build</th><th>any(fs, term)</th><th>all(fs, term)</th><th>Can the endpoints tell?</th></tr>
+    </thead>
+    <tbody>
+      <tr class="same"><td class="b">--no-default-features</td><td class="v no">absent</td><td class="v no">absent</td><td class="why">No &mdash; both gates agree</td></tr>
+      <tr class="differs"><td class="b">--features fs</td><td class="v yes">present</td><td class="v no">absent</td><td class="why"><strong>Yes</strong> &mdash; the gates disagree here</td></tr>
+      <tr class="differs"><td class="b">--features term</td><td class="v yes">present</td><td class="v no">absent</td><td class="why"><strong>Yes</strong> &mdash; and only here for <code>term</code></td></tr>
+      <tr class="same"><td class="b">default (all four)</td><td class="v yes">present</td><td class="v yes">present</td><td class="why">No &mdash; both gates agree</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>With only the endpoints, <code>any(a, b)</code> and <code>all(a, b)</code> are indistinguishable. Every build is either green or red for both, so a gate written as if two capabilities always travel together compiles everywhere and is wrong nowhere anything looks. The middle points are the entire test. The justfile says so where someone changing the recipe will read it:</p>
+
+<pre><code><span class="dim"># Four points, not the whole 2^4 lattice: everything off, `fs` alone, and `term`
+# alone. The middle points are the ones that catch a `#[cfg]` written as if two
+# features always travel together — with only all-on and all-off, `any(a, b)`
+# and `all(a, b)` are indistinguishable.</span>
+subtract:
+    cargo clippy --no-default-features --all-targets -- -D warnings
+    cargo test   --no-default-features
+    cargo clippy --no-default-features --features fs --all-targets -- -D warnings
+    cargo test   --no-default-features --features fs
+    cargo clippy --no-default-features --features term --all-targets -- -D warnings
+    cargo test   --no-default-features --features term
+</code></pre>
+
+  <h3>The <code>term</code>-alone point is younger than the others, and it exists because of a bug the earlier lattice could not have</h3>
+
+  <p>Until <a href="ADR.md">ADR-051</a>, <code>Host::File</code> was gated on <code>fs</code> alone, and the only way to paint a terminal was <code>(io/open "/dev/tty" :write)</code> &mdash; which is the filesystem capability. So a build with <code>term</code> and without <code>fs</code> could read keystrokes and could not draw anything. A half-present capability, in a build nothing compiled and no test ran.</p>
+
+  <p>ADR-051 made a tty a handle like any other, so painting is <code>io/write</code> to it, so <code>Host::File</code> now has two owners and a <code>term</code>-only build has to compile that arm. The lattice gained a point that means something, and the decision record accounts for the cost honestly: one more <code>#[cfg]</code> naming two features is one more place to be wrong, mitigated by the new point failing to compile if the gate ever narrows again.</p>
+
+  <div class="note clean">
+    <span class="tag">The gate was checked by breaking it</span>
+    <p>The claim &ldquo;this point fails to compile if the gate narrows&rdquo; is not left as an argument. ADR-051 records it as verified by reverting the widened <code>#[cfg]</code> and counting what happened: <strong>six errors in the <code>term</code>-only build.</strong> A new check believed without being broken first is the project&rsquo;s most reliable source of checks that test nothing.</p>
+  </div>
+</section>
+
+<section>
+  <span class="eyebrow">Why it runs the tests</span>
+  <h2>Compiling proves the gates line up. Running proves the language is still there.</h2>
+
+  <p>The recipe is a full <code>cargo test</code> at each point rather than a <code>cargo check</code>, and the difference is the actual claim. Compiling shows the <code>#[cfg]</code>s are consistent. It says nothing about what a program sees when a capability is gone &mdash; and what it should see is the least dramatic thing available:</p>
+
+<pre><code>(try (io/open "x") (catch e (get e :kind)))
+<span class="dim">;; in a build without `fs`:</span>  :unbound
+</code></pre>
+
+  <p>Not a parse error, not a different dialect, not a special &ldquo;capability missing&rdquo; fault. An ordinary unbound global, exactly like a name nobody defined. Two tests hold that down, and both are written so a single file states the whole matrix and each build checks its own row:</p>
+
+  <ul>
+    <li><strong>A feature removes its primitives and nothing else.</strong> Every assertion is a <code>cfg!</code>: <code>is_bound("io/open")</code> must equal <code>cfg!(feature = "fs")</code>, and so on for all four. Then a list that must be bound in <em>every</em> build &mdash; <code>+</code>, <code>count</code>, <code>conj</code>, <code>str</code>, <code>println</code>, <code>gensym</code>, <code>io/stdout</code> &mdash; plus a closure and a <code>try</code>/<code>catch</code> that must still evaluate. That second half is ADR-013&rsquo;s no-2<sup>n</sup>-languages clause, as an assertion.</li>
+    <li><strong>A cut capability is an ordinary unbound global.</strong> It loops over the capabilities that are <em>absent</em> from this build and checks each raises <code>:unbound</code>.</li>
+  </ul>
+
+  <p>The second one has a detail worth copying. In the default build every capability is present, so its loop body never runs and the test asserts nothing at all. Rather than let it read as coverage, it says so:</p>
+
+<pre><code>if !any {
+    eprintln!("all capabilities present; this test asserts nothing in the default build");
+}
+</code></pre>
+
+  <p>A test that is vacuous in the build most people run is not a bug &mdash; the matrix is what makes it non-vacuous elsewhere. It is a bug only if nobody can tell.</p>
+</section>
+
+<section>
+  <span class="eyebrow">The limit</span>
+  <h2>It proves a capability can be removed. It cannot notice a semantic left with it.</h2>
+
+  <p>Ten milestones in, someone wrote an ordinary program &mdash; not a test &mdash; and found that the language had <strong>no way to turn a string into a number</strong>. Not an awkward way. None. The primitive table converted values to strings and never back, so a length header, a config value, a line of user input were all unreachable.</p>
+
+  <p>The one path that worked was <code>(json/decode "27")</code>. And <code>json</code> is an optional host adapter, which makes the consequence worse than the gap:</p>
+
+  <div class="note found">
+    <span class="tag">The subtraction build was green the whole time</span>
+    <p><code>--no-default-features</code> removed the language&rsquo;s only way to read a number out of text. ADR-013 says features gate host capability and never language semantics, and that had quietly stopped being true &mdash; not because a feature gated a semantic, but because <em>a semantic had no home and was squatting in a feature</em>.</p>
+    <p>The harness could not catch it and still cannot catch its like. The build without <code>json</code> passed because nothing in the test suite parses a number from a string either. <strong>The subtraction harness proves a capability can be removed; it cannot notice that a semantic went missing with it.</strong></p>
+  </div>
+
+  <p>The repair (ADR-046) made <code>parse-number</code> a core primitive, unconditional in every build, and made it <em>be</em> the reader&rsquo;s own number grammar rather than a second implementation &mdash; so a literal and a parsed string cannot drift. Which surfaced a smaller bug immediately: the non-finite spellings had been three arms of the reader&rsquo;s token match sitting <em>in front of</em> the shared function, so <code>(parse-number "##Inf")</code> answered <code>nil</code> while the reader read the same characters as a float. A shared grammar the caller can add cases in front of is not shared.</p>
+
+  <p>The finding worth keeping is the shape of the blind spot rather than the bug. A subtraction test asks &ldquo;does this still build and pass with X gone?&rdquo; It can only ever be as strong as what the suite would miss X for. The thing that found this was a person writing a program that had to read a number, which is a category of oracle no amount of strengthening the harness produces.</p>
+</section>
+
+<section>
+  <span class="eyebrow">Where it stands</span>
+  <h2>The cost, which is the honest part</h2>
+
+  <div class="stats">
+    <div class="stat"><b>6,845</b><span>core lines / 7,500</span></div>
+    <div class="stat"><b>439</b><span>adapter lines, outside</span></div>
+    <div class="stat"><b>16</b><span>possible builds</span></div>
+    <div class="stat"><b>4</b><span>built and tested</span></div>
+  </div>
+
+  <p>The adapters sit outside the line budget on purpose, because substantial host capability is a Rust library behind the handle table rather than a language subsystem. That exclusion is drawn by path in the budget test and it prints every excluded file with its count, so moving lines out of the budget by moving them into <code>adapters/</code> is visible rather than quiet.</p>
+
+  <p>What the arrangement buys is narrow and worth stating plainly: a minimum binary carries the full language even when an application uses almost none of it. That is the accepted cost, on the grounds that the language is the small part. And the terminal half has no Windows story &mdash; <code>/dev/tty</code> is Unix, and the decision record says so rather than implying portability it does not have.</p>
+
+  <p class="next">The mutation harness, which asks the neighbouring question &mdash; would we know if the code were wrong: <a href="mutations.html">Breaking the line is the easy half</a>.<br>
+  The findings, in four parts: <a href="oracle.html">The tests were green and two of them were dead</a> (milestones 1&ndash;3) &middot; <a href="limits.html">What a mutation check cannot find</a> (4&ndash;6) &middot; <a href="instrument.html">The instrument that can lie</a> (7&ndash;10) &middot; <a href="programs.html">Nobody had written a program in it</a>.</p>
+</section>
+
+<footer>
+  <p>apolisp is a personal project with one user and no stability promise. Its decision log is append-only; corrections go in errata rather than over the original. Everything on this page is read out of <code>Cargo.toml</code>, the justfile, <code>tests/adapters.rs</code> and the decision records &mdash; the line counts are the budget test&rsquo;s own output.</p>
+</footer>
+
+</div>
+</body>
+</html>

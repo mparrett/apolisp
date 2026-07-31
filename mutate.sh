@@ -29,6 +29,22 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 
+# This edits the working tree in place and restores after each mutation, so for
+# the length of a run the checkout is a mutant. Anything else reading the tree
+# meanwhile sees broken source: a `just verify` started alongside a run failed
+# here once and looked like a real regression until the timing was noticed.
+# A second `mutate.sh` would be worse — the two would restore each other's
+# mutations and every result would be noise.
+LOCK="${TMPDIR:-/tmp}/apolisp-mutate.lock"
+if ! mkdir "$LOCK" 2>/dev/null; then
+  echo "another mutate.sh is running (lock: $LOCK)" >&2
+  echo "it rewrites src/ in place, so two at once produce nothing trustworthy" >&2
+  exit 2
+fi
+# Combined with the restore below into one handler, because a second `trap` on
+# the same signals *replaces* the first rather than adding to it — set separately,
+# whichever came last would run and the other would silently never fire.
+
 total=0
 flipped=0
 survived_ok=0
@@ -40,7 +56,11 @@ restore() {
     [ -f "/tmp/apolisp-mut-$(basename "$f")" ] && cp "/tmp/apolisp-mut-$(basename "$f")" "$f"
   done
 }
-trap restore EXIT INT TERM
+cleanup() {
+  restore
+  rmdir "$LOCK" 2>/dev/null
+}
+trap cleanup EXIT INT TERM
 for f in src/lib.rs src/prelude.xs tests/corpus/editor.xs; do
   cp "$f" "/tmp/apolisp-mut-$(basename "$f")"
 done
@@ -463,6 +483,71 @@ mutation src/lib.rs \
             }' \
   "$EXPAND" \
   'a macro receives its arguments as written, not already expanded'
+
+# --- The compiler (milestone 2) ---------------------------------------------
+#
+# `emit` recording the origin it was given is seeded above. The pass's survivor
+# was ADR-028 rule 2 enforced *twice* — `try_form` cleared the tail flag and the
+# `Call` arm checked the region counter, so neither could be observed alone. It
+# was fixed by deleting the redundancy rather than adding a test, which is why
+# the counter is mutable here at all: it is now the single enforcement point.
+
+mutation src/lib.rs \
+  'if tail && self.regions == 0 {' \
+  'if tail {' \
+  '--test compile' \
+  'a tail call is suppressed inside a handler region (ADR-028 rule 2)'
+
+mutation src/lib.rs \
+  'Some(Core::Capture(self.add_capture(level, spec)))' \
+  'Some(Core::Capture(0))' \
+  '--test compile' \
+  'a capture is registered at every level it crosses, not assumed to be the first'
+
+# --- The VM (milestone 3) ---------------------------------------------------
+#
+# That pass had no survivors, which is only meaningful because the predictions
+# were written first. M6 is the one with history: returning restored the wrong
+# slot-stack length, it shipped into the working tree, and it was found by a
+# program crashing rather than by a test. Read it next to milestone 4's M5, which
+# mutates the same line the other way — truncating to the *wrong* length corrupts
+# a value and dies; not truncating at all merely retains, and needed a test built
+# for it.
+
+mutation src/lib.rs \
+  'if argc < fixed || (!p.variadic && argc > fixed) {' \
+  'if false {' \
+  "$VM" \
+  'the callee prologue checks arity, at call time and in the callee (ADR-033)'
+
+mutation src/lib.rs \
+  'ex.slots[base + fixed as usize] = Value::List(Rc::new(ListObj(rest)));' \
+  'ex.slots[base + fixed as usize] = if rest.is_empty() { Value::Nil } else { Value::List(Rc::new(ListObj(rest))) };' \
+  "$VM" \
+  'an empty rest parameter is an empty list, never nil (ADR-033, E-11)'
+
+mutation src/lib.rs \
+  'ex.slots.truncate(f.ret_len);' \
+  'ex.slots.truncate(f.base);' \
+  "$VM" \
+  'returning restores the callers slot length, not the callees base — the bug that shipped'
+
+mutation src/lib.rs \
+  'let me = ex.frames[fi].closure.clone();
+                ex.slots[base + dst as usize] = Value::Fn(me);' \
+  'ex.slots[base + dst as usize] = Value::Nil;' \
+  "$VM" \
+  'GetSelf yields the running closure, which is what makes self-recursion identity'
+
+# Expressed at the compiler rather than in the VM: emitting no `TailCall` at all
+# is the same observable — every call pushes a frame — and the VM-side version
+# needs a `Frame` clone the type does not offer. Same line as the region guard
+# above, mutated a second way, which is why both are here.
+mutation src/lib.rs \
+  'if tail && self.regions == 0 {' \
+  'if false {' \
+  "$VM" \
+  'tail calls are emitted, without which a tail loop grows the frame stack'
 
 echo
 echo "=== $flipped of $total flipped, $survived_ok survived as declared"

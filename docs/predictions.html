@@ -569,7 +569,7 @@
 
   <div class="vs">
     <div class="row said-pred"><span class="lab">ADR-052</span><span class="said">The editor core loses 2&ndash;4 lines; the change costs 25&ndash;35 core lines.</span></div>
-    <div class="row said-meas"><span class="lab">Actual</span><span class="said">The core lost <strong>one</strong> line: two definitions went away and a six-line comment explaining why took their place. The change cost <strong>55</strong>, and the 20-line overrun is entirely comment.</span></div>
+    <div class="row said-meas"><span class="lab">Actual</span><span class="said">The core lost <strong>one</strong> line: two definitions went away and a six-line comment explaining why took their place. The change cost <strong>57</strong>, and the 20-line overrun is entirely comment.</span></div>
     <div class="row said-pred"><span class="lab">ADR-053</span><span class="said">The prelude gets shorter &mdash; <code>take</code> and <code>drop</code> lose their loops.</span></div>
     <div class="row said-meas"><span class="lab">Actual</span><span class="said">The prelude got <strong>longer</strong>, 195 &rarr; 201, because the comment explaining where clamping now lives is bigger than the two loops it replaced. The core total landed at 6,637, inside its predicted band.</span></div>
   </div>
@@ -716,12 +716,13 @@
   The programs: <a href="programs.html">Nobody had written a program in it</a> &middot; <a href="pager.html">Input was live and output was buffered</a> &middot; <a href="asides.html">Nothing that got its own heading was lost</a>.<br>
   The harnesses: <a href="mutations.html">Breaking the line is the easy half</a> (mutation) and <a href="subtraction.html">A seam nothing compiles is a seam nobody can trust</a> (subtraction).<br>
   The findings, in four parts: <a href="oracle.html">The tests were green and two of them were dead</a> (milestones 1&ndash;3) &middot; <a href="limits.html">What a mutation check cannot find</a> (4&ndash;6) &middot; <a href="instrument.html">The instrument that can lie</a> (7&ndash;10) &middot; <a href="programs.html">Nobody had written a program in it</a>.<br>
-  The decision log: <a href="errata.html">The decision was right and the reason was wrong</a> &mdash; 55 entries, 4 superseded, 17 corrected.<br>
+  The decision log: <a href="errata.html">The decision was right and the reason was wrong</a> &mdash; 57 entries, 4 superseded, 17 corrected.<br>
   The sibling habits: <a href="wrong-subject.html">Review reads the assertion, nothing reads the subject</a> &mdash; six checks that were green while testing the wrong thing, and <a href="budget.html">The budget has never said no</a>, whose line-cost clauses are what make a line prediction scoreable.</p>
 </section>
 
 <footer>
   <p>apolisp is a personal project with one user and no stability promise. Every claim and every number on this page is quoted from a note written before the work it describes &mdash; <code>docs/notes/the-editor-prediction.md</code>, <code>str-scalar-slice-prediction.md</code> and <code>vec-slice-prediction.md</code> &mdash; scored in place afterwards, with the original text left unedited. The two apparatus failures are from <code>milestone-9-mutants.md</code> and <code>soak-leak-check.md</code>. The habit itself is four sentences in <code>docs/BUILD.md</code>.</p>
+  <p><strong>Frozen 2026-08-01.</strong> These write-ups describe the initial development of apolisp &mdash; milestones 1 to 10 and the sessions that followed &mdash; and are not maintained. Every count on this page is true as of that date. A later phase would be a new series rather than an edit to this one.</p>
 </footer>
 
 </div>

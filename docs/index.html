@@ -266,7 +266,7 @@
   <h1>apolisp</h1>
   <p class="dek">A small Lisp in the Clojure dialect, with its own VM, in Rust. One user, no compatibility contract, no stability promise. These twelve write-ups are not about the language &mdash; they are about the loop built to check it, and about the six or seven times that loop reported a pass it had not earned.</p>
   <p class="byline">
-    <span>10 milestones</span><span class="sep">/</span><span>6,845 lines</span><span class="sep">/</span><span>55 decisions</span><span class="sep">/</span><span>12 write-ups</span>
+    <span>10 milestones</span><span class="sep">/</span><span>6,845 lines</span><span class="sep">/</span><span>57 decisions</span><span class="sep">/</span><span>12 write-ups</span>
   </p>
 </header>
 
@@ -382,7 +382,7 @@
       <div>
         <h3><a href="errata.html">The decision was right and the reason was wrong</a></h3>
         <p>An append-only log where the only edit a past entry receives is a one-line pointer. Four entries have been superseded and seventeen carry a factual correction, because what turns out to be wrong in a decision record is almost never the decision.</p>
-        <p class="facts"><b>55</b> decisions <span class="sep">&middot;</span> 4 superseded <span class="sep">&middot;</span> 17 errata <span class="sep">&middot;</span> 2 errata on errata</p>
+        <p class="facts"><b>57</b> decisions <span class="sep">&middot;</span> 4 superseded <span class="sep">&middot;</span> 17 errata <span class="sep">&middot;</span> 2 errata on errata</p>
       </div>
     </div>
     <div class="entry">
@@ -431,13 +431,14 @@
   <p>The response is the same in every case and it is not a better assertion. It is to make the subject visible &mdash; print what the check observed, print what the budget skipped, print the counters and not just the verdict &mdash; and then have someone read it. The assertions are the backstop. The printout is the instrument.</p>
 
   <div class="note">
-    <span class="tag">On the numbers here</span>
-    <p>Counts on this page are a snapshot taken 2026-07-31, not a live inventory. The project&rsquo;s own rule, arrived at the hard way, is that an inventory stated in prose is a correction you have already scheduled &mdash; so the files are the count, and this page is a description rather than something anything defers to.</p>
+    <span class="tag">On the numbers here, and the freeze</span>
+    <p>Counts on this page are a snapshot taken at the freeze, 2026-08-01, not a live inventory. The project&rsquo;s own rule, arrived at the hard way, is that an inventory stated in prose is a correction you have already scheduled &mdash; so the files are the count, and this page is a description rather than something anything defers to.</p>
   </div>
 </section>
 
 <footer>
   <p>apolisp is a personal project with one user, no third-party users, and no stability promise &mdash; the language may break on a Tuesday and be rebuilt on Wednesday. The core is one Rust file plus a prelude written in the language, with host adapters outside the line budget and the exclusion printed on every run. Everything on these pages is quoted or counted from the repository: <code>docs/ADR.md</code> for decisions, <code>docs/notes/</code> for the working notes each write-up is built from, and the tests themselves for anything with a number in it.</p>
+  <p><strong>Frozen 2026-08-01.</strong> These write-ups describe the initial development of apolisp &mdash; milestones 1 to 10 and the sessions that followed &mdash; and are not maintained. Every count on this page is true as of that date. A later phase would be a new series rather than an edit to this one.</p>
 </footer>
 
 </div>

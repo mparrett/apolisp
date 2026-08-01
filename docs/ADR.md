@@ -3362,6 +3362,59 @@ which is exactly the arrangement the line budget already has.
 
 ---
 
+### ADR-057 — The write-ups are frozen
+
+*(New, 2026-08-01. Closes the series added between 2026-07-27 and 2026-08-01.
+Does not amend ADR-056; the write-ups stay inside the prose budget.)*
+
+**Decision.** The thirteen pages in `docs/*.html` are **frozen as of
+2026-08-01**. They describe the initial development of this language —
+milestones 1 to 10 and the sessions that followed — and they are not
+maintained. Every count in them is true as of the freeze date, which each page
+now states in its footer.
+
+**A later phase is a new series, not an edit to this one.** Nothing here says
+never write another; it says this set is finished, and that bolting a
+fourteenth chapter onto it would be a different act from writing one.
+
+**Why.** A write-up is a record of a period, not a view onto a repository. The
+distinction is invisible while the period is the present and becomes the whole
+question afterwards, because the failure mode is specific and cheap to reach: a
+later session finds thirteen pages asserting "55 entries", notices the log now
+holds more, and helpfully updates them — turning an accurate historical
+document into an inaccurate current one, one edit at a time.
+
+That failure was already in progress. Nine of the thirteen stated a decision
+count in the present tense with no date anywhere on the page, and **ADR-056
+falsified all nine on the day it landed**. A freeze date is what converts those
+from wrong into right: undated, "55 entries" is false; dated, it is permanently
+true. This is E-17's rule reaching the artifact E-17 could not see, and the
+answer is the same one — the number is not the problem, the missing *as of* is.
+
+*Why a date rather than removing the counts.* The counts are load-bearing: the
+argument on most of these pages is quantitative, and a page that says "several
+entries carry corrections" is worth less than one that says seventeen. Stamping
+is cheaper than rewriting and keeps what the pages are for.
+
+**Cost.** The pages will drift further from the repository every week, and
+somebody arriving in a year will read numbers that no longer describe anything
+current. Accepted, and it is the point rather than a side effect: they are dated
+and they say so. The alternative — thirteen documents to keep synchronised with
+a moving codebase, forever, by hand — is the maintenance burden this entry
+exists to refuse.
+
+`AGENTS.md` carries the instruction not to refresh them, because that is the
+file a session reads before it starts being helpful.
+
+**Rejected.** *Leaving them live* — nothing was updating them, so "live" meant
+"undated and quietly wrong". *Removing the counts* — see above. *Excluding them
+from the prose budget now that they are frozen* — they are 3,220 lines that will
+not grow, so excluding them buys nothing, and ADR-056's argument against
+directory exclusions applies to a set that has stopped moving exactly as it does
+to one that has not.
+
+---
+
 ## Errata
 
 Factual corrections to entries whose **decision still stands**. A wrong reason is

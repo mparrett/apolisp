@@ -62,10 +62,11 @@ a clippy error because neither check was in the one command anyone runs.
 - Properties test the **library**; goldens run the **binary**. Never rebuild a
   `target/debug/...` path by hand — use `CARGO_BIN_EXE_apolisp`.
 - Dependencies are fixed by ADR-014. Adding one is an ADR.
-- **The write-ups are `docs/*.html`**, built from `docs/notes/`, self-contained
-  and indexed by `index.html`. Every one links to every other, so adding one
-  edits all of them — and check the material is not already spent before
-  writing, because three of them tell more than their filename suggests.
+- **The write-ups are `docs/*.html`, and they are frozen** (ADR-057). Thirteen
+  pages on milestones 1–10 and the sessions after, indexed by `index.html`,
+  true as of 2026-08-01 and **not maintained**. Do not refresh their counts
+  when the code moves; a stale number in a dated artifact is not a defect. A
+  later phase is a new series, not an edit to this one.
 
 ## Habits that have already paid
 

@@ -298,6 +298,9 @@
     th, td { padding-right: 0.5rem; }
 
     .kind, .link, .row, .round { grid-template-columns: 1fr; gap: 0.15rem 0; }
+    /* A 3-card grid wraps 2+1 here and the empty cell reads as a blank card.
+       Only the 4-card grid divides evenly at two columns. */
+    .moves:not(:has(.move:nth-child(4))) { grid-template-columns: 1fr; }
     .args div { grid-template-columns: 1.6rem 1fr; }
     .args dd { grid-column: 2; }
   }
@@ -492,7 +495,7 @@
   <p class="next">Next: <a href="limits.html">What a mutation check cannot find</a> — milestones 4 to 6, and three edges of the instrument. Then <a href="instrument.html">The instrument that can lie</a>, which finishes the build order.<br>
   The harnesses themselves: <a href="mutations.html">Breaking the line is the easy half</a> (mutation &mdash; would we know if the code were wrong) and <a href="subtraction.html">A seam nothing compiles is a seam nobody can trust</a> (subtraction &mdash; cutting a host capability out and finding the language untouched).<br>
   The decision log: <a href="errata.html">The decision was right and the reason was wrong</a> &mdash; 55 entries, 4 superseded, 17 corrected in place.<br>
-  The habit under all of it: <a href="predictions.html">The claim that exists to catch a flattering result</a> &mdash; 13 predictions written before the work, scored against measurement after.</p>
+  The habit under all of it: <a href="predictions.html">The claim that exists to catch a flattering result</a> &mdash; 13 predictions written before the work, scored against measurement after, and <a href="wrong-subject.html">Review reads the assertion, nothing reads the subject</a> &mdash; six checks that were green while testing the wrong thing.</p>
 </section>
 
 <footer>

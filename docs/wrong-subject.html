@@ -1,0 +1,748 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>apolisp — review reads the assertion, nothing reads the subject</title>
+<meta name="description" content="Two corpus-wide properties were green for three days while checking bytecode the VM never runs. Six checks in this project have been green while testing the wrong thing, and every one was a correct assertion applied to the wrong subject.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%91%93%3C/text%3E%3C/svg%3E">
+<style>
+  :root {
+    color-scheme: light dark;
+
+    --ground:    #edf0f3;
+    --panel:     #f8fafb;
+    --panel-2:   #e2e7ec;
+    --ink:       #14181d;
+    --muted:     #525c68;
+    --faint:     #7f8996;
+    --accent:    #1f5f7a;
+    --accent-w:  #d7e6ed;
+    --dead:      #9c3327;
+    --dead-w:    #f3ddd9;
+    --live:      #14614f;
+    --live-w:    #d6eae4;
+    --hair:      #ccd4db;
+    --hair-2:    #b0bac4;
+
+    --serif: "Charter", "Bitstream Charter", "Iowan Old Style", Georgia, ui-serif, serif;
+    --util:  "Avenir Next", Avenir, Futura, Optima, ui-sans-serif, system-ui, sans-serif;
+    --mono:  ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+
+    --measure: 64ch;
+    --rule: 1px solid var(--hair);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground:   #131619;
+      --panel:    #191d21;
+      --panel-2:  #22272d;
+      --ink:      #e3e7ec;
+      --muted:    #98a2ae;
+      --faint:    #6b7581;
+      --accent:   #6cb6d4;
+      --accent-w: #14313d;
+      --dead:     #e0837a;
+      --dead-w:   #38201d;
+      --live:     #5cc0a8;
+      --live-w:   #123029;
+      --hair:     #2a3037;
+      --hair-2:   #3a424b;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:#131619; --panel:#191d21; --panel-2:#22272d; --ink:#e3e7ec;
+    --muted:#98a2ae; --faint:#6b7581; --accent:#6cb6d4; --accent-w:#14313d;
+    --dead:#e0837a; --dead-w:#38201d; --live:#5cc0a8; --live-w:#123029;
+    --hair:#2a3037; --hair-2:#3a424b;
+  }
+  :root[data-theme="light"] {
+    --ground:#edf0f3; --panel:#f8fafb; --panel-2:#e2e7ec; --ink:#14181d;
+    --muted:#525c68; --faint:#7f8996; --accent:#1f5f7a; --accent-w:#d7e6ed;
+    --dead:#9c3327; --dead-w:#f3ddd9; --live:#14614f; --live-w:#d6eae4;
+    --hair:#ccd4db; --hair-2:#b0bac4;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--serif);
+    font-size: 1.0625rem;
+    line-height: 1.62;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  .wrap {
+    max-width: calc(var(--measure) + 4rem);
+    margin: 0 auto;
+    padding: 3.5rem 2rem 6rem;
+  }
+
+  header { border-bottom: var(--rule); padding-bottom: 2rem; margin-bottom: 2.5rem; }
+
+  h1 {
+    font-size: clamp(1.9rem, 5.2vw, 2.7rem);
+    line-height: 1.12;
+    letter-spacing: -0.018em;
+    margin: 0 0 0.9rem;
+    font-weight: 600;
+  }
+
+  .dek { font-size: 1.15rem; line-height: 1.5; color: var(--muted); margin: 0 0 1.4rem; }
+
+  .byline {
+    font-family: var(--util);
+    font-size: 0.775rem;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--faint);
+    margin: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+  }
+  .byline span { white-space: nowrap; }
+  .byline .sep { margin: 0 0.55rem; opacity: 0.5; }
+
+  section { margin: 0 0 3rem; }
+
+  .eyebrow {
+    display: block;
+    font-family: var(--util);
+    font-size: 0.7rem;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 0.5rem;
+  }
+
+  h2 {
+    font-size: clamp(1.3rem, 3.4vw, 1.6rem);
+    line-height: 1.22;
+    letter-spacing: -0.012em;
+    margin: 0 0 1rem;
+    font-weight: 600;
+  }
+
+  h3 {
+    font-family: var(--util);
+    font-size: 0.95rem;
+    letter-spacing: 0.01em;
+    margin: 1.8rem 0 0.6rem;
+    font-weight: 600;
+  }
+
+  p { margin: 0 0 1.05rem; max-width: var(--measure); }
+
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+  code {
+    font-family: var(--mono);
+    font-size: 0.86em;
+    background: var(--panel-2);
+    padding: 0.08em 0.32em;
+    border-radius: 3px;
+  }
+
+  pre {
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    line-height: 1.55;
+    background: var(--panel);
+    border: var(--rule);
+    border-left: 3px solid var(--hair-2);
+    border-radius: 4px;
+    padding: 0.95rem 1.1rem;
+    overflow-x: auto;
+    margin: 0 0 1.2rem;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; }
+  pre .dim { color: var(--faint); }
+  pre .hi { color: var(--dead); }
+  pre .ok { color: var(--live); }
+
+  .note {
+    border: var(--rule);
+    border-left: 3px solid var(--hair-2);
+    background: var(--panel);
+    border-radius: 4px;
+    padding: 1rem 1.15rem 0.4rem;
+    margin: 0 0 1.3rem;
+    max-width: var(--measure);
+  }
+  .note p { font-size: 0.965rem; }
+  .note .tag {
+    display: block;
+    font-family: var(--util);
+    font-size: 0.7rem;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+  }
+  .note.found { border-left-color: var(--dead); background: var(--dead-w); }
+  .note.found .tag { color: var(--dead); }
+  .note.clean { border-left-color: var(--live); background: var(--live-w); }
+  .note.clean .tag { color: var(--live); }
+
+  /* --- the three channels ------------------------------------------------ */
+
+  .moves {
+    display: grid;
+    /* 11rem so all three fit one row at the page measure. A width that fits
+       two leaves the third beside an empty cell. */
+    grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+    gap: 1px;
+    background: var(--hair);
+    border: var(--rule);
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 1.6rem 0 0;
+  }
+  .move { background: var(--panel); padding: 0.85rem 0.95rem 0.9rem; }
+  .move b {
+    font-family: var(--util);
+    font-size: 0.8rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    font-weight: 600;
+    display: block;
+    margin-bottom: 0.3rem;
+    color: var(--accent);
+  }
+  .move .n {
+    font-family: var(--util);
+    font-size: 1.5rem;
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: -0.02em;
+    display: block;
+    margin-bottom: 0.4rem;
+    color: var(--accent);
+  }
+  .move span.d {
+    display: block;
+    font-family: var(--util);
+    font-size: 0.78rem;
+    line-height: 1.45;
+    color: var(--muted);
+  }
+
+  /* --- the pair: what a green test actually claims ----------------------- */
+
+  .pair {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1px;
+    background: var(--hair);
+    border: var(--rule);
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 0 0 1.3rem;
+    max-width: var(--measure);
+  }
+  .pair > div { background: var(--panel); padding: 0.9rem 1rem 1rem; }
+  .pair b {
+    display: block;
+    font-family: var(--util);
+    font-size: 0.7rem;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    margin-bottom: 0.4rem;
+  }
+  .pair p { margin: 0; font-size: 0.9rem; line-height: 1.5; max-width: none; }
+  .pair .read b { color: var(--live); }
+  .pair .unread b { color: var(--dead); }
+
+  /* --- the ledger of six ------------------------------------------------- */
+
+  .kinds { margin: 0 0 1.4rem; }
+  .kind {
+    border-top: var(--rule);
+    padding: 0.9rem 0 0.95rem;
+    display: grid;
+    grid-template-columns: 3.4rem 1fr;
+    gap: 0 1rem;
+    align-items: baseline;
+  }
+  .kind:last-child { border-bottom: var(--rule); }
+  .kind .e {
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    color: var(--accent);
+    font-weight: 600;
+  }
+  .kind h3 { margin: 0 0 0.3rem; font-size: 0.93rem; }
+  .kind p { margin: 0; font-size: 0.93rem; color: var(--muted); max-width: none; }
+  .kind p + p { margin-top: 0.4rem; }
+
+  /* --- the trigger that did not fire ------------------------------------- */
+
+  .chain {
+    font-family: var(--util);
+    font-size: 0.85rem;
+    border: var(--rule);
+    background: var(--panel);
+    border-radius: 4px;
+    padding: 1rem 1.15rem;
+    margin: 0 0 1.3rem;
+    max-width: var(--measure);
+  }
+  .link {
+    display: grid;
+    grid-template-columns: 5.5rem 1fr;
+    gap: 0 0.9rem;
+    padding: 0.4rem 0;
+    align-items: baseline;
+  }
+  .link .id {
+    font-family: var(--mono);
+    font-size: 0.76rem;
+    font-weight: 600;
+    color: var(--accent);
+    white-space: nowrap;
+  }
+  .link .said { color: var(--muted); line-height: 1.45; }
+  .link.dead .said { color: var(--dead); }
+  .arrow {
+    font-family: var(--mono);
+    color: var(--faint);
+    font-size: 0.8rem;
+    padding-left: 0.4rem;
+  }
+
+  /* --- tables ------------------------------------------------------------ */
+
+  .tablewrap { overflow-x: auto; margin: 0 0 1.2rem; }
+  table {
+    border-collapse: collapse;
+    font-family: var(--util);
+    font-size: 0.83rem;
+    width: 100%;
+    min-width: 32rem;
+  }
+  th, td { text-align: left; padding: 0.45rem 0.8rem 0.45rem 0; border-bottom: var(--rule); vertical-align: top; }
+  thead th {
+    font-size: 0.68rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--faint);
+    font-weight: 600;
+    border-bottom: 1px solid var(--hair-2);
+  }
+  td.e { font-family: var(--mono); font-size: 0.76rem; color: var(--accent); font-weight: 600; white-space: nowrap; }
+  td.k { white-space: nowrap; color: var(--faint); font-size: 0.75rem; letter-spacing: 0.03em; text-transform: uppercase; }
+  thead th:nth-child(2) { width: 42%; }
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+    gap: 1px;
+    margin: 0 0 1.5rem;
+  }
+  .stat {
+    background: var(--panel);
+    padding: 0.85rem 0.95rem;
+    box-shadow: 0 0 0 1px var(--hair);
+  }
+  .stat b {
+    display: block;
+    font-family: var(--util);
+    font-size: 1.35rem;
+    letter-spacing: -0.02em;
+    font-weight: 600;
+    line-height: 1.1;
+  }
+  .stat span {
+    font-family: var(--util);
+    font-size: 0.68rem;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+
+  blockquote {
+    margin: 0 0 1.2rem;
+    padding-left: 1.1rem;
+    border-left: 2px solid var(--accent);
+    color: var(--muted);
+    font-style: italic;
+    max-width: var(--measure);
+  }
+  blockquote p { margin-bottom: 0; }
+
+  ul { max-width: var(--measure); padding-left: 1.15rem; margin: 0 0 1.1rem; }
+  li { margin-bottom: 0.45rem; }
+
+  .next {
+    margin-top: 1.7rem;
+    padding-top: 1.1rem;
+    border-top: var(--rule);
+    font-family: var(--util);
+    font-size: 0.85rem;
+    line-height: 1.65;
+    color: var(--muted);
+  }
+
+  footer {
+    border-top: var(--rule);
+    padding-top: 1.6rem;
+    color: var(--faint);
+    font-family: var(--util);
+    font-size: 0.8rem;
+    line-height: 1.6;
+  }
+  footer p { max-width: var(--measure); }
+
+  /* --- phone portrait ----------------------------------------------------
+     At 393px the 2rem gutter spends 16% of the viewport on margin and leaves
+     a ~34-character measure. Gutter, body size and every box's inner padding
+     come down together, and the fixed label columns stack rather than
+     spending a fifth of the screen on a five-character label. */
+  @media (max-width: 34rem) {
+    body { font-size: 1rem; line-height: 1.58; }
+    .wrap { padding: 2.25rem 1rem 4rem; }
+    header { padding-bottom: 1.5rem; margin-bottom: 1.9rem; }
+    section { margin: 0 0 2.2rem; }
+    .dek { font-size: 1.05rem; }
+    h3 { margin-top: 1.5rem; }
+
+    .note, .chain, .vs, .args div { padding-left: 0.85rem; padding-right: 0.85rem; }
+    .move, .stat, .gate, .g-q, .g-out, .g-body { padding-left: 0.7rem; padding-right: 0.7rem; }
+    pre { padding: 0.8rem 0.7rem; font-size: 0.75rem; }
+    blockquote { padding-left: 0.85rem; }
+    ul { padding-left: 1rem; }
+    th, td { padding-right: 0.5rem; }
+
+    .kind, .link, .row, .round { grid-template-columns: 1fr; gap: 0.15rem 0; }
+    /* A 3-card grid wraps 2+1 here and the empty cell reads as a blank card.
+       Only the 4-card grid divides evenly at two columns. */
+    .moves:not(:has(.move:nth-child(4))) { grid-template-columns: 1fr; }
+    .args div { grid-template-columns: 1.6rem 1fr; }
+    .args dd { grid-column: 2; }
+    .pair { grid-template-columns: 1fr; }
+    .pair > div { padding-left: 0.85rem; padding-right: 0.85rem; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>Review reads the assertion. Nothing reads the subject.</h1>
+  <p class="dek">Two properties swept every program in the corpus and were green for three days while checking bytecode the VM never runs. That is the second corpus-wide property in this project to have been dead, and the sixth check to have been green while testing the wrong thing &mdash; and not one of the six contained a wrong assertion.</p>
+  <p class="byline">
+    <span>6 checks</span><span class="sep">/</span><span>3 detection channels</span><span class="sep">/</span><span>0 wrong assertions</span>
+  </p>
+
+  <div class="moves">
+    <div class="move">
+      <b>Mutation</b>
+      <span class="d">Finds a check that <em>asserts too little</em> about what it sees. Needs the code to exist and a hypothesis about how it might break.</span>
+    </div>
+    <div class="move">
+      <b>An unlike input</b>
+      <span class="d">Finds a check that <em>sees too few things</em>. Needs an input that exercises a path the existing ones do not &mdash; and needs someone to write it.</span>
+    </div>
+    <div class="move">
+      <b>Ask what it observed</b>
+      <span class="d">Finds a check that is <em>looking at nothing at all</em>. Costs a <code>println</code> and thirty seconds, and is the only one that works before a test has ever been green.</span>
+    </div>
+  </div>
+</header>
+
+<section>
+  <span class="eyebrow">The incident</span>
+  <h2>Not a weakened check &mdash; an absent one</h2>
+
+  <p><code>tests/compile.rs</code> has a helper, <code>compile_ok</code>, that reads a source string and compiles it. It does not expand macros. That is exactly the right shape for the hand-written snippets that fill most of the file: they are core forms, and routing them through the expander would test the expander instead of the compiler.</p>
+
+  <p>Two properties used the same helper to sweep every file in <code>tests/corpus</code>:</p>
+
+  <pre><code>every_instruction_has_an_origin
+slot_operands_stay_inside_the_frame</code></pre>
+
+  <p>Since milestone 5 those files contain macros. So from <code>6c4785f</code> onward, both properties were compiling forms that no longer resembled what the compiler is handed at run time &mdash; and asserting over the bytecode that came out.</p>
+
+  <p>The distinction that matters is not that the checks got weaker. The bytecode being asserted over was produced from <em>pre-expansion</em> source, so nothing about post-expansion codegen was covered by either property, for any program, ever. Every instruction the VM actually runs was outside the reach of both.</p>
+</section>
+
+<section>
+  <span class="eyebrow">Why nothing noticed</span>
+  <h2>The trigger and the thing that should have fired it arrived in the same commit</h2>
+
+  <p><code>macros.xs</code> entered the corpus in the commit that made expansion exist. It did not fire, because every template in it expands to something the compiler <em>also</em> accepts unexpanded:</p>
+
+  <pre><code>(defmacro when  [test &amp; body] `(if ~test (do ~@body) nil))
+(defmacro twice [e]           `(let [v# ~e] (+ v# v#)))
+(defmacro pair  [a b]         `[~a ~b])</code></pre>
+
+  <p>Unexpanded, <code>`(if ~test &hellip;)</code> is a list whose head is <code>if</code> and whose members are <code>(unquote test)</code> &mdash; odd, but structurally a form the compiler will lower without complaint. <code>twice</code> puts a vector in binding position, but it is a <em>literal</em> vector and survives syntax-quote as one.</p>
+
+  <p>Breaking it needs an unquote standing exactly where a <strong>parameter vector</strong> goes, and one macro in the project does that:</p>
+
+  <pre><code>(defmacro defn [name params &amp; body]
+  `(def ~name (fn ~name ~params ~@body)))
+
+<span class="dim">unexpanded, ~params is (unquote params) &mdash; a list, not a vector</span>
+<span class="hi">`fn` takes a parameter vector, not a list</span></code></pre>
+
+  <p><code>editor.xs</code> is the first corpus program to define its own <code>defn</code>. It failed on the first run after being added.</p>
+
+  <blockquote><p>&ldquo;Holds over the whole corpus&rdquo; is a claim whose strength is set by the corpus&rsquo;s diversity, and nine programs that each pin one small feature are not diverse merely by being nine.</p></blockquote>
+
+  <p>The editor is 270 lines against 212 for the other nine combined, and it broke something on the way in. That is the argument for corpus growth stated as a measurement rather than as a preference: the tenth program found what nine had been unable to, not because it was better written but because it was <em>unlike</em> them.</p>
+</section>
+
+<section>
+  <span class="eyebrow">The shape</span>
+  <h2>A green test is a claim about a pair</h2>
+
+  <p>Six checks in this project have now been green while testing the wrong thing. Reading them together, the striking thing is what they have in common &mdash; and it is not carelessness.</p>
+
+  <div class="pair">
+    <div class="read">
+      <b>The assertion</b>
+      <p>What the check claims. Written deliberately, read in review, and in all six cases <strong>correct</strong>.</p>
+    </div>
+    <div class="unread">
+      <b>The subject</b>
+      <p>The thing the assertion was applied to. Established by a helper, a fixture, or a default several call sites away &mdash; and read by nobody.</p>
+    </div>
+  </div>
+
+  <p><strong>Every one of the six was a true assertion about the wrong subject. Not one was a wrong assertion.</strong> The bounds checks above were correct, applied to bytecode the VM never runs. A pin&rsquo;s assertions were correct, at a window height where the clamp they were written for cannot fire. &ldquo;Every dependency is optional&rdquo; is correct, and vacuous over an empty list. A compile check compiled exactly what it claimed to compile, and compiling is not what catches an unbound global in a language that resolves them at call time.</p>
+
+  <blockquote><p>Review reads the assertion. Nothing reads the subject.</p></blockquote>
+
+  <p>That is why all six survived being written and read by someone who understood them. Reviewing a test means reading what it asserts; the subject is upstream, usually in a helper whose name says it does the right thing, and it changes without the assertion changing at all.</p>
+
+  <div class="kinds">
+    <div class="kind">
+      <span class="e">1</span>
+      <div>
+        <h3>Milestone 1&rsquo;s span property &mdash; found by mutation</h3>
+        <p>Checking arity and nothing else. Two of three mutants &mdash; every origin <code>Unknown</code>, every span starting at byte 0 &mdash; passed the entire suite. <a href="oracle.html">Told in full in chapter one</a>.</p>
+      </div>
+    </div>
+    <div class="kind">
+      <span class="e">2</span>
+      <div>
+        <h3>The two corpus sweeps &mdash; found by an unlike input</h3>
+        <p>All post-expansion codegen, for every program, since milestone 5. The incident above.</p>
+      </div>
+    </div>
+    <div class="kind">
+      <span class="e">3</span>
+      <div>
+        <h3><code>str-scalar-slice</code>&rsquo;s <code>from &gt; to</code> branch &mdash; found by mutation</h3>
+        <p>Would have hidden <em>nothing</em>, and that was the finding. Below.</p>
+      </div>
+    </div>
+    <div class="kind">
+      <span class="e">4</span>
+      <div>
+        <h3>The editor&rsquo;s two-row pin &mdash; found by mutation</h3>
+        <p>Would have hidden the <code>max2 1</code> clamp &mdash; the entire bug the fix was written for. The pin stopped exercising the clamp once the key hint gave up its row, and went on passing.</p>
+      </div>
+    </div>
+    <div class="kind">
+      <span class="e">5</span>
+      <div>
+        <h3><code>the_language_carries_no_dependencies</code> &mdash; found by asking what it observed</h3>
+        <p>Would have hidden every dependency, if the manifest were ever reformatted. Below.</p>
+      </div>
+    </div>
+    <div class="kind">
+      <span class="e">6</span>
+      <div>
+        <h3>The editor shell&rsquo;s compile check &mdash; found by mutation</h3>
+        <p>Would have hidden a shell calling a core function that no longer exists. Globals resolve at call time, so the shell compiled perfectly with a call to the deleted <code>scalars-take</code> sitting in it. Found by putting one there on purpose, not by reading it. The check now <em>evaluates</em> the join instead, minus the one call that needs a terminal.</p>
+      </div>
+    </div>
+  </div>
+
+  <p>Four of the six were caught by mutation, one by an unlike input, one by printing what the check observed. That distribution is an artefact of which habits were being practised, not a ranking &mdash; and the three channels find genuinely different things.</p>
+
+  <h3>How a subject drifts: the ground moves under a check that never changed</h3>
+
+  <p>Instances 2 and 4 share a mechanism sharp enough that the mutation ADR names it as a distinct kind: <strong>a correct check that stops covering its subject when a later change moves the ground under it.</strong> Three arrived in a single day. The two-row pin stopped exercising its clamp once the key hint gave up its row. Two more pins silently began testing soft wrap instead of clipping, on the day soft wrap became the default.</p>
+
+  <p>Each was still passing, still correct, and no longer about anything. Nobody edited them; the default they assumed moved, and an assumption that is never written down cannot be invalidated when it stops holding.</p>
+
+  <div class="note clean">
+    <span class="tag">The mitigation, which is narrow on purpose</span>
+    <p><strong>A pin states the mode it assumes.</strong> A pin that does not is one that stops pinning the moment the default moves &mdash; and it will keep reporting a pass while it does.</p>
+  </div>
+</section>
+
+<section>
+  <span class="eyebrow">The channels</span>
+  <h2>Mutation could not have found the one this page is about</h2>
+
+  <p>The two dead corpus sweeps were not found by mutation, and no mutation would have found them. The code was not wrong. <code>compile_ok</code> does exactly what its name says, and every assertion in both properties was correct.</p>
+
+  <p>The defect was in the <em>reach</em> of the property, and reach is invisible to mutation of the code under test. Break any line the property covers and the property still fails, correctly, on the subject it was looking at. It only becomes visible when the input set grows a member that exercises a path the others do not.</p>
+
+  <div class="tablewrap">
+  <table>
+    <thead>
+      <tr><th>Channel</th><th>Finds</th><th>Needs</th></tr>
+    </thead>
+    <tbody>
+      <tr><td class="e">Mutation</td><td>A check that asserts too little about the programs it sees.</td><td class="k">code + a hypothesis</td></tr>
+      <tr><td class="e">An unlike input</td><td>A check that sees too few programs.</td><td class="k">a new input</td></tr>
+      <tr><td class="e">Ask it</td><td>A check that is looking at nothing at all.</td><td class="k">a println</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>They are complements rather than substitutes, and the failure mode of treating them as substitutes is specific: a project that mutates diligently and never adds an unlike input will keep a suite of properties that are individually sharp and collectively blind, and every mutation run will report that they are fine. That is not a hypothetical &mdash; it is three days of this project.</p>
+</section>
+
+<section>
+  <span class="eyebrow">The cheapest one</span>
+  <h2>Ask the check to show its working, before it has ever been green</h2>
+
+  <p>Instance 5 was found by neither of the other two, and it is the only one of the six that was caught <em>before</em> it went wrong.</p>
+
+  <p><code>the_language_carries_no_dependencies</code> reads <code>Cargo.toml</code>, splits out the <code>[dependencies]</code> section by hand, and asserts that every entry it finds is optional &mdash; which is the property that matters, since ADR-013 makes features host capability only, so a non-optional dependency is by definition one the language carries.</p>
+
+  <p>The assertion is correct. It is also vacuously true over an empty list, and the hand-rolled parse goes empty the moment anyone rewrites the manifest in <code>[dependencies.crossterm]</code> table style &mdash; a reformat, not a change of substance. Nothing about that would have failed.</p>
+
+  <p>What surfaced it was printing what the parse actually saw before trusting the assertion built on it: <strong>two dependency lines</strong>, which is the number that makes the check mean something. That number is now an assertion of its own, with a message saying the manifest format changed and this test stopped looking at anything.</p>
+
+  <div class="note clean">
+    <span class="tag">Why this is the one to reach for first</span>
+    <p>Mutation needs the code to exist and a hypothesis about how it might break. An unlike input needs the input, and someone to think of it. Asking a check to show its working needs a <code>println</code> and thirty seconds &mdash; and it is the only one of the three that works <em>before</em> a test has ever been green for the wrong reason.</p>
+  </div>
+
+  <p>An empty subject is the easiest failure to have and the hardest to see, because every assertion over it passes and none of them is false. A check that observed nothing and a check that observed everything print the same verdict, and only one of them is a test.</p>
+</section>
+
+<section>
+  <span class="eyebrow">Instance 3</span>
+  <h2>A survivor is a question about which of two things is wrong</h2>
+
+  <p>The reflex reading of a surviving mutant is &ldquo;the test is too weak&rdquo;. Instance 3 is the one that does not fit, and it is worth keeping for that.</p>
+
+  <p><code>str-scalar-slice</code> had a <code>from &gt; to</code> branch of its own. Removing it changed no behaviour any test could see: the scan reaches the same error either way, and ADR-039 clause 3 makes the message prose rather than contract. The correct reading was not &ldquo;the test is too weak&rdquo; but <strong>&ldquo;the code is redundant&rdquo;</strong>, and deleting it was the fix.</p>
+
+  <p>Then deleting it exposed something a stronger test would never have found. Without the loop&rsquo;s early <code>break</code>, <code>s[f..t]</code> runs backwards and <strong>panics</strong> &mdash; a process abort, where ADR-039 requires a throw. That is now held by an <code>f &lt;= t</code> guard rather than by an argument about loop ordering, and it is <a href="mutations.html">the harness&rsquo;s one declared survivor</a>: kept deliberately, unreachable while the <code>break</code> stands, and reported loudly if it ever starts dying.</p>
+
+  <div class="note found">
+    <span class="tag">What the reflex would have cost</span>
+    <p>Answering &ldquo;the test&rdquo; by reflex would have added an assertion, kept a redundant branch, and left the panic in place behind an argument nobody had written down. Two mechanisms enforcing one rule means no test can say which one is working &mdash; the same finding as chapter one, arriving from the opposite direction.</p>
+  </div>
+</section>
+
+<section>
+  <span class="eyebrow">The sharpest case</span>
+  <h2>The comment at the line named the subject the assertion could not reach</h2>
+
+  <p>One more, filed as an erratum rather than in the note, and it is the one that makes the thesis hardest to dismiss as inattention.</p>
+
+  <p>A mutation making <code>vec-slice</code> return a <strong>list</strong> instead of a vector survived the entire suite &mdash; including three assertions written the day before, whose comment read <em>&ldquo;a list in, a vector out &mdash; the conversion is the point&rdquo;</em>.</p>
+
+  <pre><code>(is= [1 2] (vec-slice ...))   <span class="dim">; the assertion</span>
+<span class="dim">; "a list in, a vector out &mdash; the conversion is the point"</span>
+
+<span class="hi">ADR-041 makes = cross representations, so this is
+equally true of the list it was written to refuse.</span>
+
+(is= "[1 2]" (str (vec-slice ...)))  <span class="ok">; prints (1 2) for a list</span></code></pre>
+
+  <p>The author knew the subject. The author <em>wrote the subject down, at the line</em>. The assertion still could not see it, because a language decision made two representations equal and the check was phrased in terms of that equality. The same hole covered <code>take</code> and <code>drop</code>, whose contract is also that they hand back a vector.</p>
+
+  <p>Found by the mutation rung one day after the tests were written, and by nothing else in the loop. If a stated intent sitting on the adjacent line does not protect a check from testing the wrong subject, no amount of reading will.</p>
+</section>
+
+<section>
+  <span class="eyebrow">The trigger</span>
+  <h2>A comment named the day this would break, and the day came</h2>
+
+  <p>The dead assertion was not unguarded. It carried this, written at milestone 2:</p>
+
+  <blockquote><p>Nothing in the corpus is macro-generated yet, so every instruction traces to real source text. When milestone 5 lands, <code>Generated</code> becomes legal here and this assertion is the thing that has to be widened deliberately.</p></blockquote>
+
+  <p>A correct prediction, with the right trigger, sitting at the right line of code.</p>
+
+  <div class="chain">
+    <div class="link"><span class="id">milestone 2</span><span class="said">The comment is written. It names the exact future change and the exact response required.</span></div>
+    <div class="arrow">&darr;</div>
+    <div class="link"><span class="id">milestone 5</span><span class="said">Lands <strong>the next day</strong>. Macros exist; <code>macros.xs</code> joins the corpus in the same commit.</span></div>
+    <div class="arrow">&darr;</div>
+    <div class="link dead"><span class="id">&mdash;</span><span class="said">Nothing happens. A comment has no mechanism to fire &mdash; it is read by whoever is already looking at the line, and after milestone 2 nobody was.</span></div>
+  </div>
+
+  <p>Pair it with the finding from instance 1: the decision record had <em>already specified the fix</em> for that dead property, in its verification clause, and the implementation had built the debug renderer and then not snapshotted it. <strong>Twice now the project has written down the thing that would have prevented a defect, in a place that was not consulted at the moment it mattered.</strong></p>
+
+  <p>Which turns a comfortable belief into an open question. Documentation that anticipates a future change is doing real work only if something reads it at the moment of the change, and neither a code comment nor a decision record has any such mechanism. The candidate fix on the table is narrow: make the trigger a failing test with an <code>#[ignore]</code> and a reason, so it is the suite asking rather than the reader remembering.</p>
+</section>
+
+<section>
+  <span class="eyebrow">The fix, and the fix&rsquo;s own trap</span>
+  <h2>Legalizing <code>Generated</code> nearly reintroduced instance 1</h2>
+
+  <p>The repair is small. <code>compile_expanded</code> mirrors what the binary does &mdash; read, expand, compile &mdash; and both corpus sweeps use it. The prelude deliberately stays out: folding it in would leave the span assertion checking prelude origins against the program&rsquo;s source length.</p>
+
+  <p>The origin property now accepts <code>Generated</code>, which is the widening the comment asked for, and still refuses <code>Unknown</code>. And one assertion was added that at least one instruction per program traces to <code>Source</code>.</p>
+
+  <div class="note found">
+    <span class="tag">Why that last assertion exists</span>
+    <p>Legalizing <code>Generated</code> without it would let a mutant that stamped <em>every</em> instruction <code>Generated</code> pass &mdash; a property that accepts anything, which is the exact failure milestone 1 is about, reintroduced by the fix for a different one.</p>
+  </div>
+
+  <p>That is the pattern worth carrying: widening a check to accommodate a legitimate new case is the moment it is most likely to become vacuous, because the widening is written while thinking about the case that motivated it and not about the case that empties it.</p>
+</section>
+
+<section>
+  <span class="eyebrow">The timing</span>
+  <h2>The habit costs least exactly when it feels least necessary</h2>
+
+  <p>Four of the six were caught by mutation, and none of the four took five minutes. But the number that changed how the habit is written down is a different one:</p>
+
+  <div class="stats">
+    <div class="stat"><b>3 of 6</b><span>caught the same session</span></div>
+    <div class="stat"><b>3 of 6</b><span>believed for days</span></div>
+    <div class="stat"><b>0 of 6</b><span>a wrong assertion</span></div>
+  </div>
+
+  <p>Three were caught in the session the check was written &mdash; before the thing had ever been trusted. The other three had been green, and believed, for days.</p>
+
+  <blockquote><p>The habit costs least at the moment the assertion is written and most after it has been green for three days, which is exactly backwards from when it feels necessary.</p></blockquote>
+
+  <p>A fresh check is the cheapest thing in the world to break: the code is loaded, the subject is in front of you, and no other work depends on it yet. A check that has been passing for a week has acquired the strongest possible evidence that it is fine, which is that it keeps passing &mdash; and that evidence is exactly what a check testing the wrong subject also produces.</p>
+
+  <p>So the project&rsquo;s habits file no longer says <em>try to break your own test</em>. It says to do it <strong>at the moment the check is written</strong>, and it gives the three ways: mutate it, feed it an input unlike the others, or just print what it observed.</p>
+</section>
+
+<section>
+  <span class="eyebrow">Still open</span>
+  <h2>What six instances do not settle</h2>
+
+  <p>The count is the note&rsquo;s ledger at a date, not a live inventory &mdash; and this page is the wrong place to keep one, for the reason <a href="errata.html">E-17</a> gives. Three questions the six raise and do not answer:</p>
+
+  <ul>
+    <li><strong>Should a corpus entry state what it reaches that no existing entry does?</strong> The <code>.out</code> list is already an asserted decision; coverage intent is not. &ldquo;Add an unlike input&rdquo; only works as a habit if unlikeness is deliberate, and the tenth program was unlike the others by accident &mdash; it was written to be used, not to be diverse.</li>
+    <li><strong>Is there a cheap check that a corpus-wide property compiles through the same pipeline as the binary?</strong> Both defects here were a test helper diverging from <code>main.rs</code>, and that divergence is mechanically detectable in a way &ldquo;is this assertion about the right thing&rdquo; is not.</li>
+    <li><strong>Should corpus growth be scheduled?</strong> It currently happens when a program is written for other reasons. Nine programs found nothing for three days; the tenth found it on the first run. Waiting for the tenth program to be wanted for its own sake is a detection strategy with no schedule.</li>
+  </ul>
+
+  <p>None of these is decided, which is the honest place to leave it. What is decided is smaller and has evidence behind it: a check is a pair, the subject half is unread by construction, and the thirty seconds that reads it are cheapest before anyone has believed the result.</p>
+
+  <p class="next">The harnesses: <a href="mutations.html">Breaking the line is the easy half</a> (mutation) and <a href="subtraction.html">A seam nothing compiles is a seam nobody can trust</a> (subtraction).<br>
+  The findings, in four parts: <a href="oracle.html">The tests were green and two of them were dead</a> (milestones 1&ndash;3) &middot; <a href="limits.html">What a mutation check cannot find</a> (4&ndash;6) &middot; <a href="instrument.html">The instrument that can lie</a> (7&ndash;10) &middot; <a href="programs.html">Nobody had written a program in it</a>.<br>
+  The decision log: <a href="errata.html">The decision was right and the reason was wrong</a>. The habit under all of it: <a href="predictions.html">The claim that exists to catch a flattering result</a>.</p>
+</section>
+
+<footer>
+  <p>apolisp is a personal project with one user and no stability promise. The incident and the six-instance ledger are from <code>docs/notes/the-corpus-as-an-oracle.md</code>; the timing finding and the fifth kind it names are from ADR-055, and the <code>vec-slice</code> case is erratum E-16. The habit those produced is a paragraph in <code>AGENTS.md</code>, and it carries a <em>when</em> because three of the six had already been believed for days.</p>
+</footer>
+
+</div>
+</body>
+</html>

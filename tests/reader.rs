@@ -556,6 +556,95 @@ fn core_stays_within_the_line_budget() {
     );
 }
 
+/// The prose budget (ADR-056). The core has had a hard budget with a test
+/// behind it since ADR-030; the documents never had one, and the documents are
+/// what grew — `ADR.md` alone is half the size of the language it describes.
+///
+/// This is not shaped like the line budget and should not be read as one.
+/// ADR-030's number is a working target with the assertion a thousand lines
+/// past it, so nobody argues about forty. **This number is the assertion.**
+/// It is a tripwire against getting carried away, set at roughly 1.4× the
+/// current total, and there is no working target underneath it to defend.
+///
+/// The `<style>` block of each write-up is excluded, because thirteen copies of
+/// one stylesheet are 4,596 lines nobody holds in their head — and the
+/// exclusion **prints**, for the reason ADR-045 gives: an exclusion nobody can
+/// see is how a budget stops measuring anything.
+#[test]
+fn the_documents_stay_within_the_prose_budget() {
+    const BUDGET: usize = 20_000;
+
+    let docs = repo_root().join("docs");
+
+    // Sorted, and recursive for `.md` so `notes/` and `archive/` are in scope.
+    // No directory is excluded: the moment a budget can be satisfied by moving
+    // a file, it measures where files are rather than how much there is.
+    let mut files: Vec<PathBuf> = Vec::new();
+    let mut stack = vec![docs.clone()];
+    while let Some(dir) = stack.pop() {
+        let mut entries: Vec<PathBuf> = std::fs::read_dir(&dir)
+            .expect("docs/ reads")
+            .filter_map(|e| e.ok().map(|e| e.path()))
+            .collect();
+        entries.sort();
+        for p in entries {
+            if p.is_dir() {
+                stack.push(p);
+            } else {
+                match p.extension().and_then(|e| e.to_str()) {
+                    // `.html` only at the top level: the write-ups live there.
+                    Some("md") => files.push(p),
+                    Some("html") if p.parent() == Some(docs.as_path()) => files.push(p),
+                    _ => {}
+                }
+            }
+        }
+    }
+    files.sort();
+
+    let mut total = 0;
+    let mut styled = 0;
+    let mut report = String::new();
+    for path in &files {
+        let text = std::fs::read_to_string(path).unwrap();
+        let all = text.lines().count();
+        let css = style_lines(&text);
+        total += all - css;
+        styled += css;
+        let name = path.strip_prefix(&docs).unwrap().to_string_lossy();
+        if css > 0 {
+            report.push_str(&format!("  {name:<34} {:5}  (+{css} css)\n", all - css));
+        } else {
+            report.push_str(&format!("  {name:<34} {:5}\n", all - css));
+        }
+    }
+
+    eprintln!("prose: {total}/{BUDGET} lines (ADR-056)\n{report}\nexcluded, duplicated <style> blocks: {styled} lines");
+
+    assert!(
+        total <= BUDGET,
+        "docs are {total} lines against a cap of {BUDGET} (ADR-056).\n\
+         This is a tripwire, not a target: it fires because something got \
+         carried away, and the fix is to cut or to raise it in a new entry — \
+         never to exclude a directory.\n{report}"
+    );
+}
+
+/// Lines inside a single `<style>` element. Zero for anything that has none,
+/// which is every file except the write-ups.
+fn style_lines(text: &str) -> usize {
+    let (Some(a), Some(b)) = (text.find("<style>"), text.find("</style>")) else {
+        return 0;
+    };
+    if b < a {
+        return 0;
+    }
+    // +1 for the closing tag's own line: `text[a..b]` stops before it, and
+    // counting the element as one line short of itself is thirteen lines of
+    // silent drift across thirteen write-ups.
+    text[a..b].lines().count() + 1
+}
+
 /// Split a file into its inline `pub mod` sections. Reporting only — after
 /// extraction into files the per-file totals above carry the same information.
 fn layers(text: &str) -> Vec<(String, usize)> {

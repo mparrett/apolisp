@@ -375,6 +375,31 @@
     line-height: 1.6;
   }
   footer p { max-width: var(--measure); }
+
+  /* --- phone portrait ----------------------------------------------------
+     At 393px the 2rem gutter spends 16% of the viewport on margin and leaves
+     a ~34-character measure. Gutter, body size and every box's inner padding
+     come down together, and the fixed label columns stack rather than
+     spending a fifth of the screen on a five-character label. */
+  @media (max-width: 34rem) {
+    body { font-size: 1rem; line-height: 1.58; }
+    .wrap { padding: 2.25rem 1rem 4rem; }
+    header { padding-bottom: 1.5rem; margin-bottom: 1.9rem; }
+    section { margin: 0 0 2.2rem; }
+    .dek { font-size: 1.05rem; }
+    h3 { margin-top: 1.5rem; }
+
+    .note, .chain, .vs, .args div { padding-left: 0.85rem; padding-right: 0.85rem; }
+    .move, .stat, .gate, .g-q, .g-out, .g-body { padding-left: 0.7rem; padding-right: 0.7rem; }
+    pre { padding: 0.8rem 0.7rem; font-size: 0.75rem; }
+    blockquote { padding-left: 0.85rem; }
+    ul { padding-left: 1rem; }
+    th, td { padding-right: 0.5rem; }
+
+    .kind, .link, .row, .round { grid-template-columns: 1fr; gap: 0.15rem 0; }
+    .args div { grid-template-columns: 1.6rem 1fr; }
+    .args dd { grid-column: 2; }
+  }
 </style>
 </head>
 <body>

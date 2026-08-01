@@ -62,6 +62,10 @@ a clippy error because neither check was in the one command anyone runs.
 - Properties test the **library**; goldens run the **binary**. Never rebuild a
   `target/debug/...` path by hand — use `CARGO_BIN_EXE_apolisp`.
 - Dependencies are fixed by ADR-014. Adding one is an ADR.
+- **The write-ups are `docs/*.html`**, built from `docs/notes/`, self-contained
+  and indexed by `index.html`. Every one links to every other, so adding one
+  edits all of them — and check the material is not already spent before
+  writing, because three of them tell more than their filename suggests.
 
 ## Habits that have already paid
 

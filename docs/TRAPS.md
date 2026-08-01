@@ -269,3 +269,13 @@ unrelated subsystem.
 **Tagged integers do not have the obvious range.** `../wallisp`'s fixnums turned
 out to be 30-bit rather than 32-bit, and it surfaced only under a benchmark. If
 integers are ever tagged, write down the real range and test its edges.
+
+**Two cargo invocations at once report a wrong answer, not a lock error.** Cargo
+serializes *builds* and does not stop one build replacing the binary another
+test is about to exec. So running anything alongside `just verify` — which
+builds `--no-default-features` three times — lets a feature-gated test read a
+binary built with different features. `without_fs_the_filesystem_primitive_is_unbound`
+failed exactly once this way, against an `fs`-enabled binary, and passed on
+every re-run. **The direction is luck.** The same race can as easily produce a
+green run against the wrong binary, and a failure that vanishes when you re-run
+it is the kind that gets a real check disabled. Run `just verify` alone.

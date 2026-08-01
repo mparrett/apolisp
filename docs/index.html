@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>apolisp — ten write-ups on trying not to fool yourself</title>
-<meta name="description" content="A small Lisp in the Clojure dialect with its own VM, in Rust. Ten write-ups about the verification loop around it: four chapters of findings, two harnesses, and four mechanisms — each of which has a page about its own blind spot.">
+<title>apolisp — twelve write-ups on trying not to fool yourself</title>
+<meta name="description" content="A small Lisp in the Clojure dialect with its own VM, in Rust. Twelve write-ups about the verification loop around it: four chapters of findings, two programs, two harnesses, and four mechanisms — each of which has a page about its own blind spot.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%93%9A%3C/text%3E%3C/svg%3E">
 <style>
   :root {
@@ -264,9 +264,9 @@
 
 <header>
   <h1>apolisp</h1>
-  <p class="dek">A small Lisp in the Clojure dialect, with its own VM, in Rust. One user, no compatibility contract, no stability promise. These ten write-ups are not about the language &mdash; they are about the loop built to check it, and about the six or seven times that loop reported a pass it had not earned.</p>
+  <p class="dek">A small Lisp in the Clojure dialect, with its own VM, in Rust. One user, no compatibility contract, no stability promise. These twelve write-ups are not about the language &mdash; they are about the loop built to check it, and about the six or seven times that loop reported a pass it had not earned.</p>
   <p class="byline">
-    <span>10 milestones</span><span class="sep">/</span><span>6,845 lines</span><span class="sep">/</span><span>55 decisions</span><span class="sep">/</span><span>10 write-ups</span>
+    <span>10 milestones</span><span class="sep">/</span><span>6,845 lines</span><span class="sep">/</span><span>55 decisions</span><span class="sep">/</span><span>12 write-ups</span>
   </p>
 </header>
 
@@ -339,6 +339,32 @@
         <h3><a href="subtraction.html">A seam nothing compiles is a seam nobody can trust</a></h3>
         <p>Four Cargo features and no users, so the features are not for turning anything on. They exist so a host capability can be cut out and the language found untouched &mdash; and the two middle points of the lattice are the ones carrying the argument.</p>
         <p class="facts"><code>just subtract</code> <span class="sep">&middot;</span> <b>4</b> build points <span class="sep">&middot;</span> 6 cargo invocations <span class="sep">&middot;</span> ADR-013</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <span class="eyebrow">The programs</span>
+  <h2>Two write-ups where the finding came from using it</h2>
+
+  <p>Chapter four is where the project started writing programs in the language rather than tests of it. These two are the individual programs whose findings did not fit in it &mdash; one about a workload nothing had touched, one about what a long design conversation loses on the way to a decision log.</p>
+
+  <div class="entries">
+    <div class="entry">
+      <span class="rail">Terminal</span>
+      <div>
+        <h3><a href="pager.html">Input was live and output was buffered</a></h3>
+        <p>A pager: correct on the first run, and impossible to use. Five keystrokes against a blank screen, then every frame at once into a terminal that had stopped caring. Two subsystems each right on their own that had never been in the same program.</p>
+        <p class="facts"><b>46</b> lines, 4 of them host shim <span class="sep">&middot;</span> 5 predictions, 4 held <span class="sep">&middot;</span> ADR-051</p>
+      </div>
+    </div>
+    <div class="entry">
+      <span class="rail">Provenance</span>
+      <div>
+        <h3><a href="asides.html">Nothing that got its own heading was lost</a></h3>
+        <p>An audit of the 1,840-line conversation the project came out of, checked against the log it became. Three ideas went missing, and all three had arrived as asides inside a long answer about something else.</p>
+        <p class="facts"><b>3</b> lost <span class="sep">&middot;</span> 3 arrived as asides <span class="sep">&middot;</span> 2 since decided, once they had a number</p>
       </div>
     </div>
   </div>

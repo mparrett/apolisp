@@ -1,0 +1,577 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>apolisp — input was live and output was buffered</title>
+<meta name="description" content="A pager, forty-six lines, correct on the first run and impossible to use: five keystrokes against a blank screen, then every frame painted at once into a terminal that had stopped caring. Two subsystems that were each right on their own and had never been in the same program.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%8C%A8%3C/text%3E%3C/svg%3E">
+<style>
+  :root {
+    color-scheme: light dark;
+
+    --ground:    #edf0f3;
+    --panel:     #f8fafb;
+    --panel-2:   #e2e7ec;
+    --ink:       #14181d;
+    --muted:     #525c68;
+    --faint:     #7f8996;
+    --accent:    #1f5f7a;
+    --accent-w:  #d7e6ed;
+    --dead:      #9c3327;
+    --dead-w:    #f3ddd9;
+    --live:      #14614f;
+    --live-w:    #d6eae4;
+    --hair:      #ccd4db;
+    --hair-2:    #b0bac4;
+
+    --serif: "Charter", "Bitstream Charter", "Iowan Old Style", Georgia, ui-serif, serif;
+    --util:  "Avenir Next", Avenir, Futura, Optima, ui-sans-serif, system-ui, sans-serif;
+    --mono:  ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+
+    --measure: 64ch;
+    --rule: 1px solid var(--hair);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground:   #131619;
+      --panel:    #191d21;
+      --panel-2:  #22272d;
+      --ink:      #e3e7ec;
+      --muted:    #98a2ae;
+      --faint:    #6b7581;
+      --accent:   #6cb6d4;
+      --accent-w: #14313d;
+      --dead:     #e0837a;
+      --dead-w:   #38201d;
+      --live:     #5cc0a8;
+      --live-w:   #123029;
+      --hair:     #2a3037;
+      --hair-2:   #3a424b;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:#131619; --panel:#191d21; --panel-2:#22272d; --ink:#e3e7ec;
+    --muted:#98a2ae; --faint:#6b7581; --accent:#6cb6d4; --accent-w:#14313d;
+    --dead:#e0837a; --dead-w:#38201d; --live:#5cc0a8; --live-w:#123029;
+    --hair:#2a3037; --hair-2:#3a424b;
+  }
+  :root[data-theme="light"] {
+    --ground:#edf0f3; --panel:#f8fafb; --panel-2:#e2e7ec; --ink:#14181d;
+    --muted:#525c68; --faint:#7f8996; --accent:#1f5f7a; --accent-w:#d7e6ed;
+    --dead:#9c3327; --dead-w:#f3ddd9; --live:#14614f; --live-w:#d6eae4;
+    --hair:#ccd4db; --hair-2:#b0bac4;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--serif);
+    font-size: 1.0625rem;
+    line-height: 1.62;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  .wrap {
+    max-width: calc(var(--measure) + 4rem);
+    margin: 0 auto;
+    padding: 3.5rem 2rem 6rem;
+  }
+
+  header { border-bottom: var(--rule); padding-bottom: 2rem; margin-bottom: 2.5rem; }
+
+  h1 {
+    font-size: clamp(1.9rem, 5.2vw, 2.7rem);
+    line-height: 1.12;
+    letter-spacing: -0.018em;
+    margin: 0 0 0.9rem;
+    font-weight: 600;
+  }
+
+  .dek { font-size: 1.15rem; line-height: 1.5; color: var(--muted); margin: 0 0 1.4rem; }
+
+  .byline {
+    font-family: var(--util);
+    font-size: 0.775rem;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--faint);
+    margin: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+  }
+  .byline span { white-space: nowrap; }
+  .byline .sep { margin: 0 0.55rem; opacity: 0.5; }
+
+  section { margin: 0 0 3rem; }
+
+  .eyebrow {
+    display: block;
+    font-family: var(--util);
+    font-size: 0.7rem;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 0.5rem;
+  }
+
+  h2 {
+    font-size: clamp(1.3rem, 3.4vw, 1.6rem);
+    line-height: 1.22;
+    letter-spacing: -0.012em;
+    margin: 0 0 1rem;
+    font-weight: 600;
+  }
+
+  h3 {
+    font-family: var(--util);
+    font-size: 0.95rem;
+    letter-spacing: 0.01em;
+    margin: 1.8rem 0 0.6rem;
+    font-weight: 600;
+  }
+
+  p { margin: 0 0 1.05rem; max-width: var(--measure); }
+
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+  code {
+    font-family: var(--mono);
+    font-size: 0.86em;
+    background: var(--panel-2);
+    padding: 0.08em 0.32em;
+    border-radius: 3px;
+  }
+
+  pre {
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    line-height: 1.55;
+    background: var(--panel);
+    border: var(--rule);
+    border-left: 3px solid var(--hair-2);
+    border-radius: 4px;
+    padding: 0.95rem 1.1rem;
+    overflow-x: auto;
+    margin: 0 0 1.2rem;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; }
+  pre .dim { color: var(--faint); }
+  pre .hi { color: var(--dead); }
+  pre .ok { color: var(--live); }
+  pre b { font-weight: 600; color: var(--ink); }
+
+  .note {
+    border: var(--rule);
+    border-left: 3px solid var(--hair-2);
+    background: var(--panel);
+    border-radius: 4px;
+    padding: 1rem 1.15rem 0.4rem;
+    margin: 0 0 1.3rem;
+    max-width: var(--measure);
+  }
+  .note p { font-size: 0.965rem; }
+  .note .tag {
+    display: block;
+    font-family: var(--util);
+    font-size: 0.7rem;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+  }
+  .note.found { border-left-color: var(--dead); background: var(--dead-w); }
+  .note.found .tag { color: var(--dead); }
+  .note.clean { border-left-color: var(--live); background: var(--live-w); }
+  .note.clean .tag { color: var(--live); }
+
+  /* --- the ratio across three programs ----------------------------------- */
+
+  .moves {
+    display: grid;
+    /* 11rem so all three fit one row at the page measure. A width that fits
+       two leaves the third beside an empty cell. */
+    grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+    gap: 1px;
+    background: var(--hair);
+    border: var(--rule);
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 1.6rem 0 0;
+  }
+  .move { background: var(--panel); padding: 0.85rem 0.95rem 0.9rem; }
+  .move b {
+    font-family: var(--util);
+    font-size: 0.8rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    font-weight: 600;
+    display: block;
+    margin-bottom: 0.3rem;
+    color: var(--accent);
+  }
+  .move .n {
+    font-family: var(--util);
+    font-size: 1.5rem;
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: -0.02em;
+    display: block;
+    margin-bottom: 0.4rem;
+    color: var(--accent);
+  }
+  .move span.d {
+    display: block;
+    font-family: var(--util);
+    font-size: 0.78rem;
+    line-height: 1.45;
+    color: var(--muted);
+  }
+
+  /* --- the two halves of the terminal ------------------------------------ */
+
+  .pair {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1px;
+    background: var(--hair);
+    border: var(--rule);
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 0 0 1.3rem;
+    max-width: var(--measure);
+  }
+  .pair > div { background: var(--panel); padding: 0.9rem 1rem 1rem; }
+  .pair b {
+    display: block;
+    font-family: var(--util);
+    font-size: 0.7rem;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    margin-bottom: 0.4rem;
+  }
+  .pair p { margin: 0; font-size: 0.9rem; line-height: 1.5; max-width: none; }
+  .pair .read b { color: var(--live); }
+  .pair .unread b { color: var(--dead); }
+
+  /* --- the pre-registration ledger --------------------------------------- */
+
+  .kinds { margin: 0 0 1.4rem; }
+  .kind {
+    border-top: var(--rule);
+    padding: 0.75rem 0 0.8rem;
+    display: grid;
+    grid-template-columns: 3.4rem 1fr;
+    gap: 0 1rem;
+    align-items: baseline;
+  }
+  .kind:last-child { border-bottom: var(--rule); }
+  .kind .e {
+    font-family: var(--util);
+    font-size: 0.7rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: var(--live);
+  }
+  .kind.key .e { color: var(--dead); }
+  .kind p { margin: 0; font-size: 0.93rem; color: var(--muted); max-width: none; }
+  .kind.key p { color: var(--ink); }
+
+  .tablewrap { overflow-x: auto; margin: 0 0 1.2rem; }
+  table {
+    border-collapse: collapse;
+    font-family: var(--util);
+    font-size: 0.83rem;
+    width: 100%;
+    min-width: 30rem;
+  }
+  th, td { text-align: left; padding: 0.45rem 0.8rem 0.45rem 0; border-bottom: var(--rule); vertical-align: top; }
+  thead th {
+    font-size: 0.68rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--faint);
+    font-weight: 600;
+    border-bottom: 1px solid var(--hair-2);
+  }
+  td.n { text-align: right; font-family: var(--mono); font-size: 0.78rem; color: var(--muted); white-space: nowrap; }
+  td.e { font-family: var(--mono); font-size: 0.76rem; color: var(--accent); font-weight: 600; white-space: nowrap; }
+
+  blockquote {
+    margin: 0 0 1.2rem;
+    padding-left: 1.1rem;
+    border-left: 2px solid var(--accent);
+    color: var(--muted);
+    font-style: italic;
+    max-width: var(--measure);
+  }
+  blockquote p { margin-bottom: 0; }
+
+  ul { max-width: var(--measure); padding-left: 1.15rem; margin: 0 0 1.1rem; }
+  li { margin-bottom: 0.45rem; }
+
+  .next {
+    margin-top: 1.7rem;
+    padding-top: 1.1rem;
+    border-top: var(--rule);
+    font-family: var(--util);
+    font-size: 0.85rem;
+    line-height: 1.65;
+    color: var(--muted);
+  }
+
+  footer {
+    border-top: var(--rule);
+    padding-top: 1.6rem;
+    color: var(--faint);
+    font-family: var(--util);
+    font-size: 0.8rem;
+    line-height: 1.6;
+  }
+  footer p { max-width: var(--measure); }
+
+  /* --- phone portrait ----------------------------------------------------
+     At 393px the 2rem gutter spends 16% of the viewport on margin and leaves
+     a ~34-character measure. Gutter, body size and every box's inner padding
+     come down together, and the fixed label columns stack rather than
+     spending a fifth of the screen on a five-character label. */
+  @media (max-width: 34rem) {
+    body { font-size: 1rem; line-height: 1.58; }
+    .wrap { padding: 2.25rem 1rem 4rem; }
+    header { padding-bottom: 1.5rem; margin-bottom: 1.9rem; }
+    section { margin: 0 0 2.2rem; }
+    .dek { font-size: 1.05rem; }
+    h3 { margin-top: 1.5rem; }
+
+    .note { padding-left: 0.85rem; padding-right: 0.85rem; }
+    .move { padding-left: 0.7rem; padding-right: 0.7rem; }
+    pre { padding: 0.8rem 0.7rem; font-size: 0.75rem; }
+    blockquote { padding-left: 0.85rem; }
+    ul { padding-left: 1rem; }
+    th, td { padding-right: 0.5rem; }
+
+    .kind { grid-template-columns: 1fr; gap: 0.15rem 0; }
+    /* A 3-card grid wraps 2+1 here and the empty cell reads as a blank card. */
+    .moves:not(:has(.move:nth-child(4))) { grid-template-columns: 1fr; }
+    .pair { grid-template-columns: 1fr; }
+    .pair > div { padding-left: 0.85rem; padding-right: 0.85rem; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>Input was live and output was buffered</h1>
+  <p class="dek">A pager: show a screenful, scroll with <code>j</code> and <code>k</code>, quit with <code>q</code>. Forty-six lines, correct on the first run, and impossible to use &mdash; five keystrokes against a blank screen, and then every frame painted at once into a terminal that had already stopped caring. Nothing in it was wrong.</p>
+  <p class="byline">
+    <span>46 lines</span><span class="sep">/</span><span>4 of them host shim</span><span class="sep">/</span><span>5 predictions, 4 held</span><span class="sep">/</span><span>ADR-051</span>
+  </p>
+
+  <div class="moves">
+    <div class="move">
+      <span class="n">6 / 17</span>
+      <b>Conway&rsquo;s Life</b>
+      <span class="d">Definitions that were standard library rebuilt by hand. Five existed only because there was no looping form.</span>
+    </div>
+    <div class="move">
+      <span class="n">30 / 54</span>
+      <b>The report</b>
+      <span class="d">Lines. Iteration was fixed, and what it had been hiding was strings and ordering.</span>
+    </div>
+    <div class="move">
+      <span class="n">4 / 46</span>
+      <b>The pager</b>
+      <span class="d">Lines, and none of them a missing function. The gaps had moved off the language and onto the host boundary.</span>
+    </div>
+  </div>
+</header>
+
+<section>
+  <span class="eyebrow">The program</span>
+  <h2>The most ordinary interactive program there is</h2>
+
+  <p>The ethos names three target workloads &mdash; terminal applications, web services, simulators. Two <a href="programs.html">earlier programs</a> had covered a simulator and a service, so the terminal was the one left. It is also where the least-exercised code in the repository lives: <code>term.rs</code> is 120 lines behind three natives, and the whole suite&rsquo;s coverage of it is <strong>one arity check</strong>.</p>
+
+  <p>So: a pager. Show one screenful of a file, scroll with <code>j</code>/<code>k</code>/space, quit with <code>q</code>. Chosen for being unremarkable.</p>
+
+  <p><strong>It works, and the first version of it cannot work.</strong> The gap between those two sentences is the finding.</p>
+</section>
+
+<section>
+  <span class="eyebrow">Written first</span>
+  <h2>Five predictions, and the one that was not a wish list</h2>
+
+  <p>Filed before running anything, in the habit the project asks for. Four held and were minor. The fifth held and was the whole result.</p>
+
+  <div class="kinds">
+    <div class="kind"><span class="e">Held</span><p>No ESC literal &mdash; the reader takes <code>\n \t \r \\ \"</code> and nothing else.</p></div>
+    <div class="kind"><span class="e">Held</span><p>No cursor or clear natives; the adapter abstracts input and not output.</p></div>
+    <div class="kind"><span class="e">Held</span><p>Raw mode has no scope form, so <code>try</code>/<code>finally</code> has to carry it &mdash; and will.</p></div>
+    <div class="kind key"><span class="e">The one</span><p><strong><code>io/stdout</code> is buffered until the program ends, which would make an interactive program unwritable.</strong></p></div>
+    <div class="kind"><span class="e">Moot</span><p>No <code>mod</code>, only <code>rem</code>. Irrelevant here &mdash; a pager clamps rather than wraps.</p></div>
+  </div>
+
+  <div class="note clean">
+    <span class="tag">Worth flagging against the other pre-registrations</span>
+    <p>Three rounds of prediction elsewhere in this project all had <a href="predictions.html">their largest finding absent from their own list</a>. This one predicted its headline. The difference is what was being predicted: buffering was a <em>known</em> mechanism whose consequence had never been faced, not a cost nothing could yet measure. Predicting the consequence of something you already understand is a much easier trick, and the note says so rather than claiming a hit.</p>
+  </div>
+</section>
+
+<section>
+  <span class="eyebrow">Measured, not read</span>
+  <h2>Two writes twenty-four seconds apart, arriving together</h2>
+
+  <p><code>io/write</code> to <code>io/stdout</code> calls <code>vm.emit</code>, which appends to <code>vm.out</code>. The driver prints that buffer <em>after</em> the run returns, under a <code>--- stdout</code> header. Nothing reaches the process&rsquo;s real stdout while the program is running.</p>
+
+  <pre><code>056.177  --- stdout
+056.213  first      <span class="dim">&larr; 24 seconds of work separates these two writes</span>
+056.246  second     <span class="dim">&larr; they arrive 33 ms apart</span></code></pre>
+
+  <p>For a batch program that is invisible. For a terminal program it is fatal, and the way it fails is worth seeing. Driven under a real pty, fed <code>j j space k q</code> at 0.6-second intervals:</p>
+
+  <pre><code>  0.63  KEY  'j'
+  1.27  KEY  'j'
+  2.00  KEY  ' '
+  2.65  KEY  'k'
+  3.37  KEY  'q'
+  3.37  OUT  223b  <b>'--- stdout\r\n&lt;ESC&gt;[2J&lt;ESC&gt;[H ... 1/61 ... 2/61 ...'</b></code></pre>
+
+  <p>Five keystrokes against a blank screen, and then all five frames painted at once, into a terminal that has already stopped caring. <code>term/read-key</code> blocks <em>live</em> on the real tty, waiting for a keystroke the user was never shown a prompt for &mdash; because the prompt is still in a buffer.</p>
+
+  <p>The program itself is correct. The frames say <code>1, 2, 3, 12, 11</code>, which is exactly what <code>j j space k</code> should do against a ten-row window; raw mode is restored; it exits 0. <strong>Correctness was never the problem.</strong></p>
+</section>
+
+<section>
+  <span class="eyebrow">The shape of it</span>
+  <h2>Two subsystems, each right on its own</h2>
+
+  <div class="pair">
+    <div class="read">
+      <b>Input</b>
+      <p><code>term/read-key</code> reads the real tty, immediately, blocking. Correct, and exactly what an event loop needs.</p>
+    </div>
+    <div class="unread">
+      <b>Output</b>
+      <p><code>io/write</code> appends to a buffer the VM owns and the driver flushes at exit. Correct, and load-bearing for something else entirely.</p>
+    </div>
+  </div>
+
+  <p>This is not a missing feature in <code>term.rs</code>. Both halves were built deliberately, both are right in isolation, and <strong>they had never been in the same program before</strong>. A test suite could not have found it: the input half has one arity check, the output half is asserted by every golden transcript in the corpus, and nothing had ever needed them to agree about <em>when</em>.</p>
+
+  <h3>The line endings are wrong for the same reason</h3>
+
+  <p>The pager writes <code>\r\n</code>, which is correct under raw mode. The captured bytes are <code>\r\r\n</code>. The buffer is flushed <em>after</em> the <code>finally</code> has already turned raw mode off, so the tty applies <code>ONLCR</code> to a newline that was never supposed to get it.</p>
+
+  <blockquote><p>A program cannot write correct bytes for a terminal mode it is guaranteed not to be in when the bytes are sent.</p></blockquote>
+</section>
+
+<section>
+  <span class="eyebrow">The workaround</span>
+  <h2>Two lines, and a capability that turns out to be half present</h2>
+
+  <p><code>io/write</code> takes a different path for a file than for stdout &mdash; files get <code>write_all</code> on the real descriptor, and only stdout goes through the buffer. So opening the terminal <em>as a file</em> bypasses the buffer entirely:</p>
+
+  <pre><code>(def tty (io/open "/dev/tty" :write))
+(def out (fn out [s] (io/write tty s)))</code></pre>
+
+  <p>Two lines, and the same pager becomes a real application:</p>
+
+  <pre><code>  0.01  OUT      7b  '&lt;ESC&gt;[2J&lt;ESC&gt;[H'      <span class="ok">&larr; paints before it blocks</span>
+  0.01  OUT    350b  '; A full-screen pager. Show one screenful ...'
+  0.67  KEY  'j'
+  0.68  OUT      7b  '&lt;ESC&gt;[2J&lt;ESC&gt;[H'      <span class="ok">&larr; ~10 ms later</span>
+  0.68  OUT    329b  '; quit with q. It pages its own source ...'</code></pre>
+
+  <p>It paints before it blocks, responds in about ten milliseconds, scrolls, clips to the window width, restores the terminal on <code>q</code>, and the line endings are now <code>\r\n</code> because raw mode is genuinely in effect when the bytes go out.</p>
+
+  <div class="note found">
+    <span class="tag">And the cost, which is the second finding</span>
+    <p><code>/dev/tty</code> is <code>io/open</code>, which is the <code>fs</code> feature. So a build with <code>term</code> and without <code>fs</code> is <strong>a terminal you can read keys from and cannot paint to</strong> &mdash; a capability half present, with nothing saying so.</p>
+  </div>
+
+  <p>The <a href="subtraction.html">subtraction harness</a> could not see it. Its three build points at the time were everything off, everything on, and <code>fs</code> alone, so <code>term</code> without <code>fs</code> was never built &mdash; and no test paints anything in any configuration anyway. This was the third instance of that one pattern, which is the count at which it stopped reading as an accident: the first was the language&rsquo;s only string&rarr;number path living inside the JSON adapter, so that turning JSON off removed a semantic.</p>
+</section>
+
+<section>
+  <span class="eyebrow">The tension</span>
+  <h2>The buffer is not an accident to be removed</h2>
+
+  <p>The obvious fix &mdash; make <code>io/stdout</code> unbuffered &mdash; would break the thing the buffer exists for. The buffered host is the oracle for the project&rsquo;s second governing constraint: emitted effects are part of the serialization round-trip comparison <em>rather than escaping it</em>, and that property is the only reason &ldquo;a running computation can be suspended, moved, and resumed&rdquo; is a property instead of an aspiration.</p>
+
+  <p><code>/dev/tty</code> escapes it. Which put the project in an awkward position and the note recorded it as such rather than resolving it:</p>
+
+  <blockquote><p>A program written the only way a terminal program can currently be written is a program whose output the round-trip property cannot see &mdash; so the terminal workload and constraint #2 do not currently meet anywhere.</p></blockquote>
+
+  <p>Filed as an open question rather than fixed, because it is a decision and not a bug.</p>
+</section>
+
+<section>
+  <span class="eyebrow">The resolution</span>
+  <h2>The refusal turned out to be the design</h2>
+
+  <p>The entry that settled it inverted the reading. The snapshot serializes the output buffer, which means <strong>buffered output is resumable machine state, not a test fixture</strong>. So the invariant that has to hold is not &ldquo;a terminal program should be snapshottable&rdquo; but its opposite:</p>
+
+  <blockquote><p>If output escaped the buffer, refuse the snapshot.</p></blockquote>
+
+  <p>Painting now goes through a handle &mdash; <code>(term/open)</code> returns one on <code>/dev/tty</code>, and <code>io/write</code> to it is the same primitive a file and a socket use. A live handle is not reconstructible, so the existing rule already makes a snapshot refuse while one is open. No new code, no new decision, and the handle table enforces the invariant without anyone having to remember it. Every other shape would have to re-derive the refusal by hand.</p>
+
+  <p>A painting program being non-snapshottable is therefore the design, rather than the concession it reads as above. And the half-present capability got closed in the same entry: a tty became <code>any(fs, term)</code> rather than <code>fs</code>, and the subtraction harness gained <code>term</code> alone as a fourth lattice point &mdash; the build that had been unreachable is now one of the four that has to compile and run.</p>
+
+  <div class="note clean">
+    <span class="tag">What the program was actually for</span>
+    <p>None of this is a defect the pager exposed in the language. It is a decision the language had not been asked to make, because nothing had ever put the two halves in the same room &mdash; and the shape of the answer came from having a broken program in front of it rather than from arguing about buffering in the abstract.</p>
+  </div>
+</section>
+
+<section>
+  <span class="eyebrow">What held</span>
+  <h2>A loop inside a <code>try</code>, measured rather than assumed</h2>
+
+  <p>One thing is worth recording because the rules make you expect the opposite. A call in tail position inside <code>try</code>/<code>finally</code> is <em>not</em> a tail call here &mdash; the cleanup still has to run. A terminal event loop is always inside a <code>try</code>, since that is the only way raw mode gets restored. If <code>recur</code> inherited that rule, every terminal program in this language would have a bounded lifetime.</p>
+
+  <p>It does not. And this was measured rather than reasoned about, because a heap-allocated frame that grows would not announce itself by overflowing:</p>
+
+  <div class="tablewrap">
+  <table>
+    <thead>
+      <tr><th>Iterations inside a <code>try</code></th><th class="n">Peak RSS</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>100,000</td><td class="n">3.42 MB</td></tr>
+      <tr><td>1,000,000</td><td class="n">3.39 MB</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>Ten times the work, no growth. <code>recur</code> is a jump within the frame and never touches the handler stack. That is the kind of claim that is cheap to assume and cheap to check, and the gap between those two costs is the entire argument for checking it.</p>
+
+  <h3>And the library carried the program</h3>
+
+  <p><code>split</code>, <code>take</code>, <code>drop</code>, <code>map</code>, <code>join</code>, <code>str-scalar-len</code> &mdash; nothing was hand-rolled, <strong>the first time that had been true</strong>. The clamping behaviour of <code>take</code> and <code>drop</code> turned out to be exactly right for scrolling: dropping past the end of a buffer is an empty page rather than an error, so the clamp at the top of the loop is the only bounds logic in the program.</p>
+
+  <p>Which is the trajectory in the header, stated as a ratio. Six of seventeen definitions, then thirty of fifty-four lines, then four of forty-six &mdash; and those last four are not missing functions. They are an ESC constant, a clear sequence, a handle, and a one-line <code>out</code>.</p>
+
+  <blockquote><p>The gaps have moved off the language surface and onto the host boundary.</p></blockquote>
+
+  <p>Three programs, three rounds, and each round&rsquo;s gaps were invisible until the previous round&rsquo;s were fixed &mdash; iteration hid strings, strings hid ordering, and all of them together hid the fact that nothing had ever painted anything. It is the same shape as <a href="predictions.html">a benchmark on a system with one dominant quadratic</a>: what you can see is bounded by what you have already removed.</p>
+
+  <p class="next"><a href="index.html">All twelve write-ups, with what each one is about</a>.<br>
+  The programs that came before and after: <a href="programs.html">Nobody had written a program in it</a> &mdash; Life, the report, the loop/recur attempt, and the editor &mdash; and <a href="asides.html">Nothing that got its own heading was lost</a>, on what the design conversation this all came out of failed to hand over.<br>
+  The harnesses: <a href="mutations.html">Breaking the line is the easy half</a> &middot; <a href="subtraction.html">A seam nothing compiles is a seam nobody can trust</a>, whose lattice this program widened by one point.<br>
+  The findings, in four parts: <a href="oracle.html">The tests were green and two of them were dead</a> &middot; <a href="limits.html">What a mutation check cannot find</a> &middot; <a href="instrument.html">The instrument that can lie</a> &middot; <a href="programs.html">Nobody had written a program in it</a>.<br>
+  The habits, and the constraint under all of it: <a href="predictions.html">The claim that exists to catch a flattering result</a> &middot; <a href="wrong-subject.html">Review reads the assertion, nothing reads the subject</a> &middot; <a href="budget.html">The budget has never said no</a> &middot; <a href="errata.html">The decision was right and the reason was wrong</a>.</p>
+</section>
+
+<footer>
+  <p>apolisp is a personal project with one user and no stability promise. Everything here is from <code>docs/notes/the-pager-program.md</code>, written the day the program was &mdash; the pre-registration above it, the pty transcripts quoted verbatim, and the open question it filed. The resolution is ADR-051, which added <code>term/open</code>, moved a tty off the <code>fs</code> feature, and widened the subtraction lattice to four points. Neither version of the pager is in the repository. The earlier programs in this series were kept out on a stated rule &mdash; they are evidence for a decision, and committing them would settle by drift the question they were written to ask &mdash; and this one went the same way.</p>
+</footer>
+
+</div>
+</body>
+</html>

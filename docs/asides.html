@@ -1,0 +1,551 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>apolisp — nothing that got its own heading was lost</title>
+<meta name="description" content="An audit of the 1,840-line conversation a project came out of, checked against every decision it produced. Almost all of it landed. Three things went missing, and all three had arrived as asides inside a long answer about something else.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%97%82%3C/text%3E%3C/svg%3E">
+<style>
+  :root {
+    color-scheme: light dark;
+
+    --ground:    #edf0f3;
+    --panel:     #f8fafb;
+    --panel-2:   #e2e7ec;
+    --ink:       #14181d;
+    --muted:     #525c68;
+    --faint:     #7f8996;
+    --accent:    #1f5f7a;
+    --accent-w:  #d7e6ed;
+    --dead:      #9c3327;
+    --dead-w:    #f3ddd9;
+    --live:      #14614f;
+    --live-w:    #d6eae4;
+    --hair:      #ccd4db;
+    --hair-2:    #b0bac4;
+
+    --serif: "Charter", "Bitstream Charter", "Iowan Old Style", Georgia, ui-serif, serif;
+    --util:  "Avenir Next", Avenir, Futura, Optima, ui-sans-serif, system-ui, sans-serif;
+    --mono:  ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+
+    --measure: 64ch;
+    --rule: 1px solid var(--hair);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground:   #131619;
+      --panel:    #191d21;
+      --panel-2:  #22272d;
+      --ink:      #e3e7ec;
+      --muted:    #98a2ae;
+      --faint:    #6b7581;
+      --accent:   #6cb6d4;
+      --accent-w: #14313d;
+      --dead:     #e0837a;
+      --dead-w:   #38201d;
+      --live:     #5cc0a8;
+      --live-w:   #123029;
+      --hair:     #2a3037;
+      --hair-2:   #3a424b;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:#131619; --panel:#191d21; --panel-2:#22272d; --ink:#e3e7ec;
+    --muted:#98a2ae; --faint:#6b7581; --accent:#6cb6d4; --accent-w:#14313d;
+    --dead:#e0837a; --dead-w:#38201d; --live:#5cc0a8; --live-w:#123029;
+    --hair:#2a3037; --hair-2:#3a424b;
+  }
+  :root[data-theme="light"] {
+    --ground:#edf0f3; --panel:#f8fafb; --panel-2:#e2e7ec; --ink:#14181d;
+    --muted:#525c68; --faint:#7f8996; --accent:#1f5f7a; --accent-w:#d7e6ed;
+    --dead:#9c3327; --dead-w:#f3ddd9; --live:#14614f; --live-w:#d6eae4;
+    --hair:#ccd4db; --hair-2:#b0bac4;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--serif);
+    font-size: 1.0625rem;
+    line-height: 1.62;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  .wrap {
+    max-width: calc(var(--measure) + 4rem);
+    margin: 0 auto;
+    padding: 3.5rem 2rem 6rem;
+  }
+
+  header { border-bottom: var(--rule); padding-bottom: 2rem; margin-bottom: 2.5rem; }
+
+  h1 {
+    font-size: clamp(1.9rem, 5.2vw, 2.7rem);
+    line-height: 1.12;
+    letter-spacing: -0.018em;
+    margin: 0 0 0.9rem;
+    font-weight: 600;
+  }
+
+  .dek { font-size: 1.15rem; line-height: 1.5; color: var(--muted); margin: 0 0 1.4rem; }
+
+  .byline {
+    font-family: var(--util);
+    font-size: 0.775rem;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--faint);
+    margin: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+  }
+  .byline span { white-space: nowrap; }
+  .byline .sep { margin: 0 0.55rem; opacity: 0.5; }
+
+  section { margin: 0 0 3rem; }
+
+  .eyebrow {
+    display: block;
+    font-family: var(--util);
+    font-size: 0.7rem;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 0.5rem;
+  }
+
+  h2 {
+    font-size: clamp(1.3rem, 3.4vw, 1.6rem);
+    line-height: 1.22;
+    letter-spacing: -0.012em;
+    margin: 0 0 1rem;
+    font-weight: 600;
+  }
+
+  h3 {
+    font-family: var(--util);
+    font-size: 0.95rem;
+    letter-spacing: 0.01em;
+    margin: 1.8rem 0 0.6rem;
+    font-weight: 600;
+  }
+
+  p { margin: 0 0 1.05rem; max-width: var(--measure); }
+
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+  code {
+    font-family: var(--mono);
+    font-size: 0.86em;
+    background: var(--panel-2);
+    padding: 0.08em 0.32em;
+    border-radius: 3px;
+  }
+
+  pre {
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    line-height: 1.55;
+    background: var(--panel);
+    border: var(--rule);
+    border-left: 3px solid var(--hair-2);
+    border-radius: 4px;
+    padding: 0.95rem 1.1rem;
+    overflow-x: auto;
+    margin: 0 0 1.2rem;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; }
+  pre .dim { color: var(--faint); }
+
+  .note {
+    border: var(--rule);
+    border-left: 3px solid var(--hair-2);
+    background: var(--panel);
+    border-radius: 4px;
+    padding: 1rem 1.15rem 0.4rem;
+    margin: 0 0 1.3rem;
+    max-width: var(--measure);
+  }
+  .note p { font-size: 0.965rem; }
+  .note .tag {
+    display: block;
+    font-family: var(--util);
+    font-size: 0.7rem;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+  }
+  .note.found { border-left-color: var(--dead); background: var(--dead-w); }
+  .note.found .tag { color: var(--dead); }
+  .note.clean { border-left-color: var(--live); background: var(--live-w); }
+  .note.clean .tag { color: var(--live); }
+
+  /* --- the three fates of an idea ---------------------------------------- */
+
+  .moves {
+    display: grid;
+    /* 11rem so all three fit one row at the page measure. A width that fits
+       two leaves the third beside an empty cell. */
+    grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+    gap: 1px;
+    background: var(--hair);
+    border: var(--rule);
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 1.6rem 0 0;
+  }
+  .move { background: var(--panel); padding: 0.85rem 0.95rem 0.9rem; }
+  .move b {
+    font-family: var(--util);
+    font-size: 0.8rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    font-weight: 600;
+    display: block;
+    margin-bottom: 0.3rem;
+  }
+  .move .n {
+    font-family: var(--util);
+    font-size: 1.5rem;
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: -0.02em;
+    display: block;
+    margin-bottom: 0.4rem;
+  }
+  .move span.d {
+    display: block;
+    font-family: var(--util);
+    font-size: 0.78rem;
+    line-height: 1.45;
+    color: var(--muted);
+  }
+  .move.landed b, .move.landed .n { color: var(--live); }
+  .move.ruled b, .move.ruled .n { color: var(--accent); }
+  .move.lost b, .move.lost .n { color: var(--dead); }
+
+  /* --- the three losses --------------------------------------------------- */
+
+  .kinds { margin: 0 0 1.4rem; }
+  .kind {
+    border-top: var(--rule);
+    padding: 0.95rem 0 1rem;
+    display: grid;
+    /* 6rem, not 4.2: "Determinism" is eleven characters of mono and a
+       narrower rail put it straight through the heading beside it. */
+    grid-template-columns: 6rem 1fr;
+    gap: 0 1rem;
+    align-items: baseline;
+  }
+  .kind:last-child { border-bottom: var(--rule); }
+  .kind .e {
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    color: var(--accent);
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+  .kind h3 { margin: 0 0 0.3rem; font-size: 0.93rem; }
+  .kind p { margin: 0; font-size: 0.93rem; color: var(--muted); max-width: none; }
+  .kind p + p { margin-top: 0.4rem; }
+  .kind .where {
+    display: block;
+    font-family: var(--util);
+    font-size: 0.75rem;
+    color: var(--dead);
+    margin-top: 0.4rem;
+  }
+
+  .tablewrap { overflow-x: auto; margin: 0 0 1.2rem; }
+  table {
+    border-collapse: collapse;
+    font-family: var(--util);
+    font-size: 0.83rem;
+    width: 100%;
+    min-width: 30rem;
+  }
+  th, td { text-align: left; padding: 0.45rem 0.8rem 0.45rem 0; border-bottom: var(--rule); vertical-align: top; }
+  thead th {
+    font-size: 0.68rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--faint);
+    font-weight: 600;
+    border-bottom: 1px solid var(--hair-2);
+  }
+  td.e { font-family: var(--mono); font-size: 0.76rem; color: var(--accent); font-weight: 600; white-space: nowrap; }
+  td.k { white-space: nowrap; font-size: 0.75rem; letter-spacing: 0.03em; text-transform: uppercase; color: var(--live); }
+  td.k.part { color: var(--faint); }
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+    gap: 1px;
+    margin: 0 0 1.5rem;
+  }
+  .stat {
+    background: var(--panel);
+    padding: 0.85rem 0.95rem;
+    box-shadow: 0 0 0 1px var(--hair);
+  }
+  .stat b {
+    display: block;
+    font-family: var(--util);
+    font-size: 1.35rem;
+    letter-spacing: -0.02em;
+    font-weight: 600;
+    line-height: 1.1;
+  }
+  .stat span {
+    font-family: var(--util);
+    font-size: 0.68rem;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+
+  blockquote {
+    margin: 0 0 1.2rem;
+    padding-left: 1.1rem;
+    border-left: 2px solid var(--accent);
+    color: var(--muted);
+    font-style: italic;
+    max-width: var(--measure);
+  }
+  blockquote p { margin-bottom: 0; }
+
+  ul { max-width: var(--measure); padding-left: 1.15rem; margin: 0 0 1.1rem; }
+  li { margin-bottom: 0.45rem; }
+
+  .next {
+    margin-top: 1.7rem;
+    padding-top: 1.1rem;
+    border-top: var(--rule);
+    font-family: var(--util);
+    font-size: 0.85rem;
+    line-height: 1.65;
+    color: var(--muted);
+  }
+
+  footer {
+    border-top: var(--rule);
+    padding-top: 1.6rem;
+    color: var(--faint);
+    font-family: var(--util);
+    font-size: 0.8rem;
+    line-height: 1.6;
+  }
+  footer p { max-width: var(--measure); }
+
+  /* --- phone portrait ----------------------------------------------------
+     At 393px the 2rem gutter spends 16% of the viewport on margin and leaves
+     a ~34-character measure. Gutter, body size and every box's inner padding
+     come down together, and the fixed label columns stack rather than
+     spending a fifth of the screen on a five-character label. */
+  @media (max-width: 34rem) {
+    body { font-size: 1rem; line-height: 1.58; }
+    .wrap { padding: 2.25rem 1rem 4rem; }
+    header { padding-bottom: 1.5rem; margin-bottom: 1.9rem; }
+    section { margin: 0 0 2.2rem; }
+    .dek { font-size: 1.05rem; }
+    h3 { margin-top: 1.5rem; }
+
+    .note { padding-left: 0.85rem; padding-right: 0.85rem; }
+    .move, .stat { padding-left: 0.7rem; padding-right: 0.7rem; }
+    pre { padding: 0.8rem 0.7rem; font-size: 0.75rem; }
+    blockquote { padding-left: 0.85rem; }
+    ul { padding-left: 1rem; }
+    th, td { padding-right: 0.5rem; }
+
+    .kind { grid-template-columns: 1fr; gap: 0.15rem 0; }
+    /* A 3-card grid wraps 2+1 here and the empty cell reads as a blank card. */
+    .moves:not(:has(.move:nth-child(4))) { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>Nothing that got its own heading was lost</h1>
+  <p class="dek">This project came out of one 1,840-line design conversation. It became thirty decision records in about a day &mdash; and then somebody audited the conversation against the log, to find out what had actually made it across that single step. Almost everything had. Three things had not, and the three had one thing in common.</p>
+  <p class="byline">
+    <span>1,840 lines audited</span><span class="sep">/</span><span>4 overruled on the record</span><span class="sep">/</span><span>3 lost</span><span class="sep">/</span><span>3 asides</span>
+  </p>
+
+  <div class="moves">
+    <div class="move landed">
+      <b>Landed</b>
+      <span class="d">Nearly everything structural, traceable to a numbered entry. The conversation&rsquo;s suggested <code>&lt;= 24</code> for the value size is the number in the code today.</span>
+    </div>
+    <div class="move ruled">
+      <span class="n">4</span>
+      <b>Overruled</b>
+      <span class="d">Rejected deliberately, with the reason recorded. A reader can find out why.</span>
+    </div>
+    <div class="move lost">
+      <span class="n">3</span>
+      <b>Lost</b>
+      <span class="d">Neither accepted nor rejected nor parked. No entry mentions them at all.</span>
+    </div>
+  </div>
+</header>
+
+<section>
+  <span class="eyebrow">Why audit at all</span>
+  <h2>&ldquo;Rejected&rdquo; and &ldquo;lost&rdquo; look identical from a distance</h2>
+
+  <p>The audit states its purpose in one line: it exists <em>so nobody has to re-read 1,840 lines to find out whether an idea was rejected or just lost.</em></p>
+
+  <p>That is the whole case for doing it. Months later, a reader who finds an idea in the archive and not in the decision log cannot tell which of two things happened &mdash; and the two call for opposite responses. A rejected idea should stay rejected; re-proposing it wastes the argument that killed it. A lost idea should be picked up. From outside, both look like silence.</p>
+
+  <p>Worse, the silence is asymmetric in the wrong direction. A rejected idea is usually rejected loudly, in a paragraph somebody wrote on purpose. A lost idea leaves nothing at all &mdash; which means the default reading of silence is &ldquo;we considered and declined that&rdquo;, and the default reading is wrong exactly when it matters.</p>
+</section>
+
+<section>
+  <span class="eyebrow">The good news first</span>
+  <h2>Nearly all of it made it across</h2>
+
+  <p>The conversation predates the specification and every decision record. It is where the four governing constraints, the closed core, flat closures, the slot VM, the handle table, and the dependency list were first argued, and the audit&rsquo;s honest headline is that most of it landed traceably: the closed-core and open-macro split, scoped reader configuration, the slot VM with monotonic allocation, flat closures with the mutual-recursion carve-out, <code>&amp;mut</code> rather than shared interior mutability everywhere, the three layers of mutation, the host protocol, text and bytes and buffers as three separate things, the crate-by-crate dependency list, and the one-file-with-inline-modules progression.</p>
+
+  <p>Two nice details in the landings. The conversation argued for <em>asserting</em> the value size rather than assuming it, and suggested <code>&lt;= 24</code> &mdash; which is the assertion in the code today. And two of the four operational criteria it proposed became the build document&rsquo;s spine rather than decision entries, which is the right home for them: determinism and inspectability are properties of how the work is done, not rulings.</p>
+
+  <h3>Four things overruled, and one that half-argued itself out</h3>
+
+  <ul>
+    <li><strong>Feature-gating language facilities</strong> &mdash; macros, exceptions and metadata as build features, with &ldquo;minimal scripting&rdquo; and &ldquo;embedded runtime&rdquo; profiles. Overruled because gating semantics turns one system into 2&#8319; systems.</li>
+    <li><strong>A workspace of four crates</strong> &mdash; the progression stops at the first level that suffices, and no deployment boundary has asked yet.</li>
+    <li><strong>A generated single-file reading view</strong> &mdash; unnecessary while the source is one file.</li>
+    <li><strong>A lexer generator</strong> &mdash; it fights character-level reader-macro dispatch.</li>
+  </ul>
+
+  <p>The first is the interesting one, because the conversation had already been talking itself out of it. Its own section on architectural constraints says to gate <em>coarse layers, not branches</em> &mdash; which is the argument that later overruled it, written by the same document that proposed the thing.</p>
+</section>
+
+<section>
+  <span class="eyebrow">The three</span>
+  <h2>Neither accepted, nor rejected, nor parked</h2>
+
+  <div class="kinds">
+    <div class="kind">
+      <span class="e">Char</span>
+      <div>
+        <h3>A character value type</h3>
+        <p>Recommended explicitly: it gives the reader and the Unicode operations a clear scalar-value type. The entry that froze the value enum did so without one and without mentioning it.</p>
+        <p>The cost of the omission is not the missing variant. It is that answering &ldquo;yes&rdquo; now means superseding an entry whose <em>size is asserted in the test suite</em> &mdash; a cheap decision on day one that has since acquired a price.</p>
+        <span class="where">One sentence, in a section about strings and I/O.</span>
+      </div>
+    </div>
+    <div class="kind">
+      <span class="e">Determinism</span>
+      <div>
+        <h3>Seeded randomness, a virtual clock, replay</h3>
+        <p>Simulators are one of the three named target workloads, and this appears in the decisions exactly once &mdash; as the word &ldquo;RNG&rdquo; in a list of things that could be feature-gated.</p>
+        <p>And it is not only a simulator concern, which is what makes losing it expensive: the serialization round-trip property compares a resumed transcript against an uninterrupted one, so an unseeded generator or a wall clock makes those differ <em>for reasons unrelated to the snapshot</em>. That is the oracle for a governing constraint flapping, which this project&rsquo;s own build document names as how oracles die.</p>
+        <span class="where">One bullet, in a list of possible future crates.</span>
+      </div>
+    </div>
+    <div class="kind">
+      <span class="e">Errors</span>
+      <div>
+        <h3>Structured error values with a closed taxonomy</h3>
+        <p>The conversation gave a concrete shape and a nine-kind vocabulary, and argued that errors should be data carrying the raw host code as metadata rather than formatted strings.</p>
+        <p>The ethos puts error quality <em>outside</em> the priority ranking entirely, on the grounds that it is the feedback loop everything else depends on, and the dependency rules call error semantics never-delegated. And nothing anywhere said what an error <em>is</em>.</p>
+        <span class="where">Item 10 of twelve.</span>
+      </div>
+    </div>
+  </div>
+
+  <p>Read the three red lines together and the finding is sitting right there.</p>
+</section>
+
+<section>
+  <span class="eyebrow">The pattern</span>
+  <h2>All three arrived as asides</h2>
+
+  <blockquote><p>All three losses are things the conversation raised once, in passing, inside a long answer about something else. Nothing that got its own heading was lost.</p></blockquote>
+
+  <p>Which yields a rule cheap enough to actually use on the next long document: <strong>the ideas that need a home are the ones that arrived as asides.</strong> Not the ones that seem most important &mdash; importance is uncorrelated here, since the error taxonomy was load-bearing enough that a milestone later forced it. The ones that arrived without a heading.</p>
+
+  <p>The mechanism is unglamorous. A heading is an index entry: it survives skimming, it shows up in a table of contents, and anyone converting the document into decisions walks the headings. A sentence in the middle of a paragraph about something else is findable only by a person reading that paragraph, for the reason they were already reading it. When the conversation got transcribed into entries, the transcription was heading-driven, because every transcription is.</p>
+
+  <div class="note found">
+    <span class="tag">The complementary failure, from the same project</span>
+    <p>The first milestone found the mirror image: the decision log&rsquo;s <em>code sketches</em> did not survive contact with an implementation while the prose around them did &mdash; <a href="errata.html">a predicted 24-byte value measured 16, and a carrier sketch contradicted the paragraph beside it</a>. Here it is prose that never became a sketch, an entry, or a question at all.</p>
+    <p>Both are failures of transcription rather than of reasoning. Nobody was wrong about anything. And both were found the same way: by going back and checking, rather than by reading forward.</p>
+  </div>
+</section>
+
+<section>
+  <span class="eyebrow">The product</span>
+  <h2>What the audit made was not corrections. It was three question numbers.</h2>
+
+  <p>Worth being precise about what an exercise like this yields, because it is easy to imagine it yields a list of mistakes. It did not. Nothing in the conversation was wrong, nothing in the log was wrong, and the audit changed no decision. What it produced was three entries in the open-questions file, which is a smaller-sounding output than it is.</p>
+
+  <p>A question has a status line. An aside in a transcript has nothing &mdash; it cannot be resolved, because there is no place for the resolution to be recorded against. Converting <em>lost</em> into <em>open</em> is the whole move, and the ledger since then is the argument for it:</p>
+
+  <div class="tablewrap">
+  <table>
+    <thead>
+      <tr><th>Raised as</th><th>Filed as</th><th>Since</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Structured error values, item 10 of twelve</td><td class="e">Q23</td><td class="k">decided &mdash; ADR-039</td></tr>
+      <tr><td>Seeded RNG and a virtual clock, one bullet</td><td class="e">Q22</td><td class="k">decided &mdash; ADR-043</td></tr>
+      <tr><td>A <code>Char</code> value type, one sentence</td><td class="e">Q20</td><td class="k part">partly decided, still open</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>Two of the three are closed, by entries that exist because a question existed to answer. The error taxonomy in particular was forced within a milestone &mdash; a transcript golden cannot pin a thrown value whose shape is undecided &mdash; so the question was not merely filed, it was load-bearing within days of being written.</p>
+
+  <div class="note clean">
+    <span class="tag">The claim, kept small</span>
+    <p>None of these three would necessarily have stayed lost forever; the error taxonomy in particular was about to be forced by the work. The claim is narrower and survives that: an idea with a number attached gets resolved <em>on purpose and on the record</em>, and an idea without one gets rediscovered under schedule pressure, by whoever trips over the gap, and settled in whatever way is cheapest at that moment.</p>
+  </div>
+</section>
+
+<section>
+  <span class="eyebrow">The uncomfortable part</span>
+  <h2>A project made mostly of documents, learning what documents cannot do</h2>
+
+  <p>At the end of the first milestone this repository held roughly 2,000 lines of normative prose against 901 lines of Rust, and the prose came first. It is about as document-forward as a project can be. Which makes the recurring result more pointed rather than less:</p>
+
+  <ul>
+    <li>The prior-art file recorded a sibling project&rsquo;s exact failure mode &mdash; a green corpus over a dead mechanism &mdash; months before there was code here to watch, and <a href="oracle.html">the first milestone reproduced it anyway</a>.</li>
+    <li>A decision entry had already specified the fix for that dead property, in its verification clause. The implementation built the debug renderer the clause asked for and then did not snapshot it.</li>
+    <li>A comment named the exact future change that would invalidate the assertion it sat on, and <a href="wrong-subject.html">that change landed the next day</a> without the comment firing, because a comment has no mechanism to fire.</li>
+    <li>And the case on this page: three ideas that were written down clearly, by someone who understood them, and never reached a document anyone consults.</li>
+  </ul>
+
+  <p>The common factor is not that the writing was bad. In every case the writing was correct, specific, and in a sensible place. What none of them had was a <em>reader guaranteed to arrive at the right moment</em> &mdash; and that, not clarity, is what makes a document work.</p>
+
+  <p>Which is why the audit is worth more than any of the documents it audited. It was not a document. It was an <strong>activity</strong>, performed once, at a named commit, with an output that changed the state of three questions. The countermeasures this project has since accumulated all have that shape: a harness that runs, a check that prints what it observed, a budget that reports its own exclusions, a prediction scored afterwards. Every one of them is something that <em>happens</em>, on a schedule or in a command, rather than something that sits somewhere being true.</p>
+
+  <div class="stats">
+    <div class="stat"><b>1,840</b><span>lines audited</span></div>
+    <div class="stat"><b>3</b><span>ideas lost</span></div>
+    <div class="stat"><b>3</b><span>arrived as asides</span></div>
+    <div class="stat"><b>2</b><span>since decided</span></div>
+  </div>
+
+  <p class="next"><a href="index.html">All twelve write-ups, with what each one is about</a>.<br>
+  The programs: <a href="programs.html">Nobody had written a program in it</a> &middot; <a href="pager.html">Input was live and output was buffered</a>.<br>
+  The findings, in four parts: <a href="oracle.html">The tests were green and two of them were dead</a> &middot; <a href="limits.html">What a mutation check cannot find</a> &middot; <a href="instrument.html">The instrument that can lie</a> &middot; <a href="programs.html">Nobody had written a program in it</a>.<br>
+  The harnesses: <a href="mutations.html">Breaking the line is the easy half</a> &middot; <a href="subtraction.html">A seam nothing compiles is a seam nobody can trust</a>.<br>
+  The habits, and the constraint under all of it: <a href="predictions.html">The claim that exists to catch a flattering result</a> &middot; <a href="wrong-subject.html">Review reads the assertion, nothing reads the subject</a> &middot; <a href="budget.html">The budget has never said no</a> &middot; <a href="errata.html">The decision was right and the reason was wrong</a>.</p>
+</section>
+
+<footer>
+  <p>apolisp is a personal project with one user and no stability promise. This page is from <code>docs/notes/design-convo-audit-2026-07-26.md</code>, an audit of <code>docs/archive/lispy-language-vm-convo-2026-07-25.md</code> performed at a named commit so the comparison is reproducible, with the first-milestone figures from <code>notes/first-impressions-2026-07-26.md</code>. The three questions it opened are Q20, Q22 and Q23 in <code>docs/QUESTIONS.md</code>; two now carry a resolution pointer, and the third is marked partly resolved and still open.</p>
+</footer>
+
+</div>
+</body>
+</html>

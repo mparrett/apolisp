@@ -1,0 +1,644 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>apolisp — the budget has never said no</title>
+<meta name="description" content="A hard line budget of 7,500, asserted a thousand lines past the number so nobody can argue about forty. In ten milestones it has refused nothing — and three separate times it quietly stopped measuring the thing it exists to measure.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%A7%AE%3C/text%3E%3C/svg%3E">
+<style>
+  :root {
+    color-scheme: light dark;
+
+    --ground:    #edf0f3;
+    --panel:     #f8fafb;
+    --panel-2:   #e2e7ec;
+    --ink:       #14181d;
+    --muted:     #525c68;
+    --faint:     #7f8996;
+    --accent:    #1f5f7a;
+    --accent-w:  #d7e6ed;
+    --dead:      #9c3327;
+    --dead-w:    #f3ddd9;
+    --live:      #14614f;
+    --live-w:    #d6eae4;
+    --hair:      #ccd4db;
+    --hair-2:    #b0bac4;
+
+    --serif: "Charter", "Bitstream Charter", "Iowan Old Style", Georgia, ui-serif, serif;
+    --util:  "Avenir Next", Avenir, Futura, Optima, ui-sans-serif, system-ui, sans-serif;
+    --mono:  ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+
+    --measure: 64ch;
+    --rule: 1px solid var(--hair);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground:   #131619;
+      --panel:    #191d21;
+      --panel-2:  #22272d;
+      --ink:      #e3e7ec;
+      --muted:    #98a2ae;
+      --faint:    #6b7581;
+      --accent:   #6cb6d4;
+      --accent-w: #14313d;
+      --dead:     #e0837a;
+      --dead-w:   #38201d;
+      --live:     #5cc0a8;
+      --live-w:   #123029;
+      --hair:     #2a3037;
+      --hair-2:   #3a424b;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:#131619; --panel:#191d21; --panel-2:#22272d; --ink:#e3e7ec;
+    --muted:#98a2ae; --faint:#6b7581; --accent:#6cb6d4; --accent-w:#14313d;
+    --dead:#e0837a; --dead-w:#38201d; --live:#5cc0a8; --live-w:#123029;
+    --hair:#2a3037; --hair-2:#3a424b;
+  }
+  :root[data-theme="light"] {
+    --ground:#edf0f3; --panel:#f8fafb; --panel-2:#e2e7ec; --ink:#14181d;
+    --muted:#525c68; --faint:#7f8996; --accent:#1f5f7a; --accent-w:#d7e6ed;
+    --dead:#9c3327; --dead-w:#f3ddd9; --live:#14614f; --live-w:#d6eae4;
+    --hair:#ccd4db; --hair-2:#b0bac4;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--serif);
+    font-size: 1.0625rem;
+    line-height: 1.62;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  .wrap {
+    max-width: calc(var(--measure) + 4rem);
+    margin: 0 auto;
+    padding: 3.5rem 2rem 6rem;
+  }
+
+  header { border-bottom: var(--rule); padding-bottom: 2rem; margin-bottom: 2.5rem; }
+
+  h1 {
+    font-size: clamp(1.9rem, 5.2vw, 2.7rem);
+    line-height: 1.12;
+    letter-spacing: -0.018em;
+    margin: 0 0 0.9rem;
+    font-weight: 600;
+  }
+
+  .dek { font-size: 1.15rem; line-height: 1.5; color: var(--muted); margin: 0 0 1.4rem; }
+
+  .byline {
+    font-family: var(--util);
+    font-size: 0.775rem;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--faint);
+    margin: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+  }
+  .byline span { white-space: nowrap; }
+  .byline .sep { margin: 0 0.55rem; opacity: 0.5; }
+
+  section { margin: 0 0 3rem; }
+
+  .eyebrow {
+    display: block;
+    font-family: var(--util);
+    font-size: 0.7rem;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 0.5rem;
+  }
+
+  h2 {
+    font-size: clamp(1.3rem, 3.4vw, 1.6rem);
+    line-height: 1.22;
+    letter-spacing: -0.012em;
+    margin: 0 0 1rem;
+    font-weight: 600;
+  }
+
+  h3 {
+    font-family: var(--util);
+    font-size: 0.95rem;
+    letter-spacing: 0.01em;
+    margin: 1.8rem 0 0.6rem;
+    font-weight: 600;
+  }
+
+  p { margin: 0 0 1.05rem; max-width: var(--measure); }
+
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+  code {
+    font-family: var(--mono);
+    font-size: 0.86em;
+    background: var(--panel-2);
+    padding: 0.08em 0.32em;
+    border-radius: 3px;
+  }
+
+  pre {
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    line-height: 1.55;
+    background: var(--panel);
+    border: var(--rule);
+    border-left: 3px solid var(--hair-2);
+    border-radius: 4px;
+    padding: 0.95rem 1.1rem;
+    overflow-x: auto;
+    margin: 0 0 1.2rem;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; }
+  pre .dim { color: var(--faint); }
+  pre .hi { color: var(--dead); }
+  pre .ok { color: var(--live); }
+
+  .note {
+    border: var(--rule);
+    border-left: 3px solid var(--hair-2);
+    background: var(--panel);
+    border-radius: 4px;
+    padding: 1rem 1.15rem 0.4rem;
+    margin: 0 0 1.3rem;
+    max-width: var(--measure);
+  }
+  .note p { font-size: 0.965rem; }
+  .note .tag {
+    display: block;
+    font-family: var(--util);
+    font-size: 0.7rem;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+  }
+  .note.found { border-left-color: var(--dead); background: var(--dead-w); }
+  .note.found .tag { color: var(--dead); }
+  .note.clean { border-left-color: var(--live); background: var(--live-w); }
+  .note.clean .tag { color: var(--live); }
+
+  /* --- the three ways it stopped measuring ------------------------------- */
+
+  .moves {
+    display: grid;
+    /* 11rem so all three fit one row at the page measure. A width that fits
+       two leaves the third beside an empty cell. */
+    grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+    gap: 1px;
+    background: var(--hair);
+    border: var(--rule);
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 1.6rem 0 0;
+  }
+  .move { background: var(--panel); padding: 0.85rem 0.95rem 0.9rem; }
+  .move b {
+    font-family: var(--util);
+    font-size: 0.8rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    font-weight: 600;
+    display: block;
+    margin-bottom: 0.3rem;
+    color: var(--dead);
+  }
+  .move .n {
+    font-family: var(--util);
+    font-size: 1.5rem;
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: -0.02em;
+    display: block;
+    margin-bottom: 0.4rem;
+    color: var(--dead);
+  }
+  .move span.d {
+    display: block;
+    font-family: var(--util);
+    font-size: 0.78rem;
+    line-height: 1.45;
+    color: var(--muted);
+  }
+
+  /* --- the gauge: budget, tripwire, and where the artifact sits ---------- */
+
+  .gauge {
+    border: var(--rule);
+    background: var(--panel);
+    border-radius: 4px;
+    padding: 1.1rem 1.15rem 0.9rem;
+    margin: 0 0 1.3rem;
+    max-width: var(--measure);
+  }
+  .bar {
+    position: relative;
+    height: 2.1rem;
+    background: var(--panel-2);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .bar .fill {
+    position: absolute;
+    inset: 0 auto 0 0;
+    background: var(--accent-w);
+    border-right: 2px solid var(--accent);
+  }
+  .bar .mark {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    border-left: 2px dashed var(--hair-2);
+  }
+  /* A legend, not a tick strip: 6,845 / 7,500 / 8,500 all land in the last
+     fifth of the bar, so positional labels would overlap — and evenly spaced
+     ones would sit under marks they do not name. */
+  .ticks {
+    font-family: var(--util);
+    font-size: 0.7rem;
+    line-height: 1.5;
+    color: var(--faint);
+    margin-top: 0.55rem;
+  }
+  .ticks span { white-space: nowrap; margin-right: 0.9rem; }
+  .ticks b { font-weight: 600; color: var(--accent); font-variant-numeric: tabular-nums; }
+  .ticks i { font-style: normal; color: var(--hair-2); margin-right: 0.3rem; letter-spacing: -0.1em; }
+  .gauge p { font-size: 0.9rem; margin: 0.8rem 0 0; color: var(--muted); max-width: none; }
+
+  /* --- tables ------------------------------------------------------------ */
+
+  .tablewrap { overflow-x: auto; margin: 0 0 1.2rem; }
+  table {
+    border-collapse: collapse;
+    font-family: var(--util);
+    font-size: 0.83rem;
+    width: 100%;
+    min-width: 30rem;
+  }
+  th, td { text-align: left; padding: 0.45rem 0.8rem 0.45rem 0; border-bottom: var(--rule); vertical-align: top; }
+  thead th {
+    font-size: 0.68rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--faint);
+    font-weight: 600;
+    border-bottom: 1px solid var(--hair-2);
+  }
+  td.n, th.n { text-align: right; font-family: var(--mono); font-size: 0.78rem; white-space: nowrap; }
+  td.n { color: var(--muted); }
+  td.e { font-family: var(--mono); font-size: 0.76rem; color: var(--accent); font-weight: 600; white-space: nowrap; }
+  td.over { color: var(--dead); }
+  tr.tot td { border-top: 1px solid var(--hair-2); border-bottom: 0; font-weight: 600; color: var(--ink); }
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+    gap: 1px;
+    margin: 0 0 1.5rem;
+  }
+  .stat {
+    background: var(--panel);
+    padding: 0.85rem 0.95rem;
+    box-shadow: 0 0 0 1px var(--hair);
+  }
+  .stat b {
+    display: block;
+    font-family: var(--util);
+    font-size: 1.35rem;
+    letter-spacing: -0.02em;
+    font-weight: 600;
+    line-height: 1.1;
+  }
+  .stat span {
+    font-family: var(--util);
+    font-size: 0.68rem;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+
+  blockquote {
+    margin: 0 0 1.2rem;
+    padding-left: 1.1rem;
+    border-left: 2px solid var(--accent);
+    color: var(--muted);
+    font-style: italic;
+    max-width: var(--measure);
+  }
+  blockquote p { margin-bottom: 0; }
+
+  ul { max-width: var(--measure); padding-left: 1.15rem; margin: 0 0 1.1rem; }
+  li { margin-bottom: 0.45rem; }
+
+  .next {
+    margin-top: 1.7rem;
+    padding-top: 1.1rem;
+    border-top: var(--rule);
+    font-family: var(--util);
+    font-size: 0.85rem;
+    line-height: 1.65;
+    color: var(--muted);
+  }
+
+  footer {
+    border-top: var(--rule);
+    padding-top: 1.6rem;
+    color: var(--faint);
+    font-family: var(--util);
+    font-size: 0.8rem;
+    line-height: 1.6;
+  }
+  footer p { max-width: var(--measure); }
+
+  /* --- phone portrait ----------------------------------------------------
+     At 393px the 2rem gutter spends 16% of the viewport on margin and leaves
+     a ~34-character measure. Gutter, body size and every box's inner padding
+     come down together, and the fixed label columns stack rather than
+     spending a fifth of the screen on a five-character label. */
+  @media (max-width: 34rem) {
+    body { font-size: 1rem; line-height: 1.58; }
+    .wrap { padding: 2.25rem 1rem 4rem; }
+    header { padding-bottom: 1.5rem; margin-bottom: 1.9rem; }
+    section { margin: 0 0 2.2rem; }
+    .dek { font-size: 1.05rem; }
+    h3 { margin-top: 1.5rem; }
+
+    .note, .chain, .vs, .args div, .gauge { padding-left: 0.85rem; padding-right: 0.85rem; }
+    .move, .stat, .gate, .g-q, .g-out, .g-body { padding-left: 0.7rem; padding-right: 0.7rem; }
+    pre { padding: 0.8rem 0.7rem; font-size: 0.75rem; }
+    blockquote { padding-left: 0.85rem; }
+    ul { padding-left: 1rem; }
+    th, td { padding-right: 0.5rem; }
+
+    .kind, .link, .row, .round { grid-template-columns: 1fr; gap: 0.15rem 0; }
+    /* A 3-card grid wraps 2+1 here and the empty cell reads as a blank card.
+       Only the 4-card grid divides evenly at two columns. */
+    .moves:not(:has(.move:nth-child(4))) { grid-template-columns: 1fr; }
+    .args div { grid-template-columns: 1.6rem 1fr; }
+    .args dd { grid-column: 2; }
+    .pair { grid-template-columns: 1fr; }
+    .pair > div { padding-left: 0.85rem; padding-right: 0.85rem; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>The budget has never said no</h1>
+  <p class="dek">apolisp has a hard line budget: 7,500 lines for the language, comments and blank lines included. The test that enforces it fires a thousand lines late, on purpose, so that nobody can argue about forty. In ten milestones it has refused nothing &mdash; and three separate times it quietly stopped measuring the thing it exists to measure. A fourth turned up while writing this page.</p>
+  <p class="byline">
+    <span>6,845 of 7,500</span><span class="sep">/</span><span>asserted at 8,500</span><span class="sep">/</span><span>0 refusals</span><span class="sep">/</span><span>3 silent failures in the log, 1 found here</span>
+  </p>
+
+  <div class="moves">
+    <div class="move">
+      <span class="n">&minus;20%</span>
+      <b>By accident</b>
+      <span class="d">Counting comments against a number set without them was a fifth of the budget removed by nobody&rsquo;s decision.</span>
+    </div>
+    <div class="move">
+      <span class="n">4</span>
+      <b>Milestones unbudgeted</b>
+      <span class="d">A whole layer had no row and nothing said so, because only the total is asserted.</span>
+    </div>
+    <div class="move">
+      <span class="n">439</span>
+      <b>Lines outside</b>
+      <span class="d">An exclusion by directory is a way to move lines out of a budget by moving files. Now it prints.</span>
+    </div>
+  </div>
+</header>
+
+<section>
+  <span class="eyebrow">What it is</span>
+  <h2>A context-window constraint, so a comment costs what code costs</h2>
+
+  <p>Constraint #1 in the project&rsquo;s ethos is not an aesthetic preference:</p>
+
+  <blockquote><p><strong>Legibility budget.</strong> The entire core is holdable at once &mdash; by one engineer and by one language model. This is a context-window constraint, not an aesthetic one, and it is the binding constraint on every other decision.</p></blockquote>
+
+  <p>That framing decides the counting rule. If the thing being measured is how much has to be held at once, then a comment occupies the window exactly as code does, and counting code alone would make the number stop measuring the constraint it exists for. So the unit is <strong>lines of file</strong>, blanks included. <code>prelude.xs</code> counts too &mdash; it is not Rust, but <code>def</code> and <code>defmacro</code> are defined in it, so it is core language.</p>
+
+  <p>The check prints before it asserts, and the printout is the part that does the work:</p>
+
+  <pre><code>core: 6845/7500 lines (ADR-030)
+lib.rs: 6314
+  (driver)      19      compile     1169      host         421
+  error        116      vm          1205      image        416
+  value        408      expand       682      session      107
+  reader       472      prim         889
+  printer      128      bytecode     282
+main.rs: 330
+prelude.xs: 201
+
+<span class="dim">outside the budget (ADR-045): 439 lines
+  adapters/json.rs         140
+  adapters/mod.rs           33
+  adapters/tcp.rs          121
+  adapters/term.rs         145</span></code></pre>
+
+  <p>Laid against the eight budgeted layers, the shape is roughly what was planned for &mdash; which is the only question the rows are meant to answer. The mapping from <code>mod</code> sections to table rows is mine and approximate; the report and the budget are different partitions of the same file, which is the point of the last row:</p>
+
+  <div class="tablewrap">
+  <table>
+    <thead>
+      <tr><th>Layer</th><th class="n">Target</th><th class="n">Actual</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Reader, printer, forms, metadata</td><td class="n">900</td><td class="n">600</td></tr>
+      <tr><td>Macro expansion</td><td class="n">800</td><td class="n">682</td></tr>
+      <tr><td>Core AST, lowering, bytecode compiler</td><td class="n">1,400</td><td class="n over">1,451</td></tr>
+      <tr><td>VM: frames, calls, closures, errors</td><td class="n">1,400</td><td class="n">1,321</td></tr>
+      <tr><td>Values, collections, strings, bytes</td><td class="n">1,200</td><td class="n over">1,297</td></tr>
+      <tr><td>Host handle table + blocking I/O</td><td class="n">700</td><td class="n">421</td></tr>
+      <tr><td>Fuel, <code>Image</code>, resume</td><td class="n">500</td><td class="n">416</td></tr>
+      <tr><td>REPL, disassembler, diagnostics</td><td class="n">600</td><td class="n">107</td></tr>
+      <tr><td><em>No row</em> &mdash; <code>main.rs</code>, <code>prelude.xs</code>, the driver stub</td><td class="n">&mdash;</td><td class="n over">550</td></tr>
+      <tr class="tot"><td>Total core</td><td class="n">~7,500</td><td class="n">6,845</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>Two rows are over by about 5% and neither is a finding &mdash; that is the design working as intended, and the next section is why. The last row is a different matter. <strong>550 lines, 8% of the core, belong to no budgeted layer at all</strong>: the process driver, the prelude, and the stub above the first <code>mod</code>. The table has never had a row for any of them, and nothing reports it, because only the total is asserted and a total does not know which rows it is made of.</p>
+
+  <p>Keep that sentence. It is about to happen twice more.</p>
+</section>
+
+<section>
+  <span class="eyebrow">The design</span>
+  <h2>The number is imprecise on purpose, and the test fires late on purpose</h2>
+
+  <p>The entry that fixed the counting rule made a second decision that matters more: the budget is an order of magnitude, not a threshold.</p>
+
+  <blockquote><p>Whether the core is 5,000 lines or 7,000 does not change whether one engineer and one model can hold it; whether it is 7,000 or 70,000 decides it. Precision past the nearest thousand is false, and a budget that reads as exact invites arguing about 40 lines instead of noticing a subsystem that doubled.</p></blockquote>
+
+  <p>&plusmn;1,000 is inside the noise band. Only the total is asserted; the per-layer rows are printed and never enforced, because a hard check at 300-line granularity would be false precision and would generate churn for rebalancing that carries no meaning.</p>
+
+  <p>And then the move that makes it real. The constant in the test is not the budget:</p>
+
+  <div class="gauge">
+    <div class="bar">
+      <div class="fill" style="width: 80.5%"></div>
+      <div class="mark" style="left: 88.2%"></div>
+    </div>
+    <div class="ticks">
+      <span><i>&#9608;</i>filled to <b>6,845</b>, the core today</span>
+      <span><i>&#9482;</i>dashed at the <b>7,500</b> budget</span>
+      <span><i>&#9474;</i>the bar ends at the <b>8,500</b> assertion</span>
+    </div>
+    <p>The tripwire sits at the <em>top</em> of the noise band rather than at the working number, because failing at 7,001 would invite exactly the 40-line debate the entry exists to prevent.</p>
+  </div>
+
+  <p>This is a constraint deliberately built so that it cannot be won by argument. There is no version of &ldquo;we are only slightly over&rdquo; available, because slightly over does not fail; and by the time it does fail, the conversation is not about forty lines. The cost is stated plainly rather than hidden: a budget with 1,000 lines of slack cannot catch anything small, and a bloated layer can hide inside a lean one.</p>
+
+  <blockquote><p>The question a row answers is &ldquo;did this subsystem double,&rdquo; never &ldquo;is this 40 lines over.&rdquo;</p></blockquote>
+
+  <p>Which means the test is not the instrument. The instrument is the printed report, and the test exists mainly to make sure the report gets printed.</p>
+</section>
+
+<section>
+  <span class="eyebrow">Silent failure one</span>
+  <h2>A fifth of the budget went missing without anyone deciding</h2>
+
+  <p>The project started from a figure of 3,000&ndash;5,000 lines, inherited from the design conversation that preceded it. That figure assumed minimal comments. Then the counting rule said comments count.</p>
+
+  <p>Nobody made that decision. Milestone 1 measured 19% comments and blanks, so applying the new rule to the old number was a silent ~20% cut &mdash; and it taxed exactly the why-comments that make the core holdable in the first place. The fix was to state the counting rule out loud <em>and</em> restore the headroom the layer table had always meant, which is how the total became ~7,000.</p>
+
+  <div class="note found">
+    <span class="tag">The shape of it</span>
+    <p>A rule and a number that were each defensible produced, in combination, a fifth of a governing constraint disappearing. Neither half was wrong. Nobody chose the result, and nothing would have reported it &mdash; the suite is green either way, because a budget nobody is near does not fail when it shrinks.</p>
+  </div>
+</section>
+
+<section>
+  <span class="eyebrow">And the number that raise was sized on</span>
+  <h2>19% was right when it was measured, and it is 27% now</h2>
+
+  <p>The raise was justified by a measurement, and the measurement has moved. Counting lines that begin with a comment marker, plus blanks, across the three files the budget covers:</p>
+
+  <div class="tablewrap">
+  <table>
+    <thead>
+      <tr><th>File</th><th class="n">Lines</th><th class="n">Comment + blank</th><th class="n">Share</th></tr>
+    </thead>
+    <tbody>
+      <tr><td class="e">src/lib.rs</td><td class="n">6,314</td><td class="n">1,644</td><td class="n">26.0%</td></tr>
+      <tr><td class="e">src/main.rs</td><td class="n">330</td><td class="n">82</td><td class="n">24.8%</td></tr>
+      <tr><td class="e">src/prelude.xs</td><td class="n">201</td><td class="n">101</td><td class="n over">50.2%</td></tr>
+      <tr class="tot"><td>Core</td><td class="n">6,845</td><td class="n">1,827</td><td class="n">26.7%</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>At milestone 1&rsquo;s 19%, a 6,845-line core would carry about 1,300 lines of comment and blank. It carries 1,827. The difference is roughly <strong>525 lines &mdash; 7% of the budget</strong> &mdash; absorbed with nothing reporting it, because only the total is asserted and the total is nowhere near its tripwire.</p>
+
+  <p>The entry predicted this in as many words: <em>&ldquo;denser subsystems will run higher&rdquo;</em>. It was right. What a budget of this design cannot do is notice by how much, or ask whether the raise it sized on 19% is still the right raise at 27%.</p>
+
+  <p>The prelude is the sharpest case at half comment, and it is the same finding two pre-registrations already ran into from the other direction: twice, a change predicted to make the code <em>smaller</em> made the file bigger, because the comment explaining a subtle invariant outweighed the code it replaced. The prelude went 195 &rarr; 201 on a change whose entire point was deleting two loops. <a href="predictions.html">Estimating the code is not estimating the change</a> &mdash; and under this counting rule, the explanation is charged at full price.</p>
+
+  <div class="note clean">
+    <span class="tag">Which is the intended trade, stated honestly</span>
+    <p>The alternative was rejected for a stated reason: a tighter budget with comments counted &ldquo;taxes exactly the why-comments that make the core holdable&rdquo;. That tax exists at any ceiling. Raising the ceiling did not remove it; it moved where it bites, and 27% is where it bites now.</p>
+  </div>
+</section>
+
+<section>
+  <span class="eyebrow">Silent failure two</span>
+  <h2>A layer nobody had budgeted, for four milestones</h2>
+
+  <p>The layer table was written before serialization existed as a subsystem. Then ADR-029 invented the <code>Vm</code>/<code>Execution</code>/<code>Image</code> split, and the entry that raised the total to ~7,000 raised it without noticing that the new layer had no row.</p>
+
+  <p>So fuel, <code>Image</code> and resume were unbudgeted from the moment they were invented until four milestones later &mdash; and nothing said so, because only the total is asserted and the total does not know which layers it is made of.</p>
+
+  <p>What fixed it is worth more than the fix. The row was written <em>before</em> the code, and the entry says exactly why:</p>
+
+  <blockquote><p>The difference between deciding 500 now and recording 500 afterwards is the difference between a budget and a measurement.</p></blockquote>
+
+  <p>A number filled in after the work is not a constraint that shaped the work; it is a description of what happened, wearing a constraint&rsquo;s clothes. Every layer row added retroactively would have been that. This one was 500 against ~1,200 uncommitted lines, chosen while it could still be wrong &mdash; and it came in at 416.</p>
+</section>
+
+<section>
+  <span class="eyebrow">Silent failure three</span>
+  <h2>An exclusion that describes an empty set costs nothing until it doesn&rsquo;t</h2>
+
+  <p>The build document has said host adapters are outside the line budget since before any adapter existed. For most of the project that sentence was free, because it described an empty set.</p>
+
+  <p>Milestone 10 gave it content: a terminal, TCP, and JSON, 439 lines across four files. And a sentence that used to be a scoping note became something else.</p>
+
+  <blockquote><p>The moment it describes real files it becomes a way to move lines out of a budget by moving them into a directory, and the only defence is that the move is visible on every run.</p></blockquote>
+
+  <p>So the exclusion prints, itemized, with line counts, on every run of the check &mdash; the block at the bottom of the report at the top of this page. An exclusion nobody can see is how a budget stops measuring anything, and the defence is not a rule against moving files. It is that moving one is loud.</p>
+
+  <div class="note found">
+    <span class="tag">The inversion worth noticing</span>
+    <p>The same exclusion became an argument <em>for</em> taking two dependencies. Hand-writing JSON escaping and terminal capability detection would have added several hundred lines of protocol nobody reviews carefully &mdash; outside the budget, <em>so nothing would even flag the growth</em>. A boundary drawn to protect the language turns out to be, on its far side, the place where growth is invisible.</p>
+  </div>
+
+  <p>The boundary is still the right one, and it is drawn on a principle rather than on convenience: substantial host capability is a Rust library behind the handle table, not a language subsystem. But &ldquo;outside the budget&rdquo; and &ldquo;unmeasured&rdquo; are not the same thing, and only one of them was intended.</p>
+</section>
+
+<section>
+  <span class="eyebrow">The accounting</span>
+  <h2>In ten milestones it has refused nothing</h2>
+
+  <p>Here is the part that a page about a line budget is most tempted to leave out. Searching every entry in the decision log: <strong>no decision has been declined with the line budget as the deciding reason.</strong></p>
+
+  <div class="stats">
+    <div class="stat"><b>0</b><span>features refused</span></div>
+    <div class="stat"><b>0</b><span>test failures</span></div>
+    <div class="stat"><b>2</b><span>raises, both by ADR</span></div>
+    <div class="stat"><b>655</b><span>lines of headroom</span></div>
+  </div>
+
+  <p>The one place the budget appears as an explicit gate is the optimisation ladder, whose middle tier &mdash; <em>large but self-contained, e.g. tiered collections at about 1,200 lines</em> &mdash; is gated on it. That tier has never been reached. The budget has been raised twice, both times by an entry that said what grew and why, which is its own rule working; it has never once been the thing that stopped something.</p>
+
+  <p>A constraint that never binds is doing one of two things: the work genuinely fits, or the constraint is slack. Both are true here. 6,845 against a 7,500 target and an 8,500 assertion is a quarter of the artifact in room.</p>
+
+  <p>So what did it buy? Not refusals. <strong>It made every growth event a written decision with a number attached.</strong> Entries carry their cost in lines as a matter of course &mdash; <em>core goes from 6,303 to 6,561</em>, <em>6,561 to 6,616 &mdash; 55 lines, against the 25&ndash;35 predicted</em>, <em>6,616 to 6,637; prelude 195 &rarr; 201, which is longer</em>. None of that would exist without a number to state the cost against, and it is the record that makes a pre-registration&rsquo;s line prediction scoreable at all.</p>
+
+  <div class="note clean">
+    <span class="tag">The honest claim</span>
+    <p>The budget has not kept the core small. Nothing has yet wanted to make it large. What the budget did was make the size of every change a thing somebody wrote down at the time &mdash; which is the only reason it is possible, ten milestones in, to say where the lines went rather than guess.</p>
+  </div>
+</section>
+
+<section>
+  <span class="eyebrow">The pattern</span>
+  <h2>Three failures, one shape</h2>
+
+  <p>The silent cut, the unbudgeted layer, and the free exclusion are not three unrelated mistakes. Each is the same thing: <strong>the budget went on passing while it stopped measuring what it exists to measure.</strong></p>
+
+  <ul>
+    <li><strong>The cut</strong> changed what the number means, and the assertion could not tell, because a total does not know what rule produced it.</li>
+    <li><strong>The unbudgeted layer</strong> changed what the number covers, and the assertion could not tell, because a total does not know which layers it is made of.</li>
+    <li><strong>The exclusion</strong> changed what the number sees, and the assertion could not tell, because a total does not know which files were skipped.</li>
+    <li><strong>The 550 unrowed lines</strong> are the same defect standing still rather than moving &mdash; a partition that never covered the artifact. Those three are in the decision log. This one is not: it turned up while laying the printed report against the budget table to make the comparison above, which is the first time in ten milestones anyone had done that.</li>
+  </ul>
+
+  <p>In all four the test was correct and green throughout. That is the same defect this project keeps finding elsewhere under a different name: a true assertion applied to a subject that quietly moved, where <a href="wrong-subject.html">review reads the assertion and nothing reads the subject</a>. A budget check is just an assertion whose subject is a set of files, and a set of files is exactly the kind of subject that drifts.</p>
+
+  <p>The response was the same each time, and it is the only one that has worked: make the subject print. The counting rule is stated in the entry, the per-layer numbers print, and the exclusion prints with its line counts. None of those is an assertion. All three exist so that a person reading the output can see what the number was computed over &mdash; which is the check that actually caught all three.</p>
+
+  <p class="next">The harnesses: <a href="mutations.html">Breaking the line is the easy half</a> (mutation) and <a href="subtraction.html">A seam nothing compiles is a seam nobody can trust</a> (subtraction).<br>
+  The findings, in four parts: <a href="oracle.html">The tests were green and two of them were dead</a> (milestones 1&ndash;3) &middot; <a href="limits.html">What a mutation check cannot find</a> (4&ndash;6) &middot; <a href="instrument.html">The instrument that can lie</a> (7&ndash;10) &middot; <a href="programs.html">Nobody had written a program in it</a>.<br>
+  The decision log: <a href="errata.html">The decision was right and the reason was wrong</a>. The habits: <a href="predictions.html">The claim that exists to catch a flattering result</a> &middot; <a href="wrong-subject.html">Review reads the assertion, nothing reads the subject</a>.</p>
+</section>
+
+<footer>
+  <p>apolisp is a personal project with one user and no stability promise. The budget is ADR-030 and the table in <code>docs/BUILD.md</code>; the assertion is <code>core_stays_within_the_line_budget</code> in <code>tests/reader.rs</code>, whose printed report is quoted verbatim above. The row added late is ADR-043, the printed exclusion is ADR-045, and the ethos constraint they all defer to is the first of four in <code>docs/ETHOS.md</code>. The comment shares were counted by prefix &mdash; lines beginning <code>//</code> or <code>;</code>, plus blanks &mdash; so they are a lower bound, since a trailing comment is not counted.</p>
+</footer>
+
+</div>
+</body>
+</html>

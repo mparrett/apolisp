@@ -1,0 +1,419 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>apolisp — ten write-ups on trying not to fool yourself</title>
+<meta name="description" content="A small Lisp in the Clojure dialect with its own VM, in Rust. Ten write-ups about the verification loop around it: four chapters of findings, two harnesses, and four mechanisms — each of which has a page about its own blind spot.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%93%9A%3C/text%3E%3C/svg%3E">
+<style>
+  :root {
+    color-scheme: light dark;
+
+    --ground:    #edf0f3;
+    --panel:     #f8fafb;
+    --panel-2:   #e2e7ec;
+    --ink:       #14181d;
+    --muted:     #525c68;
+    --faint:     #7f8996;
+    --accent:    #1f5f7a;
+    --accent-w:  #d7e6ed;
+    --dead:      #9c3327;
+    --dead-w:    #f3ddd9;
+    --live:      #14614f;
+    --live-w:    #d6eae4;
+    --hair:      #ccd4db;
+    --hair-2:    #b0bac4;
+
+    --serif: "Charter", "Bitstream Charter", "Iowan Old Style", Georgia, ui-serif, serif;
+    --util:  "Avenir Next", Avenir, Futura, Optima, ui-sans-serif, system-ui, sans-serif;
+    --mono:  ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+
+    --measure: 64ch;
+    --rule: 1px solid var(--hair);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground:   #131619;
+      --panel:    #191d21;
+      --panel-2:  #22272d;
+      --ink:      #e3e7ec;
+      --muted:    #98a2ae;
+      --faint:    #6b7581;
+      --accent:   #6cb6d4;
+      --accent-w: #14313d;
+      --dead:     #e0837a;
+      --dead-w:   #38201d;
+      --live:     #5cc0a8;
+      --live-w:   #123029;
+      --hair:     #2a3037;
+      --hair-2:   #3a424b;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:#131619; --panel:#191d21; --panel-2:#22272d; --ink:#e3e7ec;
+    --muted:#98a2ae; --faint:#6b7581; --accent:#6cb6d4; --accent-w:#14313d;
+    --dead:#e0837a; --dead-w:#38201d; --live:#5cc0a8; --live-w:#123029;
+    --hair:#2a3037; --hair-2:#3a424b;
+  }
+  :root[data-theme="light"] {
+    --ground:#edf0f3; --panel:#f8fafb; --panel-2:#e2e7ec; --ink:#14181d;
+    --muted:#525c68; --faint:#7f8996; --accent:#1f5f7a; --accent-w:#d7e6ed;
+    --dead:#9c3327; --dead-w:#f3ddd9; --live:#14614f; --live-w:#d6eae4;
+    --hair:#ccd4db; --hair-2:#b0bac4;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--serif);
+    font-size: 1.0625rem;
+    line-height: 1.62;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  .wrap {
+    max-width: calc(var(--measure) + 4rem);
+    margin: 0 auto;
+    padding: 3.5rem 2rem 6rem;
+  }
+
+  header { border-bottom: var(--rule); padding-bottom: 2rem; margin-bottom: 2.5rem; }
+
+  h1 {
+    font-size: clamp(1.9rem, 5.2vw, 2.7rem);
+    line-height: 1.12;
+    letter-spacing: -0.018em;
+    margin: 0 0 0.9rem;
+    font-weight: 600;
+  }
+
+  .dek { font-size: 1.15rem; line-height: 1.5; color: var(--muted); margin: 0 0 1.4rem; }
+
+  .byline {
+    font-family: var(--util);
+    font-size: 0.775rem;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--faint);
+    margin: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+  }
+  .byline span { white-space: nowrap; }
+  .byline .sep { margin: 0 0.55rem; opacity: 0.5; }
+
+  section { margin: 0 0 3rem; }
+
+  .eyebrow {
+    display: block;
+    font-family: var(--util);
+    font-size: 0.7rem;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 0.5rem;
+  }
+
+  h2 {
+    font-size: clamp(1.3rem, 3.4vw, 1.6rem);
+    line-height: 1.22;
+    letter-spacing: -0.012em;
+    margin: 0 0 1rem;
+    font-weight: 600;
+  }
+
+  p { margin: 0 0 1.05rem; max-width: var(--measure); }
+
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+  code {
+    font-family: var(--mono);
+    font-size: 0.86em;
+    background: var(--panel-2);
+    padding: 0.08em 0.32em;
+    border-radius: 3px;
+  }
+
+  .note {
+    border: var(--rule);
+    border-left: 3px solid var(--hair-2);
+    background: var(--panel);
+    border-radius: 4px;
+    padding: 1rem 1.15rem 0.4rem;
+    margin: 0 0 1.3rem;
+    max-width: var(--measure);
+  }
+  .note p { font-size: 0.965rem; }
+  .note .tag {
+    display: block;
+    font-family: var(--util);
+    font-size: 0.7rem;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+    color: var(--accent);
+  }
+
+  /* --- the list of ten ---------------------------------------------------
+     A left rail carries the chapter or kind, so the titles form one unbroken
+     column the eye can run down without reading the labels. */
+
+  .entries { margin: 0 0 1.2rem; }
+  .entry {
+    border-top: var(--rule);
+    padding: 1.05rem 0 1.1rem;
+    display: grid;
+    grid-template-columns: 4.5rem 1fr;
+    gap: 0 1.1rem;
+  }
+  .entry:last-child { border-bottom: var(--rule); }
+  .entry .rail {
+    font-family: var(--util);
+    font-size: 0.68rem;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--faint);
+    line-height: 1.45;
+    padding-top: 0.35rem;
+  }
+  .entry .rail b {
+    display: block;
+    font-family: var(--util);
+    font-size: 1.25rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: var(--accent);
+    line-height: 1;
+    margin-bottom: 0.15rem;
+  }
+  .entry h3 {
+    font-family: var(--serif);
+    font-size: 1.12rem;
+    font-weight: 600;
+    line-height: 1.28;
+    letter-spacing: -0.008em;
+    margin: 0 0 0.35rem;
+  }
+  .entry h3 a { text-decoration: none; }
+  .entry h3 a:hover { text-decoration: underline; }
+  .entry p { margin: 0 0 0.45rem; font-size: 0.965rem; line-height: 1.52; color: var(--muted); max-width: none; }
+  .entry .facts {
+    font-family: var(--util);
+    font-size: 0.72rem;
+    letter-spacing: 0.05em;
+    color: var(--faint);
+  }
+  .entry .facts b { font-weight: 600; color: var(--muted); }
+  .entry .facts .sep { margin: 0 0.4rem; opacity: 0.5; }
+
+  blockquote {
+    margin: 0 0 1.2rem;
+    padding-left: 1.1rem;
+    border-left: 2px solid var(--accent);
+    color: var(--muted);
+    font-style: italic;
+    max-width: var(--measure);
+  }
+  blockquote p { margin-bottom: 0; }
+
+  ul { max-width: var(--measure); padding-left: 1.15rem; margin: 0 0 1.1rem; }
+  li { margin-bottom: 0.45rem; }
+
+  footer {
+    border-top: var(--rule);
+    padding-top: 1.6rem;
+    margin-top: 1rem;
+    color: var(--faint);
+    font-family: var(--util);
+    font-size: 0.8rem;
+    line-height: 1.6;
+  }
+  footer p { max-width: var(--measure); }
+
+  /* --- phone portrait ----------------------------------------------------
+     At 393px the 2rem gutter spends 16% of the viewport on margin and leaves
+     a ~34-character measure. Gutter, body size and every box's inner padding
+     come down together, and the fixed label columns stack rather than
+     spending a fifth of the screen on a five-character label. */
+  @media (max-width: 34rem) {
+    body { font-size: 1rem; line-height: 1.58; }
+    .wrap { padding: 2.25rem 1rem 4rem; }
+    header { padding-bottom: 1.5rem; margin-bottom: 1.9rem; }
+    section { margin: 0 0 2.2rem; }
+    .dek { font-size: 1.05rem; }
+
+    .note { padding-left: 0.85rem; padding-right: 0.85rem; }
+    blockquote { padding-left: 0.85rem; }
+    ul { padding-left: 1rem; }
+
+    /* The rail becomes a kicker above the title rather than a column. */
+    .entry { grid-template-columns: 1fr; gap: 0.3rem 0; }
+    .entry .rail { padding-top: 0; }
+    .entry .rail b { display: inline; font-size: 0.85rem; margin-right: 0.4rem; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>apolisp</h1>
+  <p class="dek">A small Lisp in the Clojure dialect, with its own VM, in Rust. One user, no compatibility contract, no stability promise. These ten write-ups are not about the language &mdash; they are about the loop built to check it, and about the six or seven times that loop reported a pass it had not earned.</p>
+  <p class="byline">
+    <span>10 milestones</span><span class="sep">/</span><span>6,845 lines</span><span class="sep">/</span><span>55 decisions</span><span class="sep">/</span><span>10 write-ups</span>
+  </p>
+</header>
+
+<section>
+  <p>The project has an unusual amount of machinery for its size: an append-only decision log, a golden-file corpus, a mutation rung, a subtraction build, a hard line budget, and a habit of writing down what a change is expected to do before doing it. Ten milestones in, the interesting finding is not that the machinery worked. It is <strong>how many of these mechanisms turned out to have a blind spot exactly where they were most trusted</strong> &mdash; and that in almost every case the thing that found it was a person deliberately trying to break something that was already green.</p>
+
+  <p>Read in any order. If you want one page: <a href="wrong-subject.html">Review reads the assertion, nothing reads the subject</a> has the idea the others keep rediscovering. If you want the story in order, start with <a href="oracle.html">chapter one</a>.</p>
+</section>
+
+<section>
+  <span class="eyebrow">The findings</span>
+  <h2>Four chapters, ten milestones</h2>
+
+  <p>A running account of building the thing, organised around what breaking its own tests kept turning up. The character of the findings changes across the four, which is the reason they are four and not one.</p>
+
+  <div class="entries">
+    <div class="entry">
+      <span class="rail"><b>1</b>Milestones 1&ndash;3</span>
+      <div>
+        <h3><a href="oracle.html">The tests were green and two of them were dead</a></h3>
+        <p>Four rounds of deliberately trying to break the suite. Every round that found something found a <em>different kind</em> of failure &mdash; and the round that found nothing is part of the result.</p>
+        <p class="facts"><b>38</b> decisions <span class="sep">&middot;</span> a property that checked arity and nothing else <span class="sep">&middot;</span> 2 of 3 mutants survived</p>
+      </div>
+    </div>
+    <div class="entry">
+      <span class="rail"><b>2</b>Milestones 4&ndash;6</span>
+      <div>
+        <h3><a href="limits.html">What a mutation check cannot find</a></h3>
+        <p>The habit kept paying and kept running into its own edges. Each round found something the previous round&rsquo;s instrument was structurally unable to see.</p>
+        <p class="facts"><b>41</b> decisions <span class="sep">&middot;</span> a defect nothing could observe <span class="sep">&middot;</span> a rule nothing was checking</p>
+      </div>
+    </div>
+    <div class="entry">
+      <span class="rail"><b>3</b>Milestones 7&ndash;10</span>
+      <div>
+        <h3><a href="instrument.html">The instrument that can lie</a></h3>
+        <p>Mutation stopped finding defects and started finding holes &mdash; code that was correct and untested. Then it found something worse: a run can report a result that never happened.</p>
+        <p class="facts"><b>45</b> decisions <span class="sep">&middot;</span> ten of ten milestones <span class="sep">&middot;</span> 9 programs, 4 mutants, 0 caught</p>
+      </div>
+    </div>
+    <div class="entry">
+      <span class="rail"><b>4</b>After</span>
+      <div>
+        <h3><a href="programs.html">Nobody had written a program in it</a></h3>
+        <p>A working machine and a hundred tests that had stopped being able to say anything new about it. The gaps were one layer up, where a test suite structurally cannot look, and an afternoon of ordinary programs found them.</p>
+        <p class="facts"><b>50</b> decisions <span class="sep">&middot;</span> build order complete <span class="sep">&middot;</span> a gate that found nothing</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <span class="eyebrow">The harnesses</span>
+  <h2>Two commands, and the arguments inside them</h2>
+
+  <p>Both ask a question the ordinary suite cannot: <em>would we know if this were wrong</em>, and <em>is this seam real</em>. Both spend most of their code on the same problem &mdash; telling a genuine result apart from a run that never happened.</p>
+
+  <div class="entries">
+    <div class="entry">
+      <span class="rail">Mutation</span>
+      <div>
+        <h3><a href="mutations.html">Breaking the line is the easy half</a></h3>
+        <p>A script that damages its own source on purpose and checks that a named test notices. Everything else it does is distinguishing a mutant the suite caught from a mutation that never applied &mdash; identical from outside, and the wrong reading is the flattering one.</p>
+        <p class="facts"><code>just mutate</code> <span class="sep">&middot;</span> <b>45</b> mutations <span class="sep">&middot;</span> 3 files <span class="sep">&middot;</span> ADR-055</p>
+      </div>
+    </div>
+    <div class="entry">
+      <span class="rail">Subtraction</span>
+      <div>
+        <h3><a href="subtraction.html">A seam nothing compiles is a seam nobody can trust</a></h3>
+        <p>Four Cargo features and no users, so the features are not for turning anything on. They exist so a host capability can be cut out and the language found untouched &mdash; and the two middle points of the lattice are the ones carrying the argument.</p>
+        <p class="facts"><code>just subtract</code> <span class="sep">&middot;</span> <b>4</b> build points <span class="sep">&middot;</span> 6 cargo invocations <span class="sep">&middot;</span> ADR-013</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <span class="eyebrow">The mechanisms</span>
+  <h2>Four things that keep it honest, and how each one fails</h2>
+
+  <p>A decision log, two habits, and a budget. What these four pages have in common is that none of them is a description of a mechanism working &mdash; each is mostly an account of where that mechanism is blind, written from the project&rsquo;s own record of being caught out by it.</p>
+
+  <div class="entries">
+    <div class="entry">
+      <span class="rail">The log</span>
+      <div>
+        <h3><a href="errata.html">The decision was right and the reason was wrong</a></h3>
+        <p>An append-only log where the only edit a past entry receives is a one-line pointer. Four entries have been superseded and seventeen carry a factual correction, because what turns out to be wrong in a decision record is almost never the decision.</p>
+        <p class="facts"><b>55</b> decisions <span class="sep">&middot;</span> 4 superseded <span class="sep">&middot;</span> 17 errata <span class="sep">&middot;</span> 2 errata on errata</p>
+      </div>
+    </div>
+    <div class="entry">
+      <span class="rail">Predict</span>
+      <div>
+        <h3><a href="predictions.html">The claim that exists to catch a flattering result</a></h3>
+        <p>Numbered predictions written before three pieces of work and scored afterwards against measurement. The two claims that paid for the whole habit were the ones written specifically to make a good-looking answer impossible to accept.</p>
+        <p class="facts"><b>13</b> claims <span class="sep">&middot;</span> 5 held clean <span class="sep">&middot;</span> 2 refuted <span class="sep">&middot;</span> 0 of 2 thresholds met</p>
+      </div>
+    </div>
+    <div class="entry">
+      <span class="rail">Break it</span>
+      <div>
+        <h3><a href="wrong-subject.html">Review reads the assertion. Nothing reads the subject.</a></h3>
+        <p>Two properties swept the whole corpus and were green for three days while checking bytecode the VM never runs. Six checks here have been green while testing the wrong thing, and not one of them contained a wrong assertion.</p>
+        <p class="facts"><b>6</b> checks <span class="sep">&middot;</span> 3 detection channels <span class="sep">&middot;</span> 0 wrong assertions</p>
+      </div>
+    </div>
+    <div class="entry">
+      <span class="rail">Budget</span>
+      <div>
+        <h3><a href="budget.html">The budget has never said no</a></h3>
+        <p>7,500 lines for the language, comments included, asserted a thousand lines late so nobody can argue about forty. In ten milestones it has refused nothing &mdash; and three times it quietly stopped measuring the thing it exists to measure.</p>
+        <p class="facts"><b>6,845</b> of 7,500 <span class="sep">&middot;</span> 0 refusals <span class="sep">&middot;</span> 3 silent failures, and a fourth found writing the page</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <span class="eyebrow">The thread</span>
+  <h2>The same defect, under five names</h2>
+
+  <p>Read together, most of these pages are one finding arriving in different costume. A check is a claim about a pair &mdash; an assertion, and the subject it was applied to. Review reads the assertion. Nothing reads the subject, and the subject is the half that drifts.</p>
+
+  <ul>
+    <li>A property whose assertions were correct, applied to <strong>bytecode the VM never runs</strong>.</li>
+    <li>A mutation run reporting a survivor, where the substitution <strong>never applied</strong> &mdash; and a second where it applied and the optimizer deleted it before it reached the binary.</li>
+    <li>A soak asserting nothing leaked, over <strong>150,000 injected leaks that were never allocated</strong>.</li>
+    <li>A budget passing while a fifth of it vanished, a layer went unbudgeted for four milestones, and an exclusion turned into <strong>a way to move lines out by moving files</strong>.</li>
+    <li>A benchmark measuring the one dominant quadratic, with <strong>every other cost in the program invisible</strong> until that one was gone.</li>
+  </ul>
+
+  <blockquote><p>The flattering reading is the wrong one, and from outside the two are identical.</p></blockquote>
+
+  <p>The response is the same in every case and it is not a better assertion. It is to make the subject visible &mdash; print what the check observed, print what the budget skipped, print the counters and not just the verdict &mdash; and then have someone read it. The assertions are the backstop. The printout is the instrument.</p>
+
+  <div class="note">
+    <span class="tag">On the numbers here</span>
+    <p>Counts on this page are a snapshot taken 2026-07-31, not a live inventory. The project&rsquo;s own rule, arrived at the hard way, is that an inventory stated in prose is a correction you have already scheduled &mdash; so the files are the count, and this page is a description rather than something anything defers to.</p>
+  </div>
+</section>
+
+<footer>
+  <p>apolisp is a personal project with one user, no third-party users, and no stability promise &mdash; the language may break on a Tuesday and be rebuilt on Wednesday. The core is one Rust file plus a prelude written in the language, with host adapters outside the line budget and the exclusion printed on every run. Everything on these pages is quoted or counted from the repository: <code>docs/ADR.md</code> for decisions, <code>docs/notes/</code> for the working notes each write-up is built from, and the tests themselves for anything with a number in it.</p>
+</footer>
+
+</div>
+</body>
+</html>

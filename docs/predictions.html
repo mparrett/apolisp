@@ -1,0 +1,698 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>apolisp — the claim that exists to catch a flattering result</title>
+<meta name="description" content="Thirteen numbered predictions, written before three pieces of work and scored afterwards. Five held clean, two were refuted outright — and the claims that paid for the habit were the ones written specifically to make a good-looking answer impossible to accept.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8E%AF%3C/text%3E%3C/svg%3E">
+<style>
+  :root {
+    color-scheme: light dark;
+
+    --ground:    #edf0f3;
+    --panel:     #f8fafb;
+    --panel-2:   #e2e7ec;
+    --ink:       #14181d;
+    --muted:     #525c68;
+    --faint:     #7f8996;
+    --accent:    #1f5f7a;
+    --accent-w:  #d7e6ed;
+    --dead:      #9c3327;
+    --dead-w:    #f3ddd9;
+    --live:      #14614f;
+    --live-w:    #d6eae4;
+    --hair:      #ccd4db;
+    --hair-2:    #b0bac4;
+
+    --serif: "Charter", "Bitstream Charter", "Iowan Old Style", Georgia, ui-serif, serif;
+    --util:  "Avenir Next", Avenir, Futura, Optima, ui-sans-serif, system-ui, sans-serif;
+    --mono:  ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+
+    --measure: 64ch;
+    --rule: 1px solid var(--hair);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground:   #131619;
+      --panel:    #191d21;
+      --panel-2:  #22272d;
+      --ink:      #e3e7ec;
+      --muted:    #98a2ae;
+      --faint:    #6b7581;
+      --accent:   #6cb6d4;
+      --accent-w: #14313d;
+      --dead:     #e0837a;
+      --dead-w:   #38201d;
+      --live:     #5cc0a8;
+      --live-w:   #123029;
+      --hair:     #2a3037;
+      --hair-2:   #3a424b;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:#131619; --panel:#191d21; --panel-2:#22272d; --ink:#e3e7ec;
+    --muted:#98a2ae; --faint:#6b7581; --accent:#6cb6d4; --accent-w:#14313d;
+    --dead:#e0837a; --dead-w:#38201d; --live:#5cc0a8; --live-w:#123029;
+    --hair:#2a3037; --hair-2:#3a424b;
+  }
+  :root[data-theme="light"] {
+    --ground:#edf0f3; --panel:#f8fafb; --panel-2:#e2e7ec; --ink:#14181d;
+    --muted:#525c68; --faint:#7f8996; --accent:#1f5f7a; --accent-w:#d7e6ed;
+    --dead:#9c3327; --dead-w:#f3ddd9; --live:#14614f; --live-w:#d6eae4;
+    --hair:#ccd4db; --hair-2:#b0bac4;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--serif);
+    font-size: 1.0625rem;
+    line-height: 1.62;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  .wrap {
+    max-width: calc(var(--measure) + 4rem);
+    margin: 0 auto;
+    padding: 3.5rem 2rem 6rem;
+  }
+
+  header { border-bottom: var(--rule); padding-bottom: 2rem; margin-bottom: 2.5rem; }
+
+  h1 {
+    font-size: clamp(1.9rem, 5.2vw, 2.7rem);
+    line-height: 1.12;
+    letter-spacing: -0.018em;
+    margin: 0 0 0.9rem;
+    font-weight: 600;
+  }
+
+  .dek { font-size: 1.15rem; line-height: 1.5; color: var(--muted); margin: 0 0 1.4rem; }
+
+  .byline {
+    font-family: var(--util);
+    font-size: 0.775rem;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--faint);
+    margin: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+  }
+  .byline span { white-space: nowrap; }
+  .byline .sep { margin: 0 0.55rem; opacity: 0.5; }
+
+  section { margin: 0 0 3rem; }
+
+  .eyebrow {
+    display: block;
+    font-family: var(--util);
+    font-size: 0.7rem;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 0.5rem;
+  }
+
+  h2 {
+    font-size: clamp(1.3rem, 3.4vw, 1.6rem);
+    line-height: 1.22;
+    letter-spacing: -0.012em;
+    margin: 0 0 1rem;
+    font-weight: 600;
+  }
+
+  h3 {
+    font-family: var(--util);
+    font-size: 0.95rem;
+    letter-spacing: 0.01em;
+    margin: 1.8rem 0 0.6rem;
+    font-weight: 600;
+  }
+
+  p { margin: 0 0 1.05rem; max-width: var(--measure); }
+
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+  code {
+    font-family: var(--mono);
+    font-size: 0.86em;
+    background: var(--panel-2);
+    padding: 0.08em 0.32em;
+    border-radius: 3px;
+  }
+
+  pre {
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    line-height: 1.55;
+    background: var(--panel);
+    border: var(--rule);
+    border-left: 3px solid var(--hair-2);
+    border-radius: 4px;
+    padding: 0.95rem 1.1rem;
+    overflow-x: auto;
+    margin: 0 0 1.2rem;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; }
+  pre .dim { color: var(--faint); }
+  pre .hi { color: var(--dead); }
+
+  .note {
+    border: var(--rule);
+    border-left: 3px solid var(--hair-2);
+    background: var(--panel);
+    border-radius: 4px;
+    padding: 1rem 1.15rem 0.4rem;
+    margin: 0 0 1.3rem;
+    max-width: var(--measure);
+  }
+  .note p { font-size: 0.965rem; }
+  .note .tag {
+    display: block;
+    font-family: var(--util);
+    font-size: 0.7rem;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+  }
+  .note.found { border-left-color: var(--dead); background: var(--dead-w); }
+  .note.found .tag { color: var(--dead); }
+  .note.clean { border-left-color: var(--live); background: var(--live-w); }
+  .note.clean .tag { color: var(--live); }
+
+  /* --- the four things a scored claim can turn out to be ----------------- */
+
+  .moves {
+    display: grid;
+    /* 8.5rem so all four fit one row at the page measure; below that they
+       wrap two-and-two rather than leaving a lone card on its own line. */
+    grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+    gap: 1px;
+    background: var(--hair);
+    border: var(--rule);
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 1.6rem 0 0;
+  }
+  .move { background: var(--panel); padding: 0.85rem 0.95rem 0.9rem; }
+  .move b {
+    font-family: var(--util);
+    font-size: 0.8rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    font-weight: 600;
+    display: block;
+    margin-bottom: 0.3rem;
+  }
+  .move .n {
+    font-family: var(--util);
+    font-size: 1.5rem;
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: -0.02em;
+    display: block;
+    margin-bottom: 0.4rem;
+  }
+  .move span.d {
+    display: block;
+    font-family: var(--util);
+    font-size: 0.78rem;
+    line-height: 1.45;
+    color: var(--muted);
+  }
+  .move.held b, .move.held .n { color: var(--live); }
+  .move.wrongwhy b, .move.wrongwhy .n { color: var(--accent); }
+  .move.half b, .move.half .n { color: var(--muted); }
+  .move.ref b, .move.ref .n { color: var(--dead); }
+
+  /* --- predicted against measured, side by side -------------------------- */
+
+  .vs {
+    border: var(--rule);
+    background: var(--panel);
+    border-radius: 4px;
+    padding: 0.2rem 1.15rem 0.75rem;
+    margin: 0 0 1.3rem;
+    max-width: var(--measure);
+  }
+  .row {
+    display: grid;
+    grid-template-columns: 5.5rem 1fr;
+    gap: 0 0.9rem;
+    padding: 0.55rem 0;
+    align-items: baseline;
+    border-top: var(--rule);
+    font-family: var(--util);
+    font-size: 0.85rem;
+  }
+  .row:first-child { border-top: none; }
+  .row .lab {
+    font-family: var(--util);
+    font-size: 0.68rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--faint);
+    font-weight: 600;
+  }
+  .row .said { line-height: 1.45; color: var(--muted); }
+  .row.said-pred .said { color: var(--muted); }
+  .row.said-meas .said { color: var(--ink); }
+  .row.said-kept .lab { color: var(--live); }
+  .row.said-kept .said { color: var(--ink); }
+
+  /* --- the three rounds -------------------------------------------------- */
+
+  .rounds { margin: 0 0 1.4rem; }
+  .round {
+    border-top: var(--rule);
+    padding: 0.9rem 0 0.95rem;
+    display: grid;
+    grid-template-columns: 6.5rem 1fr;
+    gap: 0 1rem;
+    align-items: baseline;
+  }
+  .round:last-child { border-bottom: var(--rule); }
+  .round .e {
+    font-family: var(--mono);
+    font-size: 0.76rem;
+    color: var(--accent);
+    font-weight: 600;
+    line-height: 1.4;
+  }
+  .round .e em { display: block; font-style: normal; color: var(--faint); font-size: 0.72rem; }
+  .round h3 { margin: 0 0 0.3rem; font-size: 0.93rem; }
+  .round p { margin: 0; font-size: 0.93rem; color: var(--muted); max-width: none; }
+
+  /* --- the ledger -------------------------------------------------------- */
+
+  .tablewrap { overflow-x: auto; margin: 0 0 1.2rem; }
+  table {
+    border-collapse: collapse;
+    font-family: var(--util);
+    font-size: 0.83rem;
+    width: 100%;
+    min-width: 34rem;
+  }
+  th, td { text-align: left; padding: 0.45rem 0.8rem 0.45rem 0; border-bottom: var(--rule); vertical-align: top; }
+  thead th {
+    font-size: 0.68rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--faint);
+    font-weight: 600;
+    border-bottom: 1px solid var(--hair-2);
+  }
+  td.e { font-family: var(--mono); font-size: 0.76rem; color: var(--accent); font-weight: 600; white-space: nowrap; }
+  td.n { font-family: var(--mono); font-size: 0.76rem; color: var(--muted); text-align: right; white-space: nowrap; }
+  td.k { white-space: nowrap; font-size: 0.72rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--faint); }
+  td.k.held { color: var(--live); }
+  td.k.ref  { color: var(--dead); }
+  tr.rule-top td { border-top: 1px solid var(--hair-2); }
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+    gap: 1px;
+    margin: 0 0 1.5rem;
+  }
+  .stat {
+    background: var(--panel);
+    padding: 0.85rem 0.95rem;
+    box-shadow: 0 0 0 1px var(--hair);
+  }
+  .stat b {
+    display: block;
+    font-family: var(--util);
+    font-size: 1.35rem;
+    letter-spacing: -0.02em;
+    font-weight: 600;
+    line-height: 1.1;
+  }
+  .stat span {
+    font-family: var(--util);
+    font-size: 0.68rem;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+
+  blockquote {
+    margin: 0 0 1.2rem;
+    padding-left: 1.1rem;
+    border-left: 2px solid var(--accent);
+    color: var(--muted);
+    font-style: italic;
+    max-width: var(--measure);
+  }
+  blockquote p { margin-bottom: 0; }
+
+  ul { max-width: var(--measure); padding-left: 1.15rem; margin: 0 0 1.1rem; }
+  li { margin-bottom: 0.45rem; }
+
+  .next {
+    margin-top: 1.7rem;
+    padding-top: 1.1rem;
+    border-top: var(--rule);
+    font-family: var(--util);
+    font-size: 0.85rem;
+    line-height: 1.65;
+    color: var(--muted);
+  }
+
+  footer {
+    border-top: var(--rule);
+    padding-top: 1.6rem;
+    color: var(--faint);
+    font-family: var(--util);
+    font-size: 0.8rem;
+    line-height: 1.6;
+  }
+  footer p { max-width: var(--measure); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>The claim that exists to catch a flattering result</h1>
+  <p class="dek">Three times, before doing the work, apolisp wrote down numbered predictions of what the work would do &mdash; and scored them afterwards against measurement. Thirteen claims. Five held cleanly. The two that paid for the whole habit were the ones written specifically to make a good-looking answer impossible to accept.</p>
+  <p class="byline">
+    <span>3 pre-registrations</span><span class="sep">/</span><span>13 claims</span><span class="sep">/</span><span>2 refutation thresholds</span><span class="sep">/</span><span>0 met</span>
+  </p>
+
+  <div class="moves">
+    <div class="move held">
+      <span class="n">5</span>
+      <b>Held</b>
+      <span class="d">The number landed inside the band, for the stated reason.</span>
+    </div>
+    <div class="move wrongwhy">
+      <span class="n">4</span>
+      <b>Right, wrong why</b>
+      <span class="d">The headline held and the mechanism underneath it did not.</span>
+    </div>
+    <div class="move half">
+      <span class="n">2</span>
+      <b>Half</b>
+      <span class="d">One clause of a two-clause claim. Both times the same clause.</span>
+    </div>
+    <div class="move ref">
+      <span class="n">2</span>
+      <b>Refuted</b>
+      <span class="d">Wrong, and the note says by how much rather than moving on.</span>
+    </div>
+  </div>
+</header>
+
+<section>
+  <span class="eyebrow">The habit</span>
+  <h2>Two lines in a commit message, and what they are for</h2>
+
+  <p>The rule in <code>BUILD.md</code> is small enough to quote whole:</p>
+
+  <blockquote><p>Before running a benchmark, write down what you expect and why. Afterwards, record whether it was refuted. &hellip; Two lines in a commit message is enough. This is a habit, not a document.</p></blockquote>
+
+  <p>It exists because of a specific hole. ADR-021 removed the gate on optimisation work &mdash; there is no committee to convince, no performance budget to defend, and a change can go in because it looked worth trying. That freedom is the point of a project with one user, and it has an obvious failure mode: every change ships with a story about why it worked, assembled after the numbers were in. Pre-registration is what turns the freedom into knowledge rather than folklore.</p>
+
+  <p>The prior art was already doing it. <code>../wallisp</code> benchmarks eight engine architectures with pre-registered predictions and a falsification log per experiment, and its most useful finding is one of its own hypotheses being falsified: refcounting came out the <em>slowest</em> collector tested, ~1.1&ndash;1.25&times; worse than mark-sweep, because it pays inc/dec eagerly on every reference while a lazy mark-sweep barely fires. That result argues against ADR-003 here, which is exactly the kind of thing a falsification log is for and a success story never produces.</p>
+
+  <p>Three times the habit outgrew two lines in a commit message and became a note written before the work existed. Those three are what this page scores. The mutation passes use the same discipline against a different subject &mdash; a declared verdict per mutant, written before the run &mdash; and that story is <a href="mutations.html">told elsewhere</a>.</p>
+
+  <div class="rounds">
+    <div class="round">
+      <span class="e">2026-07-28<em>the editor</em></span>
+      <div>
+        <h3>A program predicted before it was written</h3>
+        <p>No editor existed. Three falsifiable claims about where a full-screen text editor would hit a wall. The three programs before it were written without a pre-registration, and in each case the interesting result had to be reconstructed afterwards from what had surprised whoever was typing.</p>
+      </div>
+    </div>
+    <div class="round">
+      <span class="e">2026-07-29<em>str-scalar-slice</em></span>
+      <div>
+        <h3>A primitive predicted before it existed</h3>
+        <p>Five claims about a scalar-indexed substring, filed against Q34 while the operation was still an open question. Became ADR-052.</p>
+      </div>
+    </div>
+    <div class="round">
+      <span class="e">2026-07-30<em>vec-slice</em></span>
+      <div>
+        <h3>A shape chosen against a rival, in advance</h3>
+        <p>Five claims, and the entry states the bet it is making: a general slice composed at the call site, against <code>splice</code>, a single-allocation primitive shaped for exactly two callers. Became ADR-053.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <span class="eyebrow">The device</span>
+  <h2>Write the claim that makes the flattering reading impossible</h2>
+
+  <p>Both slice pre-registrations contain a claim whose stated purpose is to spoil a result the author would otherwise want to believe. In the first, it is claim 2, and the note gives its reason in the entry itself: <em>&ldquo;This claim exists because the failure mode of claim 1 is a flattering one.&rdquo;</em></p>
+
+  <p>Claim 1 was that per-keystroke cost would go near-flat &mdash; about 4&nbsp;µs, barely rising across the range the editor cares about. Claim 2 said: if that is what the small numbers show, push until the linear term appears, because the operation <em>is</em> a scan and a curve that looks flat at 1,600 characters is a curve measured too close in.</p>
+
+  <div class="vs">
+    <div class="row said-pred"><span class="lab">Claim 1</span><span class="said">~4&nbsp;µs floor, a 1.3&ndash;2&times; rise from 100 to 1,600 characters, 1,500&ndash;2,500&times; faster than the old idiom.</span></div>
+    <div class="row said-meas"><span class="lab">Measured</span><span class="said">2,134&times; at 1,600 characters &mdash; inside the band. Everything about <em>why</em> was wrong: the real floor is ~0.5&nbsp;µs, so the linear term is visible almost immediately and the rise is <strong>4.9&times;</strong>. Four times better than predicted, on a curve four times worse.</span></div>
+    <div class="row said-kept"><span class="lab">Claim 2</span><span class="said">The scan shows by 25,000 characters, &ge;20&nbsp;µs. Measured 43.58&nbsp;µs, and the 100,000-character point settles the shape: 4&times; the characters costs 3.80&times;.</span></div>
+  </div>
+
+  <p>Here is the sentence that justifies the entire practice, from the scoring:</p>
+
+  <blockquote><p>The small-string numbers on their own look flat, and had I stopped at 1,600 I would have written &ldquo;flat&rdquo; into an ADR that says linear.</p></blockquote>
+
+  <p>Nothing else in the process would have caught that. The benchmark was correct, the speedup was real, the decision was right, and the sentence about to be written into the permanent record was false. What stopped it was a note, written a day earlier, saying <em>in advance</em> that this specific good news should not be accepted at this specific size.</p>
+
+  <p>The next round wrote the same kind of claim on purpose, and it was again the one that mattered. <code>vec-slice</code> predicted <code>RET</code> at 1,000 lines would drop about 70&times; &mdash; and then predicted, separately, that the growth rate would fall to 3.5&ndash;4.5&times; per 4&times; buffer, <em>&ldquo;because claim 1 could be satisfied by a large constant-factor win that leaves the exponent intact, and that is the flattering reading.&rdquo;</em></p>
+
+  <div class="vs">
+    <div class="row said-pred"><span class="lab">Claim 1</span><span class="said">7.244&nbsp;ms &rarr; ~0.10&nbsp;ms, about 70&times;.</span></div>
+    <div class="row said-meas"><span class="lab">Measured</span><span class="said">0.0288&nbsp;ms &mdash; <strong>252&times;</strong>. Held, and underestimated by 3.5&times;: four copies of a 1,000-element vector were costed as if a copy were expensive, and a <code>memcpy</code> of 1,000 pointers is not.</span></div>
+    <div class="row said-kept"><span class="lab">Claim 2</span><span class="said">3.5&ndash;4.5&times; per 4&times; buffer. Measured 2.71&times;, 3.47&times;, 3.80&times; &mdash; converging on 4.0 from below as the fixed overhead washes out. The exponent really did go.</span></div>
+  </div>
+
+  <p>A 252&times; speedup is the kind of number that ends an investigation. The reason it did not is that the thing which would have made it hollow &mdash; a constant-factor win dressed as an algorithmic one &mdash; had been named as a distinct, checkable claim before anyone knew what the numbers would be.</p>
+
+  <div class="note clean">
+    <span class="tag">The transferable part</span>
+    <p>For every prediction of the form &ldquo;X gets faster&rdquo;, write the second claim that distinguishes <em>the fix worked</em> from <em>the fix looks like it worked</em>. It is almost always about shape rather than magnitude: does the exponent move, does the curve stay flat when pushed an order of magnitude further, does the cost still track the input it should.</p>
+  </div>
+</section>
+
+<section>
+  <span class="eyebrow">The threshold</span>
+  <h2>Name the result that would say the decision was wrong, not the number</h2>
+
+  <p>Both slice entries carry a section headed <em>&ldquo;what would refute the entry rather than a number&rdquo;</em>, and it is a different instrument from the claims above. A miscalibrated prediction is ordinary. What the threshold names is the measurement that would say the <em>choice</em> was wrong &mdash; that the ADR picked the wrong shape and should be superseded rather than merely annotated.</p>
+
+  <div class="tablewrap">
+  <table>
+    <thead>
+      <tr><th>Entry</th><th>The result that would have said &ldquo;wrong shape&rdquo;</th><th>Measured</th></tr>
+    </thead>
+    <tbody>
+      <tr><td class="e">ADR-052</td><td>Per-keystroke cost above ~50&nbsp;µs at 1,600 characters &mdash; the linear scan is not cheap enough, and a cached scalar&rarr;byte offset was the better primitive.</td><td class="n">4.54&nbsp;µs</td></tr>
+      <tr><td class="e">ADR-053</td><td><code>RET</code> above 1&nbsp;ms at 1,000 lines &mdash; four allocations are the cost after all, and <code>splice</code> was the right shape.</td><td class="n">0.0288&nbsp;ms</td></tr>
+      <tr><td class="e">ADR-053</td><td>Secondary: <code>take</code>/<code>drop</code> show no improvement, which empties the general-case argument that is the entire reason <code>vec-slice</code> was chosen over <code>splice</code>.</td><td class="n">1,706&times;</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>Neither threshold was met, and the second was missed by three orders of magnitude. That is a boring outcome and it is worth exactly what it cost, because of what the threshold prevents rather than what it found: once a number like 0.0288&nbsp;ms is on the table, <em>every</em> reading of it is favourable. The pre-registration fixes in advance which readings are allowed to count as vindication of the choice, so a decision that survives can be said to have survived something.</p>
+
+  <p>The distinction between the two instruments matters. <code>str-scalar-slice</code> got three of five predictions wrong and its threshold was never approached &mdash; so the honest summary is <strong>the decision was right and most of the reasoning about it was miscalibrated</strong>, which is a sentence that can only be written because the two were separated before the run.</p>
+</section>
+
+<section>
+  <span class="eyebrow">The calibration</span>
+  <h2>What is wrong is never the direction</h2>
+
+  <p>Thirteen claims across three rounds, and not one of them pointed the wrong way. Everything that failed, failed on magnitude or on mechanism &mdash; and the mechanism failures are the ones worth reading, because a wrong mechanism survives being right about the number.</p>
+
+  <p>The editor pre-registration is the extreme case. Its central claim was that per-keystroke cost would be governed by <code>assoc</code> copying the whole lines vector, N refcount bumps per keystroke, comfortable to about 50,000 lines. The editor got built the same day.</p>
+
+  <div class="vs">
+    <div class="row said-pred"><span class="lab">Predicted</span><span class="said">Typing is comfortable to ~50,000 lines, because the per-keystroke cost is the spine copy and the spine copy is cheap enough.</span></div>
+    <div class="row said-meas"><span class="lab">Measured</span><span class="said">Comfortable, and <strong>not for that reason</strong>. Buffer size is nearly free &mdash; 8&times; the lines costs 1.12&times;. Cost tracks <em>line length</em>, because the cursor is a character column, <code>str-slice</code> takes bytes, and the character-safe surface is built from prelude <code>conj</code> loops. An edit is quadratic in the column, and at 1,600 characters that is 12.6&nbsp;ms against the native path&rsquo;s 4&nbsp;µs.</span></div>
+  </div>
+
+  <p>Right answer, wrong axis. And the third claim in that file was <em>&ldquo;it will be misdiagnosed&rdquo;</em> &mdash; recorded because the symptom is a whole-file operation and the cause is a per-element clone, so the expected first explanation would be &ldquo;the VM is slow&rdquo;. That claim held, and it was held by the document making it. The misdiagnosis on record is its own.</p>
+
+  <p>The same pattern, smaller, in round two: the predicted speedup ratio at 1,600 characters landed inside the band while <em>both terms of the ratio</em> were wrong &mdash; the floor by 8&times; and the slope by about 3&times;. Being right about a ratio through two compensating errors is not a calibrated prediction; it is a coincidence that looks like one, and it is only visible because the note recorded the terms and not just the ratio.</p>
+
+  <div class="note found">
+    <span class="tag">The habit this argues for</span>
+    <p>Predict the terms, not the summary statistic. A predicted speedup can be confirmed by two errors that cancel; a predicted floor and a predicted slope cannot both be confirmed by accident. The claims here that produced real information are, without exception, the ones stated as a shape or a mechanism rather than as a single number.</p>
+  </div>
+</section>
+
+<section>
+  <span class="eyebrow">The repeat offender</span>
+  <h2>Twice now, &ldquo;the code gets smaller&rdquo; has lost to prose</h2>
+
+  <p>The dullest claim in each entry is the line-count one. The project has a hard budget &mdash; 7,500 lines &mdash; so every change predicts its own cost, and this is the prediction that has been wrong the most consistently.</p>
+
+  <div class="vs">
+    <div class="row said-pred"><span class="lab">ADR-052</span><span class="said">The editor core loses 2&ndash;4 lines; the change costs 25&ndash;35 core lines.</span></div>
+    <div class="row said-meas"><span class="lab">Actual</span><span class="said">The core lost <strong>one</strong> line: two definitions went away and a six-line comment explaining why took their place. The change cost <strong>55</strong>, and the 20-line overrun is entirely comment.</span></div>
+    <div class="row said-pred"><span class="lab">ADR-053</span><span class="said">The prelude gets shorter &mdash; <code>take</code> and <code>drop</code> lose their loops.</span></div>
+    <div class="row said-meas"><span class="lab">Actual</span><span class="said">The prelude got <strong>longer</strong>, 195 &rarr; 201, because the comment explaining where clamping now lives is bigger than the two loops it replaced. The core total landed at 6,637, inside its predicted band.</span></div>
+  </div>
+
+  <p>ADR-030 counts comments deliberately, so this is a real cost and not a bookkeeping quibble. The rule the second round wrote down, having lost the same way twice:</p>
+
+  <blockquote><p>On a change whose <em>point</em> is a subtle invariant, the explanation is the bulk of the diff, and estimating the code is not estimating the change.</p></blockquote>
+
+  <p>It generalises past line counts. Both of these changes were small, surgical, and correct, and both were mostly writing &mdash; because what a subtle change costs is not the instructions it adds but the sentence a future reader needs in order not to undo it.</p>
+</section>
+
+<section>
+  <span class="eyebrow">The unpredicted</span>
+  <h2>Each round&rsquo;s largest finding was not on its list</h2>
+
+  <p>This is the uncomfortable one. In all three rounds the most valuable thing learned was absent from the pre-registration entirely.</p>
+
+  <ul>
+    <li><strong>Round one</strong> predicted a buffer-size cliff and found a line-length one: <code>str-slice</code> is native and byte-indexed, the character-aware surface is correct and quadratic, and <strong>they are not the same operation</strong>. ADR-049 had made the safe path the slow path, and no program had noticed because none had done character surgery in a loop. A 2,905&times; gap, absent from the file that predicted the cliff.</li>
+    <li><strong>Round two</strong> made typing 20&times; faster and <code>RET</code> 1.8&times;, so the gap between the two <em>widened from ~60&times; to ~660&times;</em>. Fixing the cheap operation is what made the expensive one conspicuous. Filed as Q36, which is round three.</li>
+    <li><strong>Round three</strong> found that typing had become linear in the buffer &mdash; 3.72&times; per 4&times; lines &mdash; because <code>insert-str</code> calls <code>assoc</code>, a native O(n) copy. That was <em>always</em> true. It was invisible while the quadratic string path sat on top of it.</li>
+  </ul>
+
+  <p>Read in order, those are not three separate surprises. They are one mechanism, three times:</p>
+
+  <div class="vs">
+    <div class="row said-meas"><span class="lab">Round 1</span><span class="said">The first editor benchmark could not see past the scalar <code>conj</code> loops.</span></div>
+    <div class="row said-meas"><span class="lab">Round 2</span><span class="said">ADR-052 removed them, typing got 20&times; faster, and <code>RET</code> became the visible cost.</span></div>
+    <div class="row said-meas"><span class="lab">Round 3</span><span class="said">ADR-053 made <code>RET</code> 252&times; faster, and <code>assoc</code> became the visible cost.</span></div>
+  </div>
+
+  <blockquote><p>A benchmark on a system with one dominant quadratic measures the quadratic, and every other cost in the program is unmeasured until it is gone.</p></blockquote>
+
+  <p>Which puts a bound on what any of these pre-registrations could have contained. Round one <em>could not</em> have predicted the <code>assoc</code> cost; nothing could measure it yet. The pre-registration is not weaker for having missed it, and the honest reading is not &ldquo;the predictions keep missing the big thing&rdquo; but &ldquo;the big thing is by construction the one currently hidden, and a fix is the instrument that exposes it&rdquo;.</p>
+
+  <p>The editor entry anticipated this in its scoring instructions, which is the best thing in it:</p>
+
+  <blockquote><p>The prediction is <em>wrong as a whole</em> if the editor turns out to be blocked by something absent from this file &mdash; in which case the useful finding is not the blocker but the fact that reading the source and writing three programs did not surface it.</p></blockquote>
+
+  <p>It was so blocked, twice: <code>concat</code> returns a list that <code>assoc</code> refuses, and the language has no type predicates. Neither appears anywhere in the file. Both were found in the first hour of writing the program.</p>
+</section>
+
+<section>
+  <span class="eyebrow">What it bought</span>
+  <h2>An optimisation refuted before anyone spent a day on it</h2>
+
+  <p>The editor pre-registration proposed a line-level gap buffer to dodge the per-keystroke <code>assoc</code>. It is a reasonable idea, it is what an editor is supposed to want, and it would have taken a day.</p>
+
+  <p>The benchmark killed it in an afternoon. Buffer size is already free; the cost is inside a single line. If anything here wants a gap buffer it is the <em>line</em>, not the vector of lines &mdash; and a scalar-indexed slice removes the reason to want one at all.</p>
+
+  <div class="note clean">
+    <span class="tag">The clearest thing the habit has paid for</span>
+    <p>A plausible optimisation, written down as a proposal <em>before</em> the measurement existed, and refuted by the measurement rather than by taste. Had the gap buffer been built first it would have been built, measured, found to help slightly, and kept &mdash; because a change that helps a little is nearly impossible to argue out of a codebase once it is in.</p>
+  </div>
+
+  <p>The same file&rsquo;s structural prediction &mdash; that <em>testability, not capability</em> would shape the program, and that written as anything other than a pure <code>state &times; key &rarr; state</code> core the editor could not be tested at all &mdash; held, with one correction it is worth having made. &ldquo;An editor cannot be pinned by the corpus&rdquo; turned out to be true only of the 62-line shell: the core replays nineteen chords through <code>reduce dispatch</code> with no terminal anywhere and has an ordinary <code>.out</code> golden. That one is <a href="programs.html">its own story</a>.</p>
+</section>
+
+<section>
+  <span class="eyebrow">The method</span>
+  <h2>Twice, the prediction found the bug in the instrument rather than the code</h2>
+
+  <p>A pre-registration is a check on the work. It turns out to be a better check on the <em>apparatus</em>, and both times it caught one, the mechanism was the same: the apparatus produced a result indistinguishable from a real one, and the wrong reading was the flattering one.</p>
+
+  <h3>The mutant that never applied</h3>
+
+  <p>Milestone 9 seeded twelve mutants into the session and the reader, each with a declared verdict written first. Two of them were substituted with a <code>perl</code> pattern containing an escape that the shell passed through unchanged, so the regex looked for two backslashes where the file has one. Neither substitution fired. Both runs reported a green suite &mdash; which is precisely what a surviving mutant reports.</p>
+
+  <div class="vs">
+    <div class="row said-pred"><span class="lab">Declared</span><span class="said">Mutant 12 &mdash; the prompt drops the suppressed chain &mdash; <strong>will survive</strong>, and here is the specific reason.</span></div>
+    <div class="row said-meas"><span class="lab">Observed</span><span class="said">Survived. Checking the stated reason meant opening the file, and the file was unmodified.</span></div>
+  </div>
+
+  <p>Nothing distinguishes &ldquo;the mutation survived&rdquo; from &ldquo;the mutation never happened&rdquo; from outside the run, and one of those is a finding while the other is a wasted run being <em>recorded</em> as a finding. What caught it was not the harness. It was that the prediction had a reason attached, and verifying a reason means looking at the subject.</p>
+
+  <h3>The mutant that applied and never reached the binary</h3>
+
+  <p>The soak asserts that two programs run under valgrind lose no memory, and neither program can make that assertion fail &mdash; so the check itself was validated by mutation. Pre-registered: inject a definite leak into a hot path, expect it caught, and note that the interesting outcome would be a survivor.</p>
+
+  <pre><code>mutant 1  std::mem::forget(Box::new([0u8; 64])) in conj
+          churn.xs: 30 conj x 5,000 iters = 150,000 leaks
+
+<span class="dim">valgrind</span>  definitely lost: 0 bytes in 0 blocks   <span class="hi">exit 0</span>
+<span class="dim">heap</span>      1,482,053 allocs, 1,482,052 frees
+                       <span class="dim">&uarr; these match, so nothing was ever allocated</span></code></pre>
+
+  <p>The boxes were never allocated. A <code>Box</code> that is allocated, never read and never freed is unobservable, and LLVM is entitled to delete it. Wrapped in <code>std::hint::black_box</code>, the same mutant is caught immediately: 9,599,936 bytes in 149,999 blocks, exit 9.</p>
+
+  <p>This is a second way to get the same wrong answer, and the rule the previous case produced does not catch it. <code>grep</code> confirmed the mutation was in the source. The build recompiled. The mutation was real in <code>src/lib.rs</code> and absent from the machine code.</p>
+
+  <div class="note found">
+    <span class="tag">Read the counters, not the verdict</span>
+    <p><code>total heap usage</code> is what distinguishes &ldquo;nothing leaked&rdquo; from &ldquo;nothing happened&rdquo;, and every instrument has an equivalent &mdash; an instruction count, a transcript, a timing. A verdict alone cannot tell the two apart. Anything mutated under <code>--release</code> is exposed, the vulnerable shape is a mutant that adds work with no observable effect, and the soak runs release because release is the profile it exists to test.</p>
+  </div>
+
+  <p>Both rules now live in <code>BUILD.md</code> next to the pre-registration rule, which is the right place for them: they are not facts about valgrind or about <code>perl</code>. They are the two ways a written-down expectation can be satisfied by a run that did not happen.</p>
+</section>
+
+<section>
+  <span class="eyebrow">The ledger</span>
+  <h2>All thirteen</h2>
+
+  <div class="stats">
+    <div class="stat"><b>13</b><span>claims</span></div>
+    <div class="stat"><b>5</b><span>held clean</span></div>
+    <div class="stat"><b>4</b><span>right, wrong why</span></div>
+    <div class="stat"><b>2</b><span>half</span></div>
+    <div class="stat"><b>2</b><span>refuted</span></div>
+  </div>
+
+  <div class="tablewrap">
+  <table>
+    <thead>
+      <tr><th>#</th><th>Predicted</th><th>What happened</th><th>Verdict</th></tr>
+    </thead>
+    <tbody>
+      <tr class="rule-top"><td class="e" colspan="4">The editor &mdash; 2026-07-28, before the program existed</td></tr>
+      <tr><td class="n">1</td><td>Typing comfortable to ~50,000 lines, the cost being <code>assoc</code> on the spine.</td><td>Comfortable at any line count; buffer size is nearly free. The stated mechanism is refuted &mdash; that cost exists and is swamped by the line-length one.</td><td class="k">right, wrong why</td></tr>
+      <tr><td class="n">2</td><td>Any whole-file pass is O(n&sup2;) &mdash; tens of seconds in the debug VM at 10,000 lines.</td><td>Quadratic confirmed cleanly. 440&nbsp;ms release, 4.3&nbsp;s debug &mdash; magnitude overestimated about fivefold.</td><td class="k">right, wrong why</td></tr>
+      <tr><td class="n">3</td><td>It will be misdiagnosed.</td><td>Held, and the author was the one who misdiagnosed it.</td><td class="k held">held</td></tr>
+
+      <tr class="rule-top"><td class="e" colspan="4"><code>str-scalar-slice</code> &mdash; 2026-07-29, before the primitive existed</td></tr>
+      <tr><td class="n">1</td><td>~4&nbsp;µs floor, 1.3&ndash;2&times; rise to 1,600 chars, 1,500&ndash;2,500&times; speedup.</td><td>2,134&times;, inside the band. Floor is ~0.5&nbsp;µs and the rise is 4.9&times; &mdash; four times better on a curve four times worse.</td><td class="k">right, wrong why</td></tr>
+      <tr><td class="n">2</td><td>The linear term shows by 25,000 chars, &ge;20&nbsp;µs.</td><td>43.58&nbsp;µs, and 4&times; the characters costs 3.80&times;. The claim written against claim 1&rsquo;s flattering failure mode, and it paid.</td><td class="k held">held</td></tr>
+      <tr><td class="n">3</td><td>Core loses 2&ndash;4 lines and two protos.</td><td>Two protos exactly. The core lost one line &mdash; a six-line comment replaced two definitions.</td><td class="k">half</td></tr>
+      <tr><td class="n">4</td><td><code>RET</code> is untouched, stays ~13&nbsp;ms.</td><td>Nearly halved, 13.228 &rarr; 7.244&nbsp;ms. <code>split-line</code> slices the line as well as rebuilding the vector, and only the rebuild had been accounted for.</td><td class="k ref">refuted</td></tr>
+      <tr><td class="n">5</td><td>25&ndash;35 core lines.</td><td>55. The 20-line overrun is entirely comment.</td><td class="k ref">refuted</td></tr>
+
+      <tr class="rule-top"><td class="e" colspan="4"><code>vec-slice</code> &mdash; 2026-07-30, before the primitive existed</td></tr>
+      <tr><td class="n">1</td><td><code>RET</code> at 1,000 lines: 7.244 &rarr; ~0.10&nbsp;ms, about 70&times;.</td><td>0.0288&nbsp;ms &mdash; 252&times;. Direction right, magnitude out by 3.5&times;; a <code>memcpy</code> of 1,000 pointers is cheaper than four copies were costed at.</td><td class="k">right, wrong why</td></tr>
+      <tr><td class="n">2</td><td><code>RET</code> becomes linear: 3.5&ndash;4.5&times; per 4&times; buffer.</td><td>2.71&times;, 3.47&times;, 3.80&times;, converging on 4.0 from below. The exponent moved, which is what this claim existed to check.</td><td class="k held">held</td></tr>
+      <tr><td class="n">3</td><td><code>take</code>/<code>drop</code> become linear, &ge;50&times; at 4,000 elements.</td><td>1,706&times; at 4,000 and 6,792&times; at 16,000, at 3.81&times; per 4&times; against the loop&rsquo;s 15.2&times;. Ahead by 34&times;.</td><td class="k held">held</td></tr>
+      <tr><td class="n">4</td><td>Prelude shorter, core longer, net +15 to +25, landing 6,631&ndash;6,641.</td><td>Core 6,637, inside the band. The prelude got <em>longer</em>, 195 &rarr; 201.</td><td class="k">half</td></tr>
+      <tr><td class="n">5</td><td>The editor&rsquo;s <code>.out</code> golden does not move.</td><td>Four phase goldens moved and the transcript did not, so the oracle certifies the change as behaviour-preserving rather than being asked to take it on trust.</td><td class="k held">held</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>Nine of thirteen landed on the right side of the answer and four of those did it for a reason that turned out to be false. That ratio is the argument for the practice rather than against it: a habit that only confirmed things would tell you nothing, and one that was usually wrong about the direction would not be worth the five minutes. What this one reliably produces is a correct expectation attached to an incorrect explanation &mdash; and the explanation is the part that gets reused, in the next benchmark and in the next ADR.</p>
+
+  <p>Both entries that named a threshold still stand, and neither threshold was approached. It is possible to say that only because the conditions were written down while the answer was still unknown.</p>
+
+  <p class="next">The harnesses: <a href="mutations.html">Breaking the line is the easy half</a> (mutation) and <a href="subtraction.html">A seam nothing compiles is a seam nobody can trust</a> (subtraction).<br>
+  The findings, in four parts: <a href="oracle.html">The tests were green and two of them were dead</a> (milestones 1&ndash;3) &middot; <a href="limits.html">What a mutation check cannot find</a> (4&ndash;6) &middot; <a href="instrument.html">The instrument that can lie</a> (7&ndash;10) &middot; <a href="programs.html">Nobody had written a program in it</a>.<br>
+  The decision log: <a href="errata.html">The decision was right and the reason was wrong</a> &mdash; 55 entries, 4 superseded, 17 corrected.</p>
+</section>
+
+<footer>
+  <p>apolisp is a personal project with one user and no stability promise. Every claim and every number on this page is quoted from a note written before the work it describes &mdash; <code>docs/notes/the-editor-prediction.md</code>, <code>str-scalar-slice-prediction.md</code> and <code>vec-slice-prediction.md</code> &mdash; scored in place afterwards, with the original text left unedited. The two apparatus failures are from <code>milestone-9-mutants.md</code> and <code>soak-leak-check.md</code>. The habit itself is four sentences in <code>docs/BUILD.md</code>.</p>
+</footer>
+
+</div>
+</body>
+</html>

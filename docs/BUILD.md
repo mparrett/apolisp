@@ -31,6 +31,18 @@ double," never "is this 40 lines over."
 The budget is hard and amendable by ADR. Over budget is a decision to record in a
 new entry, not a number to nudge or a test to silence.
 
+## Prose budget
+
+The documents get a cap of **20,000 lines** (ADR-056) — everything under `docs/`,
+with the write-ups' duplicated `<style>` blocks excluded and printed. Unlike the
+line budget it has no working target underneath it: the number *is* the
+assertion, because it is a tripwire against getting carried away rather than a
+size to build to. The test prints the current total and the per-file breakdown.
+
+The asymmetry it closes is that constraint #1 is a context-window constraint and
+had only ever been enforced against `src/`, while `ADR.md` grew to half the size
+of the language it describes.
+
 Tests, host adapters (HTTP, terminal, JSON), and tooling live **outside** this
 budget. The boundary is the point: *substantial host capability is a Rust library
 behind the handle table, not a language subsystem.*

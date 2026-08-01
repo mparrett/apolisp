@@ -3307,6 +3307,61 @@ than in a runnable list.
 
 ---
 
+### ADR-056 — A prose budget, as a tripwire
+
+*(New, 2026-08-01. Adds `the_documents_stay_within_the_prose_budget`. Does not
+amend ADR-030, which stays the budget for `src/`.)*
+
+**Decision.** The documents get a cap of **20,000 lines**, asserted by a test.
+Everything under `docs/` counts — `.md` recursively, so `notes/` and `archive/`
+are in scope, and `.html` at the top level. One exclusion: the `<style>` block of
+each write-up, which **prints**, with its line count, on every run.
+
+**The number is the assertion, and this is the part that differs from ADR-030.**
+That entry sets a working target of 7,500 and puts the tripwire a thousand lines
+past it, so that failing can never start an argument about forty lines. There is
+no working target here and no noise band beneath the number. This is a cap
+against getting carried away, not a size the documents are meant to approach. The
+current total is the test's to report and not this entry's to state — E-17 —
+and if it ever approaches the cap that will be because something went wrong
+rather than because a budget was being spent down.
+
+**Why.** Constraint #1 is a context-window constraint, and for fifty-five entries
+it has only ever been enforced against `src/`. Measured on the day of this entry:
+6,845 lines of language against 10,751 lines of markdown, of which `ADR.md` is
+3,524 — **half the size of the language it describes**. `notes/budget.html` had
+just finished establishing that the line budget has never once refused anything,
+and the reason is now plain: the code was never the thing growing. A project that
+rigorously measures the artifact that was never at risk is not measuring.
+
+*The exclusion prints, for ADR-045's reason.* Thirteen copies of one stylesheet
+are 4,596 lines that nobody holds in their head, and counting them would put the
+total at 18,567 — a cap meant as a safety margin binding on the day it was
+written. But an exclusion nobody can see is how a budget stops measuring
+anything, so it is itemised per file beside the content count.
+
+*No directory is excluded.* `archive/` is 2,575 frozen lines that will never
+grow, and excluding it would be free today. It is not excluded, because the
+moment a budget can be satisfied by moving a file it measures where files are
+rather than how much there is.
+
+**Cost.** `ADR.md` is the largest single file inside this budget, so entries like
+this one spend it. That is intended rather than ironic: an entry that costs
+nothing to write is one nobody weighs before writing.
+
+The failure modes will be the ones `budget.html` already catalogues for the line
+budget — a counting rule that changes meaning, a layer that arrives unbudgeted, an
+exclusion that grows. The mitigations are the same three and they are already
+here: state the rule in the entry, print the breakdown, print what was skipped.
+
+**Rejected.** *Per-file or per-directory caps* — false precision, and the
+rebalancing churn ADR-030 already refused. *Counting only the normative docs* —
+`notes/` is where the write-ups come from and is growing faster than `docs/*.md`.
+*A `just prose` target* — the test prints the report and `just verify` runs it,
+which is exactly the arrangement the line budget already has.
+
+---
+
 ## Errata
 
 Factual corrections to entries whose **decision still stands**. A wrong reason is

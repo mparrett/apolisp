@@ -345,27 +345,28 @@ file size that is not unusual.
 
 **The candidates, and what each costs.** Not ordered, and none chosen.
 
-1. **Kill a slot at its last use** (E-13's first suggestion; ADR-006's optional
-   reuse pass, extended). The accumulator's refcount at the native call becomes
-   1, `make_mut` mutates in place, and *every* `conj` loop gets amortised
-   O(1) — including ones in user code that no library change could reach.
-   Blast radius is the compiler and every program's slot layout, so every
-   `.disasm` golden moves at once. That is a large reviewed diff rather than a
-   risk, but it is the one ADR-021 would want an argument for.
-2. **A consuming call protocol** — a native declares it consumes an argument,
-   and the VM clears the caller's slot before the call. Reaches ADR-038's call
-   protocol and ADR-034's instruction format. Narrower than 1 in what it fixes:
-   it helps the primitives, not an arbitrary loop.
-3. **Make the hot functions native.** `split` and `join` take no closure, so
+1. **Kill a slot at its last use, *and* a consuming call protocol.** E-18
+   measured these and they are not the two alternatives E-13 called them: with
+   no live local at all, `conj`'s own `x.clone()` still leaves the count at 2,
+   so a perfect last-use pass on its own changes nothing observable. The
+   consuming half — a native taking the value *out* of its argument slot rather
+   than cloning it — is what reaches 1, and the last-use half is what keeps a
+   loop's live accumulator from putting it back to 2. Together they give every
+   `conj` loop amortised O(1), including ones in user code that no library
+   change could reach. Blast radius is the compiler, `native_call`'s signature,
+   and every program's slot layout, so every `.disasm` golden moves at once.
+   This is the real fix and the expensive one, and E-18 is why it cannot be
+   bought in halves.
+2. **Make the hot functions native.** `split` and `join` take no closure, so
    ADR-041 part 6 does not forbid them, and they are the two that actually bit.
    Cheap, and it fixes the *measured* case without touching the call protocol.
    It does nothing for `map`, `filter`, `repeat` or a hand-written loop, and it
    moves library code into the line budget.
-4. **Transients, or a persistent vector.** Both supersede ADR-041, and the
+3. **Transients, or a persistent vector.** Both supersede ADR-041, and the
    second supersedes ADR-011's one-representation rule too. Largest, and the
    furthest from ETHOS constraint #3's "concrete representations and good
    constants".
-5. **Accept it and write the limit down.** The corpus is small, and every
+4. **Accept it and write the limit down.** The corpus is small, and every
    program so far has finished. This is the option that gets taken by default
    if nothing decides, which is the reason to have the question.
 

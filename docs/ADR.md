@@ -3634,6 +3634,43 @@ what gets reused. Superseding an entry over a mistaken sentence would be
 ceremony; errata are the cheaper mechanism, and the affected entry carries a
 pointer line. Where a correction changes a decision, it gets an ADR instead.
 
+**E-18 — E-13, "or" should be "and", and one of the two alternatives does
+nothing on its own.** E-13 closes by saying the O(n²) can be removed by "the
+compiler to kill a slot on its last use (ADR-006's optional reuse pass,
+extended) **or** a call protocol where a primitive consumes its arguments."
+Measured 2026-08-02, by printing `Rc::strong_count` on both sides of `conj`'s
+clone: they are not alternatives, and the first one alone cannot work at all.
+
+| program | count at the slot | after `conj`'s own clone |
+|---|---:|---:|
+| `(conj (vector) 1)` — a temporary, no other holder | 1 | **2** |
+| `(loop [out []] … (recur (conj out i)))` | 2 | 3 |
+| `(def v [1 2]) (conj v 3)` | 3 | 4 |
+
+The first row is the one that settles it. With **no** live local, no global, and
+nothing else referencing the vector — the best case a last-use pass could ever
+produce — the count at `Rc::make_mut` is still 2, because `conj` itself does
+`x.clone()` on the argument before mutating it. A compiler pass that killed
+every dead slot perfectly would take the loop from 3 to 2 and change nothing
+observable.
+
+So the consuming half is **necessary**: something has to take the value *out of
+the argument slot* rather than clone it, which needs a native to receive its
+arguments mutably. `native_call` currently passes `&ex.slots[..]`, and its
+comment explains why — the arguments are borrowed in place rather than copied.
+That borrow is exactly what has to change.
+
+And the last-use half is necessary too, because it is what removes the second
+row's extra reference: consuming the slot in a loop gets 3 to 2, not to 1. Both,
+or neither pays.
+
+The decision this corrects nothing about — ADR-041's flat `Vec` with
+copy-on-write still stands, and E-13's finding that it does not yet pay is
+confirmed rather than weakened. What is wrong is the sentence naming the fix,
+and it matters because it is the sentence anyone costing the work would read
+first: it makes the cheaper-sounding option look sufficient when it is inert.
+Now owned by **Q37**.
+
 **E-17 — E-16, a number that should not have been written down.** That erratum
 corrects ADR-055's "eight mutations" to "eighteen", and was stale within the day:
 the set is larger again, and will be larger still. Both entries state an

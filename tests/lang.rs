@@ -239,6 +239,52 @@ fn a_listing_reports_the_kind_of_each_entry() {
     );
 }
 
+/// BUILD.md: anything in `examples/` needs a check that runs, or it is a file
+/// nobody notices has rotted. `the_editor_shell_still_fits_the_core` is the
+/// other one; this is `xgrep`'s.
+///
+/// Unlike the editor shell, this one can assert the whole output rather than
+/// merely that it evaluates — a grep over a fixture is deterministic in a way a
+/// terminal program is not, and ADR-060 sorting the listing is what makes the
+/// order of the *files* deterministic too. Without that sort this test would
+/// pass or fail by filesystem.
+#[test]
+#[cfg(feature = "fs")]
+fn the_grep_example_still_runs() {
+    let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("xgrep");
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(dir.join("skipped-dir")).expect("the fixture builds");
+    std::fs::write(dir.join("a.txt"), "alpha\nbeta gamma\ndelta\n").expect("writes");
+    std::fs::write(dir.join("b.txt"), "gamma only\nnothing here\n").expect("writes");
+    std::fs::write(dir.join("c.txt"), "no match at all\n").expect("writes");
+
+    let out = Command::new(bin())
+        .current_dir(repo_root())
+        .arg("run")
+        .arg("examples/xgrep.xs")
+        .arg("gamma")
+        .arg(dir.to_str().expect("a UTF-8 target directory"))
+        .output()
+        .expect("runs");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(out.status.success(), "xgrep runs\n{stdout}");
+
+    // The line numbers are one-based and the directory is not descended into.
+    // A `skipped-dir` in the output would mean `:kind` stopped being consulted.
+    assert!(
+        stdout.contains("a.txt:2:beta gamma\nb.txt:1:gamma only\n"),
+        "expected both matches in file order, got {stdout}"
+    );
+    assert!(
+        !stdout.contains("skipped-dir"),
+        "a directory was read as a file"
+    );
+    assert!(
+        !stdout.contains("c.txt"),
+        "a file with no match reported one"
+    );
+}
+
 /// The runner has to be able to fail, which is not obvious from a suite that
 /// passes: a harness that swallowed a throw, or a driver that exited 0 on one,
 /// would make every assertion above decorative.

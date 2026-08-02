@@ -241,11 +241,12 @@ gained `term` alone as a fourth point.
 
 **Sharpened 2026-08-02 by `notes/the-grep-program.md`**, which was written to
 be the program that asked and was not. A grep over all of `docs/` — 22 files,
-14,000 lines — runs in 0.72 s in debug, so nothing about it wants to report
-progress. What that measured is the *shape* of the program that would: not one
-that reads many files, but one that reads a **big** one, since Q37's 3.84× per
-doubling puts a single 30,000-line file past a second on its own. The wait is
-now for that program rather than for the language to be able to express one.
+14,000 lines — runs in 0.72 s in debug and about 0.1 s in release, so nothing
+about it wants to report progress. What that measured is the *shape* of the
+program that would: not one that reads many files, but one that reads a **big**
+one, since Q37's quadratic puts a single 14,500-line file past a second and a
+64,000-line one at nineteen. The wait is now for that program rather than for
+the language to be able to express one.
 
 **Still open: `io/stdout` is all-or-nothing.** A program that wants incremental
 output to a *pipe* — a progress line, a log, anything long-running that is not a
@@ -320,28 +321,37 @@ open" about a number listed under *Resolved* at the top of this file. A problem
 that is simultaneously resolved and open is one nobody owns, and this is the
 largest known defect in the system.
 
-**The evidence, and it is now three independent measurements.**
+**The evidence.**
 
 - The editor's `map`: **3.87×** per doubling of input, 8,000 elements at 272 ms
   against 2,000 at 18 ms (`notes/the-editor-program.md`).
-- `xgrep`'s `split`: **3.84×** per doubling, 8,000 lines at 1.92 s against
-  1,000 at 0.04 s (`notes/the-grep-program.md`). A different function in a
-  different program, arriving at the editor's figure to two significant
-  figures.
 - E-13's instrumentation: `copied=true` on every iteration of a five-element
   build, and replacing `make_mut` with an unconditional clone survived the
   entire suite. The two are indistinguishable today.
+- E-18's refcounts, which are what say *why*: even a temporary with no other
+  holder anywhere reaches `make_mut` at 2.
+- `xgrep`'s `split`, **measured in release across a 16× range** and fitting n²
+  to within 7% end to end:
 
-Attributed: reading `docs/ADR.md` is below the timer's resolution and reading
-*and splitting* it is 160 ms, so `split` is essentially the whole cost of a
-grep over the documentation. Debug numbers — release does not link on the
-machine that measured them — so the ratios are the load-bearing part and the
-absolute figures want re-running.
+| lines in one file | release | ns per line² |
+|---:|---:|---:|
+| 2,000 | 0.02 s | 5.00 |
+| 4,000 | 0.07 s | 4.38 |
+| 8,000 | 0.29 s | 4.53 |
+| 16,000 | 1.20 s | 4.69 |
+| 32,000 | 4.84 s | 4.73 |
+| 64,000 | **19.09 s** | 4.66 |
 
-**The threshold this puts a number on.** At 3.84× per doubling, a single file
-of about **30,000 lines** takes a whole-file pass past a second on its own.
-That is an ordinary log or CSV export, so this stops being theoretical at a
-file size that is not unusual.
+Ratio **4.0× per doubling**, which is the asymptote for a pure quadratic; the
+earlier debug figure of 3.84× was the same curve with a larger constant. The
+profile moves the constant by about 6.6× and does not touch the exponent, so
+nothing here was an artefact of having measured debug.
+
+**The threshold.** **One second at about 14,500 lines**, and a 64,000-line log
+takes nineteen. *An earlier version of this entry said 30,000 lines and was
+wrong by 2× in the flattering direction* — it extrapolated upward from a debug
+run that had already passed a second at 8,000 lines. The corrected figure is
+what makes this urgent rather than eventual: 14,500 lines is not a large file.
 
 **The candidates, and what each costs.** Not ordered, and none chosen.
 

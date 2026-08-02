@@ -149,11 +149,19 @@ accumulates with `str`, and each step copies the string built so far.
 until 2026-08-02: ADR-053 gave them `vec-slice` and nothing came back to strike
 them out. Check the prelude before trusting any membership here.
 
-Measured three times, twice by doubling: `map` over 8,000 elements is 272 ms
-against 18 ms at 2,000 (**3.87×** per doubling), and `split` over 8,000 lines is
-1.92 s against 0.04 s at 1,000 (**3.84×**). Fine at the sizes the corpus uses
-and a wall at the sizes a real file has — about **30,000 lines in one file** is
-where a whole-file pass passes a second.
+Measured in release across a 16x range of sizes, and the fit is a textbook n²:
+4.4 to 4.7 ns per line² from 2,000 lines to 32,000, ratio **4.0x per doubling**.
+
+| lines in one file | whole-file pass |
+|---:|---:|
+| 8,000 | 0.29 s |
+| 16,000 | 1.2 s |
+| 32,000 | 4.84 s |
+| 64,000 | **19.1 s** |
+
+**One second lands at about 14,500 lines**, and an ordinary 64,000-line log
+takes nineteen. That is the number to remember; an earlier version of this
+entry said 30,000 and was wrong by 2x in the flattering direction.
 
 Owned by **Q37**. It is not Q6: that number is retired, and was still being
 cited as open by five documents including this one.

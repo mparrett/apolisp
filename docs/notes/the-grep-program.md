@@ -17,7 +17,7 @@ is not slow enough to want the thing it was written to justify.
 | | Claim | Result |
 |---|---|---|
 | P1 | ≤60 code lines, nothing hand-rolled | **Split** — 38 lines, but one hand-rolled function |
-| P2 | The quadratic is the wall, `split` is where | **Confirmed**, with a caveat on the absolute number |
+| P2 | The quadratic is the wall, `split` is where | **Confirmed** on the ratio, **refuted** on the absolute number |
 | P3 | All progress arrives at once, at exit | **Confirmed** |
 | P4 | The run is slow enough for that to matter | **Refuted** |
 | P5 | `:kind` is enough to skip a subdirectory | **Confirmed** |
@@ -36,7 +36,7 @@ One file, one match, timed end to end:
 Predicted "more than 3× per doubling"; measured 3.84× at the top. That is the
 same figure the editor's `map` came in at (3.87×), from a different function in
 a different program, which is worth more than either number alone: it is
-E-11/Q6's constant showing up twice independently.
+the same constant showing up twice independently (now Q37; E-11/Q6 was the wrong citation, since Q6 is retired).
 
 Attributed, on `docs/ADR.md` at 3,843 lines:
 
@@ -45,14 +45,27 @@ read the file            0.00 s   (below the timer's resolution)
 read and split it        0.16 s
 ```
 
-So `split` is essentially the whole cost, as predicted. **The caveat is that
-these are debug numbers.** `cargo build --release` does not link on this machine
-(the Xcode license has not been accepted), so the second half of P2 — "ADR.md
-costs more than 50 ms" — is confirmed at 160 ms in debug and is probably
-*refuted* in release, where a 5–10× profile gap would put it at 16–32 ms. The
-ratio claim is profile-independent and stands; the absolute one should be
-re-run by anyone who can build release, and is marked here rather than quietly
-counted as a win.
+So `split` is essentially the whole cost, as predicted.
+
+**Re-run in release, later the same day**, once the toolchain was fixed. The
+debug caveat this note originally carried is withdrawn: the profile changes the
+constant and not the exponent, so nothing above was an artefact.
+
+| lines in one file | release | ns per line² |
+|---:|---:|---:|
+| 2,000 | 0.02 s | 5.00 |
+| 4,000 | 0.07 s | 4.38 |
+| 8,000 | 0.29 s | 4.53 |
+| 16,000 | 1.20 s | 4.69 |
+| 32,000 | 4.84 s | 4.73 |
+| 64,000 | 19.09 s | 4.66 |
+
+A stable 4.4–4.7 ns per line² across a 16× range, which is as clean an n² fit
+as this project has measured anything. Release is about 6.6× faster than debug
+and the ratio per doubling goes *up* rather than down — 4.0×, the asymptote —
+because the quadratic term dominates a smaller constant sooner. The half of P2
+that predicted ">50 ms for ADR.md" is refuted in release, where it is about
+25 ms.
 
 ## P4 — refuted, and that is the useful result
 
@@ -68,12 +81,16 @@ It is not. And the pre-registration committed in advance to what that means:
 > either.
 
 So Q33 shape 4 stays open and stays unbuilt. What this program did establish is
-the *size* of the workload that would ask: at 3.84× per doubling, a single file
-of about 30,000 lines takes this past a second on its own, and that is a real
-file — a log, a CSV export, a concatenated corpus. **The program that wants a
-flush point is not one that reads many files, it is one that reads a big one.**
-That is a sharper target than "wait for a program", and it is the thing to
-recognise rather than a reason to build now.
+the *size* of the workload that would ask. **The program that wants a flush
+point is not one that reads many files, it is one that reads a big one.**
+
+**A correction, and it is mine.** This note first put that threshold at "about
+30,000 lines", and it is **14,500** in release. The error was arithmetic rather
+than measurement: the debug run had already passed a second at 8,000 lines, and
+the extrapolation went upward from there instead of downward. It was wrong in
+the flattering direction — it made the wall further away than it is — which is
+the direction to be suspicious of. Corrected in `TRAPS.md` and Q37 as well as
+here.
 
 P3 held exactly as documented: the first line of output arrived 0.747 s into a
 0.75 s run, i.e. at exit, all 703 lines at once.

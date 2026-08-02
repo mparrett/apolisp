@@ -167,3 +167,43 @@
 (is (io/open? io/stdout))
 (is (io/open? io/stdin))
 (is= :vm-error (get (try (io/read-all io/stdout) (catch e e)) :type))
+
+; --- enumerating a directory (ADR-060) ---------------------------------------
+
+; `path-a` and `path-b` were written above; `z.txt` and `sub` go in now, in an
+; order chosen to be wrong. Creation order is what several filesystems hand
+; back, so a listing that came out `a b z sub` by luck would prove nothing —
+; the entry created last sorts in the middle.
+(with-open [f (io/open (str tmp-dir "/z.txt") :write)]
+  (io/write f "z"))
+(with-open [f (io/open (str tmp-dir "/m.txt") :write)]
+  (io/write f "m"))
+
+(def listing (io/read-dir tmp-dir))
+(is= 4 (count listing))
+
+; Sorted by name, byte order, and asserted through `str` rather than by
+; equality. ADR-041 makes `=` cross list and vector, so an assertion written as
+; `(is= [...] listing)` cannot see the representation — E-16 is the record of
+; that exact hole surviving three assertions written to close it.
+(is= "[{:name \"a.txt\" :kind :file} {:name \"b.txt\" :kind :file} {:name \"m.txt\" :kind :file} {:name \"z.txt\" :kind :file}]"
+  (str listing))
+
+; Every entry carries both keys, and `:kind` is one of the four. `contains?`
+; rather than a nil test: `get` cannot tell an absent key from a nil one
+; (TRAPS.md), and absence is exactly the claim here.
+(is (contains? (first listing) :name))
+(is (contains? (first listing) :kind))
+(is= :file (get (first listing) :kind))
+
+; `:dir` and `:symlink` are not asserted here, and the reason is a limit of
+; this rung rather than an omission: the language cannot create a directory or
+; a link, so a suite written in it can only ever see `:file`. That half is
+; pinned from the runner, which can build the fixture (`tests/lang.rs`).
+
+; The failure shape is the one shape, and it names the directory it was for.
+(def missing (try (io/read-dir (str tmp-dir "/nope")) (catch e e)))
+(is= :io-error (get missing :type))
+(is= :read-dir (get missing :operation))
+(is= :not-found (get missing :kind))
+(is= (str tmp-dir "/nope") (get missing :path))

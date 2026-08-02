@@ -5487,10 +5487,14 @@ pub mod host {
         Accept,
         Encode,
         Decode,
+        /// ADR-060. Its own operation rather than `:open` or `:read`, because
+        /// the whole point of the closed set is that a handler can tell which
+        /// call failed, and nothing else enumerates.
+        ReadDir,
     }
 
     impl IoOp {
-        pub const ALL: [IoOp; 9] = [
+        pub const ALL: [IoOp; 10] = [
             IoOp::Open,
             IoOp::Close,
             IoOp::Read,
@@ -5500,6 +5504,7 @@ pub mod host {
             IoOp::Accept,
             IoOp::Encode,
             IoOp::Decode,
+            IoOp::ReadDir,
         ];
 
         pub fn name(self) -> &'static str {
@@ -5513,6 +5518,7 @@ pub mod host {
                 IoOp::Accept => "accept",
                 IoOp::Encode => "encode",
                 IoOp::Decode => "decode",
+                IoOp::ReadDir => "read-dir",
             }
         }
     }
@@ -5604,6 +5610,12 @@ pub mod host {
 
     #[cfg(feature = "fs")]
     fn install_fs(vm: &mut Vm) {
+        // Imported here rather than at the top of the module: every one of
+        // these is used only by `io/read-dir`, and a `use` outside this
+        // function is an unused import in the build ADR-013 exists to keep
+        // compiling. The subtraction gate caught exactly that.
+        use crate::value::{KwId, MapObj, StrObj, VecObj};
+
         vm.native("io/open", 2, false, |vm, a| {
             let path = string_arg(&a[0], "io/open")?.to_string();
             let mode = match &a[1] {
@@ -5632,6 +5644,61 @@ pub mod host {
                 Ok(f) => Ok(Value::Handle(vm.open_handle(Host::File(f)))),
                 Err(e) => Err(host_failed(IoOp::Open, Some(path), &e)),
             }
+        });
+
+        // ADR-060. A call rather than a handle: a directory is enumerated once
+        // and the vector is the result, so there is nothing to close and
+        // nothing for a snapshot to refuse.
+        vm.native("io/read-dir", 1, false, |vm, a| {
+            let path = string_arg(&a[0], "io/read-dir")?.to_string();
+            let fail = |e: &std::io::Error| host_failed(IoOp::ReadDir, Some(path.clone()), e);
+            let mut entries: Vec<(String, &'static str)> = Vec::new();
+            for entry in std::fs::read_dir(&path).map_err(|e| fail(&e))? {
+                let entry = entry.map_err(|e| fail(&e))?;
+                let name = entry.file_name().into_string().map_err(|_| {
+                    io_fault(
+                        IoOp::ReadDir,
+                        IoKind::InvalidData,
+                        "a directory entry's name is not valid UTF-8",
+                    )
+                })?;
+                // `file_type` describes the link and not its target, which is
+                // ADR-060's decision rather than an oversight: following it is
+                // a second syscall that can fail on its own, and a broken link
+                // is not an error in the listing.
+                let t = entry.file_type().map_err(|e| fail(&e))?;
+                entries.push((
+                    name,
+                    if t.is_symlink() {
+                        "symlink"
+                    } else if t.is_dir() {
+                        "dir"
+                    } else if t.is_file() {
+                        "file"
+                    } else {
+                        "other"
+                    },
+                ));
+            }
+            // BUILD.md's fifth rule, at a syscall rather than at a hash map.
+            // Directory order is the filesystem's and agrees across neither
+            // machines nor runs, and it reaches a golden through any program
+            // that prints a listing.
+            entries.sort();
+
+            let name_key = Value::Keyword(KwId(vm.interner.intern("name")));
+            let kind_key = Value::Keyword(KwId(vm.interner.intern("kind")));
+            let items = entries
+                .into_iter()
+                .map(|(name, kind)| {
+                    let kind = Value::Keyword(KwId(vm.interner.intern(kind)));
+                    Value::Map(Rc::new(MapObj(vec![
+                        (name_key.clone(), Value::Str(Rc::new(StrObj(name)))),
+                        (kind_key.clone(), kind),
+                    ])))
+                })
+                .collect();
+            Ok(Value::Vec(Rc::new(VecObj(items))))
         });
     }
 

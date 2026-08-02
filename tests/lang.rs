@@ -189,6 +189,56 @@ fn a_program_receives_the_arguments_after_its_path() {
     );
 }
 
+/// ADR-060's other three kinds, which `tests/lang/io.xs` cannot reach.
+///
+/// The language can create a file and nothing else — no mkdir, no symlink — so
+/// a suite written in it sees `:file` for every entry and would pass against an
+/// implementation that only ever answered `:file`. The fixture has to be built
+/// from outside, which is this file's job for the same reason the arguments
+/// above are.
+///
+/// The symlink is the load-bearing one: ADR-060 says a link to a directory is
+/// `:symlink` and not `:dir`, and that is a decision rather than a fact about
+/// the syscall — `metadata` would have said `:dir`.
+#[test]
+#[cfg(feature = "fs")]
+fn a_listing_reports_the_kind_of_each_entry() {
+    let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("read-dir-kinds");
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(dir.join("a-dir")).expect("the fixture builds");
+    std::fs::write(dir.join("b-file"), "x").expect("the fixture builds");
+    #[cfg(unix)]
+    std::os::unix::fs::symlink(dir.join("a-dir"), dir.join("c-link")).expect("the fixture builds");
+
+    let text = dir.to_str().expect("a UTF-8 target directory");
+    let joined = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("read-dir-kinds.xs");
+    std::fs::write(
+        &joined,
+        format!("(println (str (io/read-dir \"{text}\")))\n"),
+    )
+    .expect("writes");
+
+    let out = Command::new(bin())
+        .arg("run")
+        .arg(&joined)
+        .output()
+        .expect("runs");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(out.status.success(), "the listing runs\n{stdout}");
+
+    // Printed in full rather than probed key by key, so the sort order and the
+    // kinds are one assertion and neither can drift past the other.
+    let expected = if cfg!(unix) {
+        "[{:name \"a-dir\" :kind :dir} {:name \"b-file\" :kind :file} {:name \"c-link\" :kind :symlink}]"
+    } else {
+        "[{:name \"a-dir\" :kind :dir} {:name \"b-file\" :kind :file}]"
+    };
+    assert!(
+        stdout.contains(expected),
+        "expected {expected}\ngot {stdout}"
+    );
+}
+
 /// The runner has to be able to fail, which is not obvious from a suite that
 /// passes: a harness that swallowed a throw, or a driver that exited 0 on one,
 /// would make every assertion above decorative.

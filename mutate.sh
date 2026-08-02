@@ -52,7 +52,7 @@ dead=()
 seen=()
 
 restore() {
-  for f in src/lib.rs src/prelude.xs tests/corpus/editor.xs; do
+  for f in src/lib.rs src/main.rs src/adapters/tcp.rs src/prelude.xs tests/corpus/editor.xs; do
     [ -f "/tmp/apolisp-mut-$(basename "$f")" ] && cp "/tmp/apolisp-mut-$(basename "$f")" "$f"
   done
 }
@@ -61,7 +61,7 @@ cleanup() {
   rmdir "$LOCK" 2>/dev/null
 }
 trap cleanup EXIT INT TERM
-for f in src/lib.rs src/prelude.xs tests/corpus/editor.xs; do
+for f in src/lib.rs src/main.rs src/adapters/tcp.rs src/prelude.xs tests/corpus/editor.xs; do
   cp "$f" "/tmp/apolisp-mut-$(basename "$f")"
 done
 
@@ -548,6 +548,59 @@ mutation src/lib.rs \
   'if false {' \
   "$VM" \
   'tail calls are emitted, without which a tail loop grows the frame stack'
+
+# --- ADR-058 and ADR-059: the host boundary ---------------------------------
+
+ARGS='--test lang a_program_receives_the_arguments_after_its_path'
+ADAPT='--test adapters'
+
+mutation src/main.rs \
+  'apolisp::host::set_args(&mut vm, &args[3..]);' \
+  'apolisp::host::set_args(&mut vm, &args[2..]);' \
+  "$ARGS" \
+  'the driver passes the arguments after the file, not the file itself (ADR-058)'
+
+# The corpus entry is what makes this visible. Dropping the global from the
+# `Image` does not fault on resume: the fresh VM `restore` builds has already
+# bound it to `[]`, so a lost argument vector reads as a program that was given
+# none. Quiet, which is the only kind of snapshot bug there is.
+mutation src/lib.rs \
+  'vm.gensym = img.gensym;' \
+  'vm.gensym = img.gensym;
+        crate::host::set_args(&mut vm, &[] as &[&str]);' \
+  "$SNAP" \
+  'a programs arguments survive the round trip as an ordinary global (ADR-058)'
+
+mutation src/adapters/tcp.rs \
+  'IoKind::Timeout,
+                        "no connection arrived before the deadline",' \
+  'IoKind::WouldBlock,
+                        "no connection arrived before the deadline",' \
+  "$ADAPT" \
+  'an expired accept deadline is :timeout, because this clock is ours (ADR-059)'
+
+mutation src/adapters/tcp.rs \
+  'let restored = l
+        .set_nonblocking(false)
+        .map_err(|e| host_failed(IoOp::Accept, None, &e));
+    outcome.and_then(|accepted| restored.map(|()| accepted))' \
+  '    outcome' \
+  "$ADAPT" \
+  'the poll restores the listener, so clearing a deadline blocks again (ADR-059)'
+
+# Declared. The first version of the test above missed this one — it timed out,
+# reconnected, accepted again, and passed with the line deleted, because a second
+# accept re-enters the poll and sets non-blocking itself. That test was rewritten
+# to use a late-connecting peer; this mutation is the *other* restore, and no
+# test here can separate it on the platforms this runs on.
+mutation src/adapters/tcp.rs \
+  'stream
+            .set_nonblocking(false)
+            .map_err(|e| host_failed(IoOp::Accept, None, &e))?;' \
+  '' \
+  "$ADAPT" \
+  'an accepted socket is put back into blocking mode explicitly (ADR-059)' \
+  'whether accept inherits the listeners mode is platform-specific, and neither macOS nor Linux inherits it — so on every platform this suite runs on, the line is unobservable and the guard is for the platform that does'
 
 echo
 echo "=== $flipped of $total flipped, $survived_ok survived as declared"

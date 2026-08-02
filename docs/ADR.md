@@ -3556,6 +3556,76 @@ a reason; see above.
 
 ---
 
+### ADR-060 — `io/read-dir`, sorted, and an entry says what kind it is
+
+*(New, 2026-08-02. Adds to the `fs` capability ADR-042 opened. Does not change
+the handle model: a directory is read and returned, never held.)*
+
+**Decision.** `(io/read-dir path)` returns a **vector of maps**, one per entry,
+sorted by `:name` in byte order:
+
+```clojure
+[{:name "a.xs" :kind :file} {:name "sub" :kind :dir}]
+```
+
+`:kind` is a closed set of four — `:file`, `:dir`, `:symlink`, `:other` — and
+is **not** followed through a symlink: a link to a directory is `:symlink`, not
+`:dir`. `:name` is the entry's own name, not a path. `.` and `..` are not
+included, because the underlying `read_dir` does not produce them.
+
+It is gated on `fs`, like every other filesystem primitive, and it is a plain
+call rather than a handle: a directory is enumerated once and the vector is the
+result, so there is nothing to close and nothing for a snapshot to refuse.
+
+**Why.** `fs` was `open`, `read`, `read-all`, `write`, `close` — a capability
+that can read a file it is told the name of and cannot find out any names. A
+batch tool cannot enumerate its own inputs, which rules out most of what a
+program would do with a filesystem at all.
+
+**Why sorted, and why that is not a convenience.** Directory order is whatever
+the filesystem hands back — creation order on some, hash order on others, and
+stable on neither across machines. BUILD.md's fifth rule names directory
+listings specifically as something that must be ordered explicitly, and the
+reason is the oracle: an unsorted listing that reaches a `.out` makes the
+golden flap, a flapping golden gets disabled, and then there is no oracle. This
+is one of the few places the rule is about a syscall rather than about a hash
+map, and sorting inside the primitive is what keeps every caller from having to
+remember. `tests/lang.rs` already sorts its own `read_dir` for the same reason,
+which is the pattern being made a language guarantee rather than a habit.
+
+**Why a map per entry rather than a vector of names.** Almost every use skips
+one kind or the other, and with no type predicates in the language (TRAPS.md) a
+program that got bare names would have to `try` an `io/open` on each to find
+out what it had. The kind comes off the same directory read on both supported
+platforms, so carrying it is free where asking again is a syscall per entry.
+
+**Why `:symlink` is its own kind rather than resolved.** Following a link means
+a second syscall that can fail on its own — a broken link is not an error in
+the *listing* — and it means a listing can recurse. Reporting the link as a
+link is the answer that cannot be wrong; a program that wants the target can
+open it and find out.
+
+**Why the name and not the path.** There is no path type and no join
+primitive, so returning a joined path would put string concatenation with a
+platform separator inside the language, and it would do it in the one place a
+program cannot opt out of. The caller already holds the directory it asked
+about. `(str dir "/" name)` is the program's line to write.
+
+**Cost.** A vector allocated per call, and a whole directory read into memory
+before the first entry is visible — a listing is not a stream. At the sizes
+anything here has run that is not measurable, and ADR-012's refusal of laziness
+means a streaming version would have no shape to take anyway.
+
+**Rejected.** *A directory handle*, opened and closed like a file — it makes
+enumeration a resource, and a resource is something a snapshot has to refuse
+(ADR-043 part 5), which would mean a program that lists a directory cannot be
+suspended. That is a real cost for an operation that completes immediately.
+*`:dir` as a boolean* — three of the four kinds are not directories and a
+boolean says nothing about which. *Recursing* — a walk is a program, and it is
+a shorter one than the argument about what to do with a symlink loop.
+
+---
+
 ## Errata
 
 Factual corrections to entries whose **decision still stands**. A wrong reason is

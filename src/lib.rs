@@ -5230,7 +5230,7 @@ pub mod prim {
         vm.native("scalars-str", 1, false, |_, a| {
             let items = seq_items(&a[0], "scalars-str")?;
             let mut out = String::new();
-            for v in &items {
+            for v in items {
                 let n = index(v, "scalars-str")? as u32;
                 match char::from_u32(n) {
                     Some(c) => out.push(c),
@@ -5385,11 +5385,22 @@ pub mod prim {
 
     // --- collection helpers ---------------------------------------------------
 
-    fn seq_items(v: &Value, op: &str) -> Result<Vec<Value>, Fault> {
+    /// The elements of a sequence, **borrowed**.
+    ///
+    /// This returned `Vec<Value>` — a clone of the whole collection — until
+    /// 2026-08-02, which made `nth` O(n) in the collection rather than O(1) in
+    /// the index. ADR-041 part 1 makes every collection a flat `Vec` precisely
+    /// so that indexing is constant, so this was a defect against a standing
+    /// decision rather than a design choice, and it was invisible because the
+    /// name says "items" and the cost was in the word "clone".
+    ///
+    /// It went undiagnosed through three measurements of the quadratic: `conj`
+    /// was blamed for all of it, and `conj` was only ever half.
+    fn seq_items<'a>(v: &'a Value, op: &str) -> Result<&'a [Value], Fault> {
         match v {
-            Value::Nil => Ok(Vec::new()),
-            Value::List(l) => Ok(l.0.clone()),
-            Value::Vec(x) => Ok(x.0.clone()),
+            Value::Nil => Ok(&[]),
+            Value::List(l) => Ok(&l.0),
+            Value::Vec(x) => Ok(&x.0),
             other => Err(fault(
                 Kind::Type,
                 format!("`{op}` needs a sequence, not a {}", kind_name(other)),

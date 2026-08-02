@@ -35,6 +35,12 @@ struct Transcript {
 /// from the one the driver runs.
 fn build(src: &str) -> (Vm, Chunk) {
     let mut machine = Vm::new();
+    // ADR-058, for every program rather than for the one that reads them. The
+    // arguments are a global and globals are cells, so they are in every
+    // `Image` this file takes whether the program looks at them or not —
+    // setting them here is what makes that true of the harness too, and the
+    // corpus entry below is what makes it observable.
+    apolisp::host::set_args(&mut machine, &ARGS);
     let forms = reader::read_all(src, &mut machine.interner)
         .map_err(|e| e.render("<test>", src))
         .expect("the test source reads");
@@ -105,10 +111,26 @@ fn cut_and_resume(src: &str, cut: u64) -> Transcript {
     finish(&mut fresh, outcome)
 }
 
+/// What `build` hands every program as its arguments (ADR-058). Two of them,
+/// and distinguishable from each other, so a round trip that kept the vector
+/// and lost its order fails as loudly as one that dropped it.
+const ARGS: [&str; 2] = ["alpha", "beta"];
+
 /// The programs the property runs over. Each is here for a distinct piece of
 /// state that has to survive the round trip, named so a failure says which.
 const PROGRAMS: &[(&str, &str)] = &[
     ("globals and cells", "(def a 1) (def b (+ a 2)) (println a b) b"),
+    // ADR-058. The failure this catches is quiet rather than loud: the fresh VM
+    // `restore` builds has already bound `*command-line-args*` to `[]`, because
+    // that is what `host::install` does — so an encoder that dropped the global
+    // would not fault on resume, it would answer the empty vector and print a
+    // shorter line. BUILD.md's limit on this property is the reason the entry
+    // exists at all: adding state means adding a program that creates it, and
+    // the property will not ask.
+    (
+        "a program's arguments",
+        "(println (nth *command-line-args* 1)) (str *command-line-args*)",
+    ),
     (
         "closures and captures",
         "(def mk (fn mk [n] (fn [] n))) (def f (mk 7)) (println (f)) (f)",

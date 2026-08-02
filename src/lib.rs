@@ -5635,6 +5635,24 @@ pub mod host {
     /// A snapshot refuses anything beyond them.
     pub const RECONSTRUCTIBLE: usize = 2;
 
+    /// ADR-058: the arguments after the file, as a vector of strings.
+    ///
+    /// A global rather than a native, so the `Image` carries it as an ordinary
+    /// cell and there is no capture arm to forget. `set_global` is
+    /// create-or-rebind (ADR-027), so calling this twice rebinds rather than
+    /// shadowing — which is what lets `install` bind the empty default and the
+    /// driver overwrite it.
+    pub fn set_args<S: AsRef<str>>(vm: &mut Vm, args: &[S]) {
+        let items: Vec<Value> = args
+            .iter()
+            .map(|s| Value::Str(Rc::new(crate::value::StrObj(s.as_ref().to_string()))))
+            .collect();
+        vm.set_named_global(
+            "*command-line-args*",
+            Value::Vec(Rc::new(crate::value::VecObj(items))),
+        );
+    }
+
     pub fn install(vm: &mut Vm) {
         // Not functions. ADR-038 made a primitive an ordinary global, so the
         // two standard streams are *values* in the global table — one handle
@@ -5644,6 +5662,11 @@ pub mod host {
         let stdout = vm.open_handle(Host::Stdout);
         vm.set_named_global("io/stdin", Value::Handle(stdin));
         vm.set_named_global("io/stdout", Value::Handle(stdout));
+        // ADR-058. Bound here rather than by the driver so that a program's
+        // arguments are empty rather than *unbound* everywhere the driver is
+        // not — the REPL, the tests, an embedder — and so the name is a
+        // language fact rather than something `main.rs` decides.
+        set_args(vm, &[] as &[String]);
 
         #[cfg(feature = "fs")]
         install_fs(vm);

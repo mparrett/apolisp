@@ -126,6 +126,69 @@ fn the_in_language_suite_passes() {
     }
 }
 
+/// ADR-058. The suites above cannot hold this one: they are run with no
+/// arguments, so what a program does with arguments it was *given* is only
+/// observable from something that can pass them — which is the driver, and
+/// which is this file's one job.
+///
+/// Three claims, and the third is the one that is quiet when it breaks. The
+/// arguments arrive in order; the program's own path is not among them; and a
+/// run with no arguments binds the empty vector rather than leaving the name
+/// unbound — because an unbound global is a throw and a *nil* would be truthy
+/// nowhere and falsy in `if`, so both failures look like program bugs at the
+/// first `count`.
+#[test]
+fn a_program_receives_the_arguments_after_its_path() {
+    let harness = std::fs::read_to_string(repo_root().join("tests/lang/harness.xs"))
+        .expect("the harness reads");
+    let joined = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("args.xs");
+    std::fs::write(
+        &joined,
+        format!(
+            "{harness}\n\
+             (is= 2 (count *command-line-args*))\n\
+             (is= \"alpha\" (nth *command-line-args* 0))\n\
+             (is= \"beta\" (nth *command-line-args* 1))\n\
+             ; A vector, not a list — the printed forms differ and `=` does not\n\
+             ; (ADR-041), so this is the only assertion here that can see it.\n\
+             (is= \"[\\\"alpha\\\" \\\"beta\\\"]\" (str *command-line-args*))\n"
+        ),
+    )
+    .expect("writes");
+
+    let out = Command::new(bin())
+        .arg("run")
+        .arg(&joined)
+        .arg("alpha")
+        .arg("beta")
+        .output()
+        .expect("runs");
+    assert!(
+        out.status.success(),
+        "arguments should reach the program\n{}",
+        String::from_utf8_lossy(&out.stdout)
+    );
+
+    // The same file with nothing after it. `count` is what makes the empty
+    // vector distinguishable from a missing one: an unbound `*command-line-args*`
+    // throws before `count` is reached, and the transcript says which.
+    std::fs::write(
+        &joined,
+        format!("{harness}\n(is= 0 (count *command-line-args*))\n"),
+    )
+    .expect("writes");
+    let out = Command::new(bin())
+        .arg("run")
+        .arg(&joined)
+        .output()
+        .expect("runs");
+    assert!(
+        out.status.success(),
+        "no arguments should be the empty vector, not unbound\n{}",
+        String::from_utf8_lossy(&out.stdout)
+    );
+}
+
 /// The runner has to be able to fail, which is not obvious from a suite that
 /// passes: a harness that swallowed a throw, or a driver that exited 0 on one,
 /// would make every assertion above decorative.

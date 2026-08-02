@@ -32,7 +32,8 @@ fn main() -> ExitCode {
         return print_prelude();
     }
     if args.len() < 3 {
-        eprintln!("usage: apolisp <read|spans|expand|compile|run> <file.xs>");
+        eprintln!("usage: apolisp <read|spans|expand|compile> <file.xs>");
+        eprintln!("       apolisp run <file.xs> [args...]");
         return ExitCode::from(2);
     }
     let (cmd, path) = (args[1].as_str(), args[2].as_str());
@@ -142,6 +143,10 @@ fn main() -> ExitCode {
         // cannot be pinned, and milestone 4 adds the thrown-value half.
         "run" => {
             let mut vm = vm::Vm::new();
+            // ADR-058. Everything about what the name means is in `host`; this
+            // owns only the slice — the arguments after the file, which is the
+            // one thing the driver knows and the library cannot.
+            apolisp::host::set_args(&mut vm, &args[3..]);
             // Before the unit, for the reason the `compile` stage gives.
             let prelude = expand::prelude_definitions(&mut vm);
             let forms = match pipeline(&src, path, &mut vm) {

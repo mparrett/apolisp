@@ -266,6 +266,23 @@ the deviation most likely to be typed from muscle memory: an empty list is
 `(nil? more)` takes the opposite branch — and takes it silently, with no error
 anywhere. The compiler emitting `nil` here instead would be equally silent.
 
+**A local shadows a primitive, and there is no way to say the primitive.** The
+natural loop over a sequence is `(loop [rest xs] ... (recur (rest rest)))`, and
+it fails at run time with `:not-callable "cannot call a vector"` — the binding
+named `rest` shadows the primitive for the whole body, so the recursive step
+calls the vector. The message names the symptom, so the search starts at "why is
+a vector in function position" and the answer is one scope up.
+
+Clojure has the same shadowing and not the same trap, because `clojure.core/rest`
+is still reachable. ADR-027 fixes v1 at one namespace with no qualification, so
+here the shadowed primitive has **no spelling at all** inside that scope: it is
+gone rather than obscured. The only fix is renaming the binding, which means
+every program has to know which names are load-bearing before it picks a
+variable name — and the names most at risk are the ones a loop variable most
+wants, `rest` and `first` and `count`. Found by writing one
+(`notes/the-grep-program.md`), where it was the only finding not predicted in
+advance.
+
 **A `let`-bound function cannot call itself.** `(let [f (fn [] (f))] (f))` looks
 recursive and is not. ADR-033 makes `let` sequential, so the inner `f` is not in
 scope while its own initializer is compiled, and ADR-002/ADR-027 restrict

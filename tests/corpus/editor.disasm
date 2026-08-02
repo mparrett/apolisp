@@ -2058,11 +2058,11 @@ proto 38  <fn>  params 2  slots 22
     0012  MOVE        r14 <- r0              394:21
     0013  CALL        r11 <- r13(1)          394:16
     0014  GETGLOBAL   r15 <- +               394:25
-    0015  MOVE        r16 <- r1              394:27
+    0015  MOVEKILL    r16 <- r1              394:27
     0016  GETGLOBAL   r18 <- line-height     394:32
     0017  GETCAP      r19 <- c2              394:44
     0018  GETCAP      r20 <- c3              394:50
-    0019  MOVE        r21 <- r0              394:52
+    0019  MOVEKILL    r21 <- r0              394:52
     0020  CALL        r17 <- r18(3)          394:31
     0021  CALL        r12 <- r15(2)          394:24
     0022  TAILCALL    r10(2)                 394:9
@@ -2113,12 +2113,12 @@ proto 40  <fn>  params 3  slots 50
     0020  CALL        r16 <- r17(2)          403:11
     0021  JUMPUNLESS  r16, 0032              generated 402:9
     0022  GETSELF     r22 <- self            403:25
-    0023  MOVE        r23 <- r0              403:32
+    0023  MOVEKILL    r23 <- r0              403:32
     0024  GETGLOBAL   r26 <- inc             403:35
-    0025  MOVE        r27 <- r1              403:39
+    0025  MOVEKILL    r27 <- r1              403:39
     0026  CALL        r24 <- r26(1)          403:34
     0027  GETGLOBAL   r28 <- dec             403:43
-    0028  MOVE        r29 <- r2              403:47
+    0028  MOVEKILL    r29 <- r2              403:47
     0029  CALL        r25 <- r28(1)          403:42
     0030  TAILCALL    r22(3)                 403:25
     0031  JUMP        0059                   generated 402:9
@@ -2133,11 +2133,11 @@ proto 40  <fn>  params 3  slots 50
     0040  JUMPUNLESS  r30, 0051              generated 402:9
     0041  GETSELF     r38 <- self            404:42
     0042  GETGLOBAL   r42 <- inc             404:50
-    0043  MOVE        r43 <- r0              404:54
+    0043  MOVEKILL    r43 <- r0              404:54
     0044  CALL        r39 <- r42(1)          404:49
     0045  CONST       r40 <- k1              404:57
     0046  GETGLOBAL   r44 <- dec             404:60
-    0047  MOVE        r45 <- r2              404:64
+    0047  MOVEKILL    r45 <- r2              404:64
     0048  CALL        r41 <- r44(1)          404:59
     0049  TAILCALL    r38(3)                 404:42
     0050  JUMP        0059                   generated 402:9
@@ -2386,10 +2386,10 @@ proto 44  <fn>  params 3  slots 65
     0014  CALL        r10 <- r11(2)          451:11
     0015  JUMPUNLESS  r10, 0025              451:7
     0016  GETSELF     r16 <- self            452:9
-    0017  MOVE        r17 <- r0              452:16
-    0018  MOVE        r18 <- r1              452:18
+    0017  MOVEKILL    r17 <- r0              452:16
+    0018  MOVEKILL    r18 <- r1              452:18
     0019  GETGLOBAL   r20 <- conj            452:23
-    0020  MOVE        r21 <- r2              452:28
+    0020  MOVEKILL    r21 <- r2              452:28
     0021  CONST       r22 <- k0              452:32
     0022  CALL        r19 <- r20(2)          452:22
     0023  TAILCALL    r16(3)                 452:9
@@ -2409,19 +2409,19 @@ proto 44  <fn>  params 3  slots 65
     0037  JUMPUNLESS  r27, 0046              454:11
     0038  GETSELF     r35 <- self            455:13
     0039  GETGLOBAL   r39 <- inc             455:21
-    0040  MOVE        r40 <- r0              455:25
+    0040  MOVEKILL    r40 <- r0              455:25
     0041  CALL        r36 <- r39(1)          455:20
     0042  CONST       r37 <- k1              455:28
-    0043  MOVE        r38 <- r2              455:30
+    0043  MOVEKILL    r38 <- r2              455:30
     0044  TAILCALL    r35(3)                 455:13
     0045  JUMP        0074                   454:11
     0046  GETSELF     r41 <- self            456:13
-    0047  MOVE        r42 <- r0              456:20
+    0047  MOVEKILL    r42 <- r0              456:20
     0048  GETGLOBAL   r45 <- inc             456:23
     0049  MOVE        r46 <- r1              456:27
     0050  CALL        r43 <- r45(1)          456:22
     0051  GETGLOBAL   r47 <- conj            457:21
-    0052  MOVE        r48 <- r2              457:26
+    0052  MOVEKILL    r48 <- r2              457:26
     0053  GETGLOBAL   r51 <- get             457:35
     0054  GETCAP      r52 <- c1              457:39
     0055  CONST       r53 <- k2              457:45
@@ -2429,8 +2429,8 @@ proto 44  <fn>  params 3  slots 65
     0057  JUMPUNLESS  r50, 0064              457:30
     0058  GETGLOBAL   r54 <- wrap-seg        458:33
     0059  GETCAP      r55 <- c2              458:42
-    0060  MOVE        r56 <- r23             458:44
-    0061  MOVE        r57 <- r1              458:49
+    0060  MOVEKILL    r56 <- r23             458:44
+    0061  MOVEKILL    r57 <- r1              458:49
     0062  CALL        r49 <- r54(3)          458:32
     0063  JUMP        0072                   457:30
     0064  GETGLOBAL   r58 <- window          459:33
@@ -2439,7 +2439,7 @@ proto 44  <fn>  params 3  slots 65
     0067  CONST       r64 <- k3              459:51
     0068  CALL        r59 <- r62(2)          459:40
     0069  GETCAP      r60 <- c2              459:64
-    0070  MOVE        r61 <- r23             459:66
+    0070  MOVEKILL    r61 <- r23             459:66
     0071  CALL        r49 <- r58(3)          459:32
     0072  CALL        r44 <- r47(2)          457:20
     0073  TAILCALL    r41(3)                 456:13

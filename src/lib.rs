@@ -1167,6 +1167,17 @@ pub mod bytecode {
             dst: Slot,
             src: Slot,
         },
+        /// ADR-061 part 1. `Move`, and then `Nil` into `src`.
+        ///
+        /// Emitted only where liveness proves `src` is never read again, which
+        /// makes it observationally identical to `Move` — and drops the
+        /// reference the source slot was holding, which is the entire point:
+        /// E-18 measured that without it a consuming native still reaches
+        /// `Rc::make_mut` at a count of 2.
+        MoveKill {
+            dst: Slot,
+            src: Slot,
+        },
         /// The operand is the interned name, not a `CellId`: forward references
         /// then need no fixup, and the disassembly does not depend on the order
         /// globals were defined in (ADR-034). The VM still owns the cell
@@ -1387,6 +1398,7 @@ pub mod bytecode {
         match *i {
             Instr::Const { dst, k } => ("CONST", format!("r{dst} <- k{k}")),
             Instr::Move { dst, src } => ("MOVE", format!("r{dst} <- r{src}")),
+            Instr::MoveKill { dst, src } => ("MOVEKILL", format!("r{dst} <- r{src}")),
             Instr::GetGlobal { dst, name } => {
                 ("GETGLOBAL", format!("r{dst} <- {}", interner.name(name.0)))
             }
@@ -2285,6 +2297,172 @@ pub mod compile {
         }
     }
 
+    // --- ADR-061 part 1: which local reads are last uses ---------------------
+
+    /// The `Core::Local` occurrences whose slot may be cleared as they are
+    /// read, identified by address.
+    ///
+    /// Address identity rather than an occurrence index, because the
+    /// alternative is walking the tree twice and trusting the two walks to
+    /// agree on a count — which is a thing that goes wrong silently and stays
+    /// green, and this project has a note about how often that shape wins.
+    type Kills = std::collections::HashSet<usize>;
+
+    fn addr(e: &Expr) -> usize {
+        e as *const Expr as usize
+    }
+
+    /// Every local a subtree reads, including the ones a closure reads
+    /// invisibly. Used where the analysis gives up and wants everything live.
+    fn all_reads(e: &Expr, live: &mut std::collections::HashSet<LocalId>) {
+        match &e.core {
+            Core::Local(id) => {
+                live.insert(*id);
+            }
+            // A closure's captures are not `Core::Local` nodes — they are a
+            // list on the `FnDef` that the *enclosing* function's slots are
+            // read into at `Closure` (ADR-002, flat closures, copied at
+            // creation). A walk that only looked at `Core::Local` would not see
+            // them, and would happily clear a slot a closure was about to
+            // capture.
+            Core::Fn(def) => {
+                for c in &def.captures {
+                    if let CaptureSpec::Local(id) = c {
+                        live.insert(*id);
+                    }
+                }
+            }
+            Core::Literal(_) | Core::Capture(_) | Core::SelfFn | Core::Global(_) => {}
+            Core::If(a, b, c) => {
+                all_reads(a, live);
+                all_reads(b, live);
+                all_reads(c, live);
+            }
+            Core::Do(es) | Core::Recur(es) => {
+                for e in es {
+                    all_reads(e, live);
+                }
+            }
+            Core::Let(binds, body) => {
+                for (_, init) in binds {
+                    all_reads(init, live);
+                }
+                for e in body {
+                    all_reads(e, live);
+                }
+            }
+            Core::Call(f, args) => {
+                all_reads(f, live);
+                for a in args {
+                    all_reads(a, live);
+                }
+            }
+            Core::SetCell(a, b) => {
+                all_reads(a, live);
+                all_reads(b, live);
+            }
+            Core::SetGlobal(_, e) | Core::Throw(e) => all_reads(e, live),
+            Core::Try(t) => {
+                for e in &t.body {
+                    all_reads(e, live);
+                }
+                if let Some((_, body)) = &t.catch {
+                    for e in body {
+                        all_reads(e, live);
+                    }
+                }
+                if let Some(body) = &t.finally {
+                    for e in body {
+                        all_reads(e, live);
+                    }
+                }
+            }
+        }
+    }
+
+    /// One backward step. `live` is what is read *after* `e` on some path going
+    /// in, and what is read *before* it coming out.
+    fn liveness(e: &Expr, live: &mut std::collections::HashSet<LocalId>, kills: &mut Kills) {
+        match &e.core {
+            Core::Local(id) => {
+                if !live.contains(id) {
+                    kills.insert(addr(e));
+                }
+                live.insert(*id);
+            }
+            Core::Fn(def) => {
+                for c in &def.captures {
+                    if let CaptureSpec::Local(id) = c {
+                        live.insert(*id);
+                    }
+                }
+            }
+            Core::Literal(_) | Core::Capture(_) | Core::SelfFn | Core::Global(_) => {}
+            // The branches are alternatives, so a local read in only one of them
+            // is still dead on the other — which is exactly the case `filter`
+            // is, and the reason this is a real analysis and not a read count.
+            Core::If(t, a, b) => {
+                let mut la = live.clone();
+                liveness(a, &mut la, kills);
+                let mut lb = live.clone();
+                liveness(b, &mut lb, kills);
+                *live = la.union(&lb).copied().collect();
+                liveness(t, live, kills);
+            }
+            Core::Do(es) => {
+                for e in es.iter().rev() {
+                    liveness(e, live, kills);
+                }
+            }
+            Core::Let(binds, body) => {
+                for e in body.iter().rev() {
+                    liveness(e, live, kills);
+                }
+                for (_, init) in binds.iter().rev() {
+                    liveness(init, live, kills);
+                }
+            }
+            // ADR-033: the callee is evaluated before the arguments, and the
+            // arguments left to right. Backwards is the reverse of that.
+            Core::Call(f, args) => {
+                for a in args.iter().rev() {
+                    liveness(a, live, kills);
+                }
+                liveness(f, live, kills);
+            }
+            Core::SetCell(a, b) => {
+                liveness(b, live, kills);
+                liveness(a, live, kills);
+            }
+            Core::SetGlobal(_, e) | Core::Throw(e) => liveness(e, live, kills),
+            // **No kills anywhere inside a `try`, and this is deliberate.** A
+            // handler can be entered from any point in its region, so a slot
+            // whose last *textual* read is in the body is still live if the
+            // catch reads it — and getting that wrong yields `nil` where a
+            // value should be, which is a wrong answer rather than a crash
+            // (ADR-061). Refusing to analyse it is sound; the cost is that a
+            // `conj` loop inside a `try` stays quadratic.
+            Core::Try(_) | Core::Recur(_) => all_reads(e, live),
+        }
+    }
+
+    /// The kills for one `recur`'s arguments.
+    ///
+    /// `live` starts **empty**, and that is a claim rather than a convenience.
+    /// A `recur` re-enters the loop and overwrites every loop binding; a `loop`
+    /// is lowered as its own function (ADR-047), so the only locals in scope
+    /// inside it are those bindings and `let`s within the arguments themselves.
+    /// Nothing a recur argument can read outlives the recur — anything from the
+    /// enclosing function is a *capture*, which is a different slot.
+    fn recur_kills(args: &[Expr]) -> Kills {
+        let mut kills = Kills::new();
+        let mut live = std::collections::HashSet::new();
+        for a in args.iter().rev() {
+            liveness(a, &mut live, &mut kills);
+        }
+        kills
+    }
+
     struct FnLower {
         code: Vec<Instr>,
         lines: Vec<SpanOrigin>,
@@ -2297,6 +2475,9 @@ pub mod compile {
         /// reason covers `catch` exactly as it covers `finally`: the handler
         /// record names this frame, and a reused frame is a different one.
         regions: u32,
+        /// ADR-061 part 1. Filled in per `recur` and consulted at every local
+        /// read; a node not in here lowers to an ordinary `Move`.
+        kills: Kills,
     }
 
     impl FnLower {
@@ -2315,6 +2496,7 @@ pub mod compile {
                 slots,
                 next: def.params,
                 regions: 0,
+                kills: Kills::new(),
             }
         }
 
@@ -2397,7 +2579,15 @@ pub mod compile {
                     // code that reads as a peephole optimization, which is the
                     // shape the milestone-2 mutation pass already found once.
                     let src = self.slots[*id as usize];
-                    self.emit(Instr::Move { dst, src }, o);
+                    // ADR-061 part 1. The two are observationally identical
+                    // wherever the kill is emitted — that is what the analysis
+                    // proves — and the difference is one `Rc` reference at the
+                    // native call this feeds.
+                    if self.kills.contains(&addr(e)) {
+                        self.emit(Instr::MoveKill { dst, src }, o);
+                    } else {
+                        self.emit(Instr::Move { dst, src }, o);
+                    }
                 }
                 Core::Capture(i) => {
                     self.emit(Instr::GetCapture { dst, idx: *i }, o);
@@ -2509,6 +2699,11 @@ pub mod compile {
                     let argc = args.len() as u32;
                     let base = self.alloc(1 + argc);
                     self.emit(Instr::GetSelf { dst: base }, o);
+                    // ADR-061 part 1, and this is the only place kills are
+                    // computed. Extended by union rather than replacement: a
+                    // `fn` lowered inside these arguments carries its own
+                    // recurs, and addresses are unique across the whole tree.
+                    self.kills.extend(recur_kills(args));
                     for (i, a) in args.iter().enumerate() {
                         self.expr(lo, a, base + 1 + i as u32, false);
                     }
@@ -2728,7 +2923,12 @@ pub mod vm {
         }
     }
 
-    pub type NativeFn = fn(&mut Vm, &[Value]) -> Result<Value, Fault>;
+    /// ADR-061 part 2. `&mut` so a collection builder can take its argument
+    /// *out* of the slot rather than clone it — E-18 measured that a clone
+    /// leaves `Rc::make_mut` non-unique even when nothing else holds the value,
+    /// which is why copy-on-write had never once fired. Most natives ignore the
+    /// mutability: `&mut [Value]` reborrows to `&[Value]` at every helper.
+    pub type NativeFn = fn(&mut Vm, &mut [Value]) -> Result<Value, Fault>;
 
     struct Native {
         name: SymId,
@@ -3353,6 +3553,13 @@ pub mod vm {
             Instr::Move { dst, src } => {
                 ex.slots[base + dst as usize] = ex.slots[base + src as usize].clone();
             }
+            // Taken rather than cloned, which is the whole difference. The
+            // source is dead by construction (ADR-061 part 1), so leaving `Nil`
+            // behind changes nothing a program can read.
+            Instr::MoveKill { dst, src } => {
+                let v = std::mem::replace(&mut ex.slots[base + src as usize], Value::Nil);
+                ex.slots[base + dst as usize] = v;
+            }
             Instr::GetGlobal { dst, name } => {
                 let v = vm.global(name).cloned().ok_or_else(|| {
                     raise(
@@ -3749,7 +3956,7 @@ pub mod vm {
 
     fn native_call(
         vm: &mut Vm,
-        ex: &Execution,
+        ex: &mut Execution,
         id: NativeId,
         callee: usize,
         argc: u32,
@@ -3774,8 +3981,10 @@ pub mod vm {
             ));
         }
         // `ex` and `vm` are distinct, so the arguments are borrowed in place
-        // rather than copied into a temporary for every native call.
-        let args = &ex.slots[callee + 1..callee + 1 + argc as usize];
+        // rather than copied into a temporary for every native call. Mutably
+        // since ADR-061: the window is the caller's, and a consuming native
+        // leaves `Nil` behind in it.
+        let args = &mut ex.slots[callee + 1..callee + 1 + argc as usize];
         // A native raises a `Fault`, which has no position: it acquires the
         // calling instruction's origin here, the same one a bytecode callee's
         // arity error gets.
@@ -4718,12 +4927,23 @@ pub mod prim {
         // Where the copy-on-write lives (ADR-041 part 1). A list grows at the
         // front and a vector at the back, as in Clojure — `conj` adds where the
         // representation is cheap, and says so by doing it.
+        // ADR-061 part 2's first consumer, and the one the whole entry is for:
+        // every `conj` loop in the language is on this path. The target is
+        // *taken* from the slot rather than borrowed, so the `Rc` reaching
+        // `make_mut` below is one reference lighter than it used to be — and
+        // with ADR-061 part 1 clearing the caller's dead local, it is the only
+        // one, which is what makes the mutation happen in place.
+        //
+        // Taken unconditionally, including on the type-error path. The slot
+        // belongs to the argument window, which is truncated on unwind, so a
+        // `Nil` left behind by a throw is unobservable.
         vm.native("conj", 1, true, |_, a| {
-            let rest = &a[1..];
-            Ok(match &a[0] {
+            let (head, rest) = a.split_at_mut(1);
+            let rest = &*rest;
+            Ok(match std::mem::replace(&mut head[0], Value::Nil) {
                 Value::Nil => Value::List(Rc::new(ListObj(rest.iter().rev().cloned().collect()))),
                 Value::List(l) => {
-                    let mut out = l.clone();
+                    let mut out = l;
                     let items = &mut Rc::make_mut(&mut out).0;
                     for v in rest {
                         items.insert(0, v.clone());
@@ -4731,12 +4951,12 @@ pub mod prim {
                     Value::List(out)
                 }
                 Value::Vec(x) => {
-                    let mut out = x.clone();
+                    let mut out = x;
                     Rc::make_mut(&mut out).0.extend(rest.iter().cloned());
                     Value::Vec(out)
                 }
                 Value::Map(m) => {
-                    let mut out = m.clone();
+                    let mut out = m;
                     for v in rest {
                         let pair = seq_items(v, "conj")?;
                         if pair.len() != 2 {
@@ -4756,7 +4976,7 @@ pub mod prim {
                 other => {
                     return Err(fault(
                         Kind::Type,
-                        format!("`conj` needs a collection, not a {}", kind_name(other)),
+                        format!("`conj` needs a collection, not a {}", kind_name(&other)),
                     ))
                 }
             })

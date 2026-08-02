@@ -291,7 +291,9 @@ fn slots_of(i: &Instr) -> Vec<Slot> {
         | Instr::GetSelf { dst }
         | Instr::GetGlobal { dst, .. }
         | Instr::Closure { dst, .. } => vec![dst],
-        Instr::Move { dst, src } | Instr::SetCell { cell: dst, src } => vec![dst, src],
+        Instr::Move { dst, src }
+        | Instr::MoveKill { dst, src }
+        | Instr::SetCell { cell: dst, src } => vec![dst, src],
         Instr::SetGlobal { src, .. } | Instr::Return { src } | Instr::Throw { src } => vec![src],
         Instr::Call { dst, base, argc } => {
             let mut v = vec![dst, base];

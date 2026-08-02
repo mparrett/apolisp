@@ -58,10 +58,10 @@ proto 2  <fn>  params 2  slots 18
     0008  MOVE        r10 <- r0              86:40
     0009  CALL        r7 <- r9(1)            86:34
     0010  GETGLOBAL   r11 <- conj            86:45
-    0011  MOVE        r12 <- r1              86:50
+    0011  MOVEKILL    r12 <- r1              86:50
     0012  GETCAP      r14 <- c0              86:55
     0013  GETGLOBAL   r16 <- first           86:58
-    0014  MOVE        r17 <- r0              86:64
+    0014  MOVEKILL    r17 <- r0              86:64
     0015  CALL        r15 <- r16(1)          86:57
     0016  CALL        r13 <- r14(1)          86:54
     0017  CALL        r8 <- r11(2)           86:44
@@ -100,13 +100,13 @@ proto 4  <fn>  params 2  slots 21
     0014  CALL        r11 <- r12(1)          93:30
     0015  JUMPUNLESS  r11, 0023              93:26
     0016  GETGLOBAL   r16 <- conj            93:46
-    0017  MOVE        r17 <- r1              93:51
+    0017  MOVEKILL    r17 <- r1              93:51
     0018  GETGLOBAL   r19 <- first           93:56
-    0019  MOVE        r20 <- r0              93:62
+    0019  MOVEKILL    r20 <- r0              93:62
     0020  CALL        r18 <- r19(1)          93:55
     0021  CALL        r8 <- r16(2)           93:45
     0022  JUMP        0024                   93:26
-    0023  MOVE        r8 <- r1               93:67
+    0023  MOVEKILL    r8 <- r1               93:67
     0024  TAILCALL    r6(2)                  93:9
     0025  RETURN      r2                     91:7
 
@@ -135,9 +135,9 @@ proto 6  <fn>  params 2  slots 16
     0008  MOVE        r10 <- r0              101:40
     0009  CALL        r7 <- r9(1)            101:34
     0010  GETCAP      r11 <- c0              101:45
-    0011  MOVE        r12 <- r1              101:47
+    0011  MOVEKILL    r12 <- r1              101:47
     0012  GETGLOBAL   r14 <- first           101:52
-    0013  MOVE        r15 <- r0              101:58
+    0013  MOVEKILL    r15 <- r0              101:58
     0014  CALL        r13 <- r14(1)          101:51
     0015  CALL        r8 <- r11(2)           101:44
     0016  TAILCALL    r6(2)                  101:27
@@ -175,8 +175,8 @@ proto 8  <fn>  params 2  slots 16
     0010  CONST       r12 <- k0              105:52
     0011  CALL        r8 <- r10(2)           105:47
     0012  GETGLOBAL   r13 <- conj            105:56
-    0013  MOVE        r14 <- r1              105:61
-    0014  MOVE        r15 <- r0              105:65
+    0013  MOVEKILL    r14 <- r1              105:61
+    0014  MOVEKILL    r15 <- r0              105:65
     0015  CALL        r9 <- r13(2)           105:55
     0016  TAILCALL    r7(2)                  105:40
     0017  RETURN      r2                     105:24
@@ -210,11 +210,11 @@ proto 10  <fn>  params 2  slots 16
     0006  JUMP        0017                   109:24
     0007  GETSELF     r7 <- self             109:40
     0008  GETGLOBAL   r10 <- +               109:48
-    0009  MOVE        r11 <- r0              109:50
+    0009  MOVEKILL    r11 <- r0              109:50
     0010  CONST       r12 <- k0              109:52
     0011  CALL        r8 <- r10(2)           109:47
     0012  GETGLOBAL   r13 <- conj            109:56
-    0013  MOVE        r14 <- r1              109:61
+    0013  MOVEKILL    r14 <- r1              109:61
     0014  GETCAP      r15 <- c1              109:65
     0015  CALL        r9 <- r13(2)           109:55
     0016  TAILCALL    r7(2)                  109:40
@@ -259,10 +259,10 @@ proto 12  <fn>  params 2  slots 17
     0008  MOVE        r10 <- r0              118:42
     0009  CALL        r7 <- r9(1)            118:36
     0010  GETGLOBAL   r11 <- str             118:47
-    0011  MOVE        r12 <- r1              118:51
+    0011  MOVEKILL    r12 <- r1              118:51
     0012  GETCAP      r13 <- c0              118:55
     0013  GETGLOBAL   r15 <- first           118:60
-    0014  MOVE        r16 <- r0              118:66
+    0014  MOVEKILL    r16 <- r0              118:66
     0015  CALL        r14 <- r15(1)          118:59
     0016  CALL        r8 <- r11(3)           118:46
     0017  TAILCALL    r6(2)                  118:29
@@ -317,11 +317,11 @@ proto 14  <fn>  params 2  slots 36
     0026  CALL        r26 <- r27(1)          133:25
     0027  CALL        r22 <- r24(2)          133:18
     0028  GETGLOBAL   r29 <- conj            133:46
-    0029  MOVE        r30 <- r1              133:51
+    0029  MOVEKILL    r30 <- r1              133:51
     0030  GETGLOBAL   r32 <- str-slice       133:56
     0031  GETCAP      r33 <- c0              133:66
-    0032  MOVE        r34 <- r0              133:68
-    0033  MOVE        r35 <- r3              133:73
+    0032  MOVEKILL    r34 <- r0              133:68
+    0033  MOVEKILL    r35 <- r3              133:73
     0034  CALL        r31 <- r32(3)          133:55
     0035  CALL        r23 <- r29(2)          133:45
     0036  TAILCALL    r21(2)                 133:11
@@ -494,14 +494,14 @@ proto 20  <fn>  params 3  slots 50
     0029  CALL        r20 <- r21(2)          181:15
     0030  JUMPUNLESS  r20, 0044              181:11
     0031  GETSELF     r28 <- self            182:13
-    0032  MOVE        r29 <- r0              182:20
+    0032  MOVEKILL    r29 <- r0              182:20
     0033  GETGLOBAL   r32 <- rest            182:23
     0034  MOVE        r33 <- r1              182:28
     0035  CALL        r30 <- r32(1)          182:22
     0036  GETGLOBAL   r34 <- conj            182:32
-    0037  MOVE        r35 <- r2              182:37
+    0037  MOVEKILL    r35 <- r2              182:37
     0038  GETGLOBAL   r37 <- first           182:42
-    0039  MOVE        r38 <- r1              182:48
+    0039  MOVEKILL    r38 <- r1              182:48
     0040  CALL        r36 <- r37(1)          182:41
     0041  CALL        r31 <- r34(2)          182:31
     0042  TAILCALL    r28(3)                 182:13
@@ -510,11 +510,11 @@ proto 20  <fn>  params 3  slots 50
     0045  GETGLOBAL   r43 <- rest            183:21
     0046  MOVE        r44 <- r0              183:26
     0047  CALL        r40 <- r43(1)          183:20
-    0048  MOVE        r41 <- r1              183:29
+    0048  MOVEKILL    r41 <- r1              183:29
     0049  GETGLOBAL   r45 <- conj            183:32
-    0050  MOVE        r46 <- r2              183:37
+    0050  MOVEKILL    r46 <- r2              183:37
     0051  GETGLOBAL   r48 <- first           183:42
-    0052  MOVE        r49 <- r0              183:48
+    0052  MOVEKILL    r49 <- r0              183:48
     0053  CALL        r47 <- r48(1)          183:41
     0054  CALL        r42 <- r45(2)          183:31
     0055  TAILCALL    r39(3)                 183:13
@@ -533,9 +533,9 @@ proto 21  <fn>  params 2  slots 16
     0008  MOVE        r10 <- r0              178:61
     0009  CALL        r7 <- r9(1)            178:55
     0010  GETGLOBAL   r11 <- conj            178:65
-    0011  MOVE        r12 <- r1              178:70
+    0011  MOVEKILL    r12 <- r1              178:70
     0012  GETGLOBAL   r14 <- first           178:75
-    0013  MOVE        r15 <- r0              178:81
+    0013  MOVEKILL    r15 <- r0              178:81
     0014  CALL        r13 <- r14(1)          178:74
     0015  CALL        r8 <- r11(2)           178:64
     0016  TAILCALL    r6(2)                  178:48
@@ -554,9 +554,9 @@ proto 22  <fn>  params 2  slots 16
     0008  MOVE        r10 <- r0              180:63
     0009  CALL        r7 <- r9(1)            180:57
     0010  GETGLOBAL   r11 <- conj            180:67
-    0011  MOVE        r12 <- r1              180:72
+    0011  MOVEKILL    r12 <- r1              180:72
     0012  GETGLOBAL   r14 <- first           180:77
-    0013  MOVE        r15 <- r0              180:83
+    0013  MOVEKILL    r15 <- r0              180:83
     0014  CALL        r13 <- r14(1)          180:76
     0015  CALL        r8 <- r11(2)           180:66
     0016  TAILCALL    r6(2)                  180:50

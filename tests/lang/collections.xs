@@ -255,3 +255,75 @@
 (is (throws? (compare :a :b)))
 (is (throws? (compare [1] [2])))
 (is (throws? (compare ##NaN 1)))
+
+; --- ADR-061: the dead-slot kill, and the cases where it must not fire -------
+
+; The analysis clears a loop binding at its last read. These pin that it is a
+; last read *on every path*, because the failure mode is not a crash: a slot
+; cleared too early reads back as `nil`, and the program computes a wrong
+; answer with complete confidence.
+
+; The shape the whole entry exists for.
+(is= [0 1 2 3] (loop [i 0 out []] (if (= i 4) out (recur (+ i 1) (conj out i)))))
+
+; `filter`'s shape: the accumulator is read on both branches of an `if`, and
+; only one of them runs. A read-count analysis refuses this; a branch-aware one
+; kills on each path. Getting it wrong drops elements.
+(is= [0 2 4] (loop [i 0 out []]
+               (if (= i 6)
+                 out
+                 (recur (+ i 1) (if (= 0 (rem i 2)) (conj out i) out)))))
+
+; Read twice in one argument list. The *first* read must not kill, or the
+; second sees nil.
+(is= [[0 0] [1 1]] (loop [i 0 out []]
+                     (if (= i 2) out (recur (+ i 1) (conj out [i i])))))
+
+; A binding read in a later argument after being read in an earlier one.
+(is= 6 (loop [i 0 acc 0] (if (= i 4) acc (recur (+ i 1) (+ acc i)))))
+
+; A closure capturing a loop binding. Captures are a list on the `fn` rather
+; than `Core::Local` reads (ADR-002), so an analysis that only walked local
+; reads would clear the slot before the closure copied it — and the closure
+; would capture nil.
+(is= 3 (loop [i 0 acc 0]
+         (if (= i 3)
+           acc
+           (recur (+ i 1) (+ acc ((fn [] 1)))))))
+(is= [1 2] (loop [i 0 out []]
+             (if (= i 2)
+               out
+               (recur (+ i 1) (conj out ((fn capture [] (+ i 1))))))))
+
+; Inside a `try`. The analysis refuses to kill anywhere in a handler region,
+; because a catch can be entered from any point in its body — so a slot whose
+; last textual read is in the body is still live if the catch reads it.
+;
+; **The body has to throw *after* reading the accumulator**, or this proves
+; nothing. The first version of these assertions had a body that always
+; succeeded, so the catch never ran, so a mutation removing the guard entirely
+; passed them — caught by `just mutate`, which is the whole reason that rung
+; exists. The interesting path is the one where the kill has already happened
+; and the handler then reads the slot.
+(is= [] (loop [i 0 out []]
+          (if (= i 1)
+            out
+            (recur (+ i 1) (try (do (conj out i) (throw :x)) (catch e out))))))
+(is= [0] (loop [i 0 out []]
+           (if (= i 1)
+             out
+             (recur (+ i 1)
+                    (try (do (conj out 99) (throw :x)) (catch e (conj out i)))))))
+(is= [0 1] (loop [i 0 out []]
+             (if (= i 2)
+               out
+               (recur (+ i 1) (try (conj out i) (catch e out))))))
+(is= :caught (loop [i 0 out []]
+               (if (= i 1)
+                 :caught
+                 (recur (+ i 1) (try (throw :x) (catch e (conj out i)))))))
+
+; And the library functions that ride on all of it.
+(is= [1 2 3] (map (fn [x] (+ x 1)) [0 1 2]))
+(is= [0 2 4] (filter (fn [x] (= 0 (rem x 2))) [0 1 2 3 4 5]))
+(is= 4 (count (split "," "a,b,c,d")))

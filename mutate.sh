@@ -626,6 +626,81 @@ mutation src/lib.rs \
   "$LANGIO" \
   'a link to a directory is :symlink and not :dir (ADR-060)'
 
+# --- ADR-061: the dead-slot kill and the consuming protocol ------------------
+
+LANGC='--test lang'
+DISASM='--test compile'
+
+# The handler guard. A catch can be entered from anywhere in its region, so a
+# slot whose last textual read is in the try body is still live. Removing the
+# guard makes the analysis treat a try like ordinary control flow, and the loop
+# that catches reads a cleared accumulator.
+mutation src/lib.rs \
+  'Core::Try(_) | Core::Recur(_) => all_reads(e, live),' \
+  'Core::Try(t) => { for e in t.body.iter().rev() { liveness(e, live, kills); } }
+            Core::Recur(_) => all_reads(e, live),' \
+  "$LANGC" \
+  'no slot is killed inside a handler region (ADR-061 part 1)'
+
+# A closure captures outer locals through a list on the FnDef, not through
+# Core::Local nodes. An analysis blind to that clears the slot before the
+# closure copies it, and the closure captures nil.
+mutation src/lib.rs \
+  'Core::Fn(def) => {
+                for c in &def.captures {
+                    if let CaptureSpec::Local(id) = c {
+                        live.insert(*id);
+                    }
+                }
+            }
+            Core::Literal(_) | Core::Capture(_) | Core::SelfFn | Core::Global(_) => {}
+            // The branches are alternatives' \
+  'Core::Fn(_) => {}
+            Core::Literal(_) | Core::Capture(_) | Core::SelfFn | Core::Global(_) => {}
+            // The branches are alternatives' \
+  "$LANGC" \
+  'a closures captured locals are live at the closure (ADR-061 part 1)'
+
+# The branch union is what makes `filter` work: the accumulator is read on both
+# arms of an `if` and only one runs. Collapsing the union into a sequential walk
+# is *conservative* — it kills less — so no program changes answer and the
+# goldens lose MOVEKILLs. The disassembly is the only thing that can see it.
+mutation src/lib.rs \
+  'let mut la = live.clone();
+                liveness(a, &mut la, kills);
+                let mut lb = live.clone();
+                liveness(b, &mut lb, kills);
+                *live = la.union(&lb).copied().collect();' \
+  'liveness(a, live, kills);
+                liveness(b, live, kills);' \
+  "$DISASM" \
+  'the two arms of an if are alternatives, not a sequence (ADR-061 part 1)'
+
+# Declared. The kill and the clear are observationally identical by
+# construction — that is what the analysis proves — so nothing in a suite of
+# assertions can separate them. The benchmark is the check, and it is not a
+# test.
+mutation src/lib.rs \
+  'let v = std::mem::replace(&mut ex.slots[base + src as usize], Value::Nil);
+                ex.slots[base + dst as usize] = v;' \
+  'ex.slots[base + dst as usize] = ex.slots[base + src as usize].clone();' \
+  "$LANGC" \
+  'MoveKill clears the source slot (ADR-061 part 1)' \
+  'the whole point of the kill is that it changes nothing observable — it drops an Rc reference, and no assertion can see a refcount. Refuted only by the benchmark: with this mutation split goes back to 4.0x per doubling'
+
+# Declared, same reason as the kill above: reverting `seq_items` to the clone it
+# used to be restores an O(n) `nth` and changes no answer anywhere.
+mutation src/lib.rs \
+  'Value::Nil => Ok(&[]),
+            Value::List(l) => Ok(&l.0),
+            Value::Vec(x) => Ok(&x.0),' \
+  'Value::Nil => Ok(Box::leak(Vec::new().into_boxed_slice())),
+            Value::List(l) => Ok(Box::leak(l.0.clone().into_boxed_slice())),
+            Value::Vec(x) => Ok(Box::leak(x.0.clone().into_boxed_slice())),' \
+  "$LANGC" \
+  'seq_items borrows rather than cloning, so nth is O(1) (ADR-041 part 1)' \
+  'the clone is a cost and not a behaviour, so no assertion separates them — it leaks here only to keep the mutant compiling. The benchmark is the check: with this reverted, xgrep goes back to 4.0x per doubling even with ADR-061 in place, which is how the second quadratic stayed hidden behind conj for three measurements'
+
 echo
 echo "=== $flipped of $total flipped, $survived_ok survived as declared"
 if [ ${#dead[@]} -gt 0 ]; then

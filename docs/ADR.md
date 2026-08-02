@@ -3482,6 +3482,80 @@ serialize. Not answered here.
 
 ---
 
+### ADR-059 — `accept` takes a deadline, and `:timeout` finally has a second raiser
+
+*(New, 2026-08-02. Extends ADR-045 part 5. Does not supersede it: the handle
+model, the error shape, and the three network kinds are unchanged.)*
+
+**Decision.** `tcp/set-timeout` accepts a **listener** as well as a connection.
+With one set, `tcp/accept` waits at most that long and then raises
+`{:type :io-error :operation :accept :kind :timeout}`. `nil` clears it and
+restores the blocking accept, which stays the default.
+
+The deadline is implemented inside the adapter by putting the listener in
+non-blocking mode and polling on a **1 ms** interval until it expires. The
+accepted connection is put back into blocking mode explicitly, because whether
+it inherits the listener's mode is platform-specific and the one that inherits
+would hand a program a socket whose reads fail with `:would-block` for no
+reason it could see.
+
+**Why.** `tcp/set-timeout` refused a listener, `TcpListener` has no
+`set_read_timeout`, and `accept` is therefore the one call in this language
+with no way out of it. The consequence is larger than an inconvenience: a VM
+that is single-threaded by design and blocked in `accept` cannot do anything
+else, so **a server could serve exactly one connection at a time and could not
+even round-robin** — the loop that would take turns is the loop that is stuck.
+Of the three workloads ETHOS names, that made web services unreachable rather
+than awkward, which is a bigger claim than "an ergonomic gap" and is why this
+is worth an entry rather than a patch.
+
+**The vocabulary already had a hole shaped like this.** ADR-045 part 2 added
+`:timeout` and wrote that "`:connect` and `:accept` are the two a `:timeout`
+or a `:connection-reset` actually comes out of, so naming them is what makes
+those kinds dispatchable" — and then nothing could raise `:timeout` from
+`:accept`. That pairing has been in the closed set, undispatchable, since
+milestone 10. This entry is its raiser, and it is the second one `:timeout`
+has ever had.
+
+**Why `:timeout` and not `:would-block`.** TRAPS.md records that a *read*
+deadline raises `:would-block`, and the reason is that the kind is the
+platform's: `SO_RCVTIMEO` produces `WouldBlock` on Unix and `TimedOut` on
+Windows, and the language forwards what it is handed. Here the deadline is
+**ours** — the polling loop decides when it has expired — so nothing is being
+forwarded and there is no platform disagreement to hedge. A synthesized
+deadline that expired is `:timeout`, which is what the kind means. The
+asymmetry with `io/read` is real and is a consequence of who owns the clock.
+
+**Why polling rather than a socket option.** `SO_RCVTIMEO` does apply to
+`accept` on Unix and is the direct implementation, and reaching it needs
+`libc` — a dependency, which ADR-014 makes an ADR, for a syscall wrapper on
+one of two platforms. Polling costs a 1 ms granularity on the deadline and a
+wakeup per millisecond while a program is waiting, and it needs nothing.
+Constraint ordering says simplicity over efficiency, and this is the case that
+ordering was written for.
+
+**Cost.** A timeout is accurate to about a millisecond, and a program that
+asks for one gets a sleep-poll loop rather than a blocked thread — measurable
+if anything ever waits in a tight loop with a very short deadline, invisible
+otherwise. The listener carries an `Option<Duration>` in its `Host` variant,
+which is the entry's whole cost inside the line budget; the loop itself is in
+`adapters/tcp.rs` and outside it, which is ADR-045's boundary working.
+
+Nothing changes for a program that does not set one. A blocking `accept`
+remains the default, so no existing program's behaviour moves.
+
+**Rejected.** *A non-blocking `accept` exposed to the language*, with the
+program writing its own retry loop — more general, and it needs a `sleep` the
+language does not have, so the honest version of this option is "add a clock
+first". That is a real question (there is no time primitive at all) and it is
+not this one. *Making the deadline per-call, `(tcp/accept l 100)`* — a second
+spelling for a thing `tcp/set-timeout` already says, and it would leave
+connections and listeners with different APIs for the same concept. *Raising
+`:would-block` for symmetry with `io/read`* — symmetry with an accident is not
+a reason; see above.
+
+---
+
 ## Errata
 
 Factual corrections to entries whose **decision still stands**. A wrong reason is

@@ -61,6 +61,25 @@ timeout argument, which is `connect_timeout` underneath and does return
 it also gives `:would-block` — so the both-kinds tolerance is carrying Windows
 alone, and no run has ever exercised the branch that needs it.
 
+**An *accept* deadline raises `:timeout`, and that asymmetry is deliberate.**
+ADR-059 gives `tcp/set-timeout` a listener, but `TcpListener` has no
+`set_read_timeout`, so the deadline is the adapter's own polling loop rather
+than a socket option. Nothing is being forwarded from the platform, so there is
+no disagreement to hedge and the kind is pinned exactly. **The same call on the
+same name gives a different kind depending on which end of the socket it was
+set on** — `:would-block` from a read, `:timeout` from an accept — and a
+handler written for one will silently not fire for the other. The rule is which
+side owns the clock, and it is not visible from the call site.
+
+**A socket accepted from a listener with a deadline may inherit non-blocking
+mode.** Whether it does is platform-specific, and where it does, every read on a
+perfectly good connection answers `:would-block` with nothing in the program to
+explain it — the listener's configuration reaching a socket that was never
+configured. `adapters/tcp.rs` sets it back explicitly on every accept for that
+reason, so this is a trap about *not removing that line*: the platform where it
+matters is not necessarily the one the change is written on, and the suite is
+green on a platform that does not inherit whether the line is there or not.
+
 **`io/read` is a short read.** `(io/read sock n)` returns *up to* `n` bytes and
 returns as soon as any arrive — asking for 99 with 3 in flight gives 3, with no
 error and no way to tell that apart from a peer that sent exactly 3. Nothing in

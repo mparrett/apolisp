@@ -353,6 +353,16 @@ wrong by 2× in the flattering direction* — it extrapolated upward from a debu
 run that had already passed a second at 8,000 lines. The corrected figure is
 what makes this urgent rather than eventual: 14,500 lines is not a large file.
 
+**Built 2026-08-02, and scored in `notes/the-consuming-protocol.md`.** `split`
+is linear and 382× faster at 64,000 lines; the one-second threshold moved from
+14,500 lines to past a million. **What the work found is that this question was
+about three defects and named one.** `conj`'s copy-on-write was a third of it;
+`seq_items` cloning a whole collection to index one element (`nth` O(n), against
+ADR-041's flat `Vec`) was a second, fixed with it; and `rest` copying the tail
+is a third, which is structural and is now **Q38**. Every measurement this entry
+cites was taken through a program containing at least two of them at once, which
+is why one cause looked like the whole cause for so long.
+
 **Answered 2026-08-02 by ADR-061: candidate 1, both halves.** The candidate
 list below is kept because the reasoning for rejecting the others is the useful
 part, and because if ADR-061's C3 is refuted — `split` linear, `map` still
@@ -389,6 +399,44 @@ that says so. Predictions in `notes/the-consuming-protocol-prediction.md`.
 Whatever is chosen, ADR-021's habit applies: **pre-register the number**. Each
 candidate above predicts a specific change to the 3.84× ratio, and a fix that
 does not move it is a fix that did not work.
+
+**Q38 — `rest` copies the tail, and `map` rides on it.** *(Filed 2026-08-02
+from `notes/the-consuming-protocol.md`, which is ADR-061 finding it while fixing
+something else.)*
+
+`(rest xs)` builds a new collection from `xs[1..]`, so it is O(n) per call, and
+the prelude traverses with it:
+
+```clojure
+(loop [in xs out []] (if (empty? in) out (recur (rest in) (conj out (f (first in))))))
+```
+
+`map`, `filter`, `join` and `repeat` are all this shape, so all four are still
+quadratic after ADR-061. Measured against the identical algorithm traversing by
+index — 8,000 elements at 0.09 s via `rest` against 0.00 s via `nth`, 32,000 at
+1.45 s against 0.01 s, 4.0× per doubling against flat.
+
+**This is structural rather than a defect**, which is what separates it from the
+`seq_items` half of ADR-061's work. On a flat `Vec` with no shared tails `rest`
+*cannot* be O(1); ADR-011 chose one representation per collection and ADR-041
+chose flat `Vec`, and this is the cost of that showing up somewhere other than
+where anyone was looking.
+
+Two shapes, and they are not close in size.
+
+1. **Traverse by index in the prelude.** `map` becomes a `loop` over
+   `(nth xs i)`, which is O(1) since ADR-061. Small, and it works today. The
+   cost is that the library stops being written the way a user would write it —
+   the obvious `(rest in)` recursion stays quadratic, so the prelude is fast and
+   the idiom it teaches is not, which is a worse trap than the slow library was.
+2. **A representation with shared tails**, so `rest` is a view. Supersedes
+   ADR-011 and part of ADR-041, and is the thing both of those explicitly
+   deferred until a workload asked. One is now asking.
+
+Note what makes this decidable in a way Q37 was not: there is a measurement,
+the mechanism is understood, and the two options differ by an order of
+magnitude in cost. Not urgent — `map` over a few thousand elements is fine, and
+every program written so far is under that.
 
 ## No milestone — decide when evidence arrives
 

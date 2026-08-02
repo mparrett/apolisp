@@ -146,6 +146,29 @@ written down first — with a number on the one quantitative claim, which is tha
 E-11's copy-on-write turns any whole-file pass into the O(n²) **Q6** has named
 since before anything could reach it. Nothing is committed to building it.
 
+**The host boundary, 2026-08-02, from a review rather than from a program**
+(`project-docs/docs/apolisp/production-readiness-review-2026-08-02.md`). Three
+of the four gaps that review put in front of everything else are closed:
+**ADR-058** gives a program its arguments, **ADR-059** gives `accept` a
+deadline, and **ADR-060** lets a program find out what is in a directory.
+
+Worth recording that this is a *different source of evidence* from the four
+entries above it, and weaker in a specific way. ADR-046 through ADR-051 were
+each scoped by a program that had already wanted the thing; these three were
+scoped by reading the surface and asking what a program could not do. That is
+faster and it is how a language grows a feature nobody needed — so the check on
+it is that each entry names the program that wanted it, and two of the three
+can: the pager and `just edit FILE` both wanted arguments, and nothing at all
+wanted `read-dir` except the observation that `fs` could not enumerate.
+
+The one the review put fourth is **not** done, on purpose. A flush point for a
+pipe is Q33 shape 4, it reaches ADR-016 and ADR-029, and Q33's own answer is
+"wait for the program". Nothing has still asked. What has changed is that
+arguments and a directory listing together make the program that would ask —
+a long-running batch tool writing progress to a pipe — writable for the first
+time, so the wait is now a wait for someone to write one rather than a wait for
+the language to be able to express it.
+
 The candidates, and what each is really a bet on:
 
 1. **Write programs, fix what they break.** The bet is that the test suite has

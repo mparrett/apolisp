@@ -3415,6 +3415,73 @@ to one that has not.
 
 ---
 
+### ADR-058 — A program's arguments
+
+*(New, 2026-08-02. Answers the "adjacent, and worth settling in the same breath"
+clause of Q33 — a program has no argv — and leaves the environment half of it
+undecided.)*
+
+**Decision.** `*command-line-args*` is a **global bound to a vector of
+strings**: the driver's arguments after the file, in order. It is always bound,
+to `[]` when there are none, and it is **not feature-gated**.
+
+The driver grows a tail: `apolisp run FILE [args...]`. No other command takes
+one — `read`, `expand` and `compile` do not run the program, and `repl` has no
+file to take arguments after.
+
+**Why.** Three programs written under Q31's practice each wanted this and none
+got it. The pager pages *its own source*, because that is the only file it can
+name; `just edit FILE` exists to splice a filename into a program textually,
+which is a build step standing in for an argument. Every terminal program takes
+one, and this is the cheapest item on that list by a wide margin.
+
+**Why a global rather than an `(argv)` native.** Globals are cells, and cells
+are already in the `Image` — so a program that reads its arguments, exhausts
+its fuel and resumes gets the arguments it had, with no new VM field, no
+capture arm, and no restore arm. A native would need `Vm::args`, and milestone
+8's mutation pass is the record of what a VM field the `Image` forgets costs:
+four fields were dropped and the round-trip property, in both forms, over nine
+programs, noticed none of them. The cheapest field to serialize correctly is
+the one that is not a field.
+
+**Why a vector, where Clojure gives a seq.** ADR-012 declined laziness, so
+there is no seq for this to be one of — the choice is between a list and a
+vector rather than between a vector and a seq. A vector is what `nth` and
+`count` want, it is what `take` and `drop` already hand back (ADR-050), and it
+does not walk into the trap where `concat` turns a program's own data into a
+list that `assoc` then refuses.
+
+**Why not gated.** ADR-013 gates host *capability*. A process always has an
+argument list; an empty one is not a missing capability, and a build without
+`fs` still has arguments. Gating it would make `just subtract` produce a build
+where the name is *unbound* rather than empty — which is precisely the shape
+ADR-046 recorded when it found a semantic squatting inside an optional feature.
+
+**Cost.** One more name bound in every unit, and it is rebindable like any
+other global (ADR-027's create-or-rebind), so a program can overwrite its own
+arguments. Accepted: that is equally true of `io/stdout`, and a single namespace
+with no `def`-vs-`set!` distinction is what ADR-027 bought.
+
+The goldens do not move, and the reason is worth stating because it is a
+constraint on the corpus rather than a happy accident: the harness runs every
+corpus program with **no trailing arguments**, so every `.out` is unchanged. A
+corpus program that read its arguments would put the harness's command line
+into a golden file, which is the same defect as an absolute path in a `.forms`
+(BUILD.md). None does, and none should.
+
+**Rejected.** *A native `(argv)`* — see above; it buys a function call and
+costs an `Image` field. *The name `*argv*`* — ETHOS says inherit Clojure's
+surface rather than invent one, and Clojure's name is `*command-line-args*`.
+The length is the price of not having a second spelling to remember, and it is
+paid once per program. *Element 0 as the program path* — the path belongs to
+the driver, the driver already prints it, and every use of an argument vector
+starts by dropping it. *Environment variables in the same entry* — a related
+hole and a different decision, with its own question about whether a
+process-wide mutable table belongs in a machine whose state is supposed to
+serialize. Not answered here.
+
+---
+
 ## Errata
 
 Factual corrections to entries whose **decision still stands**. A wrong reason is

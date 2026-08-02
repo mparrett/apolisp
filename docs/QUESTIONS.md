@@ -269,6 +269,12 @@ environment.** `main.rs` takes a command and a path. The pager pages its own
 source because that is the only file it can name, and every terminal program
 takes an argument.
 
+**The argv half is answered by ADR-058**, as a global rather than a native so
+that the `Image` gets it for free. The **environment** half is still open, and
+it is not the same question: an argument vector is fixed at process start and a
+process-wide mutable table is not, which is a question about serializable state
+rather than about a missing name.
+
 ## No milestone — decide when evidence arrives
 
 **Q30 — Is `Proto.lines` the wrong shape?** *(Filed 2026-07-27 from

@@ -139,11 +139,24 @@ keystroke: 3.7 µs via native `str-slice` against 12,605 µs via scalars at a
 a curve. Same fault line as the `str-len` entry above, one layer down: ADR-018
 and ADR-049 made the unsafe path quiet, and then made the safe path slow. Q34.
 
-**Anything built with `conj` in a loop is O(n²).** Errata E-11's copy-on-write
-does not pay yet, so `map`, `filter`, `range`, `repeat`, `take`, `drop` and
-`join` are all quadratic in output length — `map` over 8,000 elements is 272 ms
-where 2,000 is 18 ms. This is fine at the sizes the corpus uses and is a wall at
-the sizes a real file has. Q6.
+**Anything built with `conj` in a loop is O(n²).** Errata E-13's copy-on-write
+does not pay yet — `Rc::make_mut` never holds a unique reference at a native
+call — so `map`, `filter`, `range`, `repeat` and `split` are all quadratic in
+output length. `join` is the same shape by a different mechanism: it
+accumulates with `str`, and each step copies the string built so far.
+
+*`take` and `drop` are no longer on this list*, and the list said they were
+until 2026-08-02: ADR-053 gave them `vec-slice` and nothing came back to strike
+them out. Check the prelude before trusting any membership here.
+
+Measured three times, twice by doubling: `map` over 8,000 elements is 272 ms
+against 18 ms at 2,000 (**3.87×** per doubling), and `split` over 8,000 lines is
+1.92 s against 0.04 s at 1,000 (**3.84×**). Fine at the sizes the corpus uses
+and a wall at the sizes a real file has — about **30,000 lines in one file** is
+where a whole-file pass passes a second.
+
+Owned by **Q37**. It is not Q6: that number is retired, and was still being
+cited as open by five documents including this one.
 
 **A `recur` from a `catch` is allowed here, and is not in Clojure.** This VM
 pops a handler record when it dispatches to it, so a catch body runs with no

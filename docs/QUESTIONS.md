@@ -239,6 +239,14 @@ machinery ADR-016 already built, and which shape 3 would have broken silently.
 Painting is now `term`'s capability rather than `fs`'s, and `just subtract`
 gained `term` alone as a fourth point.
 
+**Sharpened 2026-08-02 by `notes/the-grep-program.md`**, which was written to
+be the program that asked and was not. A grep over all of `docs/` — 22 files,
+14,000 lines — runs in 0.72 s in debug, so nothing about it wants to report
+progress. What that measured is the *shape* of the program that would: not one
+that reads many files, but one that reads a **big** one, since Q37's 3.84× per
+doubling puts a single 30,000-line file past a second on its own. The wait is
+now for that program rather than for the language to be able to express one.
+
 **Still open: `io/stdout` is all-or-nothing.** A program that wants incremental
 output to a *pipe* — a progress line, a log, anything long-running that is not a
 terminal — has no answer at all, and `/dev/tty` is not one. That is shape 4
@@ -297,6 +305,73 @@ that the `Image` gets it for free. The **environment** half is still open, and
 it is not the same question: an argument vector is fixed at process start and a
 process-wide mutable table is not, which is a question about serializable state
 rather than about a missing name.
+
+**Q37 — What removes the quadratic, and what does it supersede?** *(Filed
+2026-08-02. Takes over the open half of the retired Q6, which is why six
+documents currently point at a question that resolved a year of decisions ago.)*
+
+**This question exists because the problem did not have one.** Q6 asked which
+collection representation to use and was resolved by ADR-041 — flat `Vec`,
+copy-on-write, no transients. What ADR-041 did *not* close is the cost, and
+E-13 later found the cost was not even being paid down: `Rc::make_mut` never
+holds a unique reference at a native call, so every `conj` copies. So
+`TRAPS.md`, ADR-053, E-11, E-13 and Q31 all say some version of "Q6/E-11 stays
+open" about a number listed under *Resolved* at the top of this file. A problem
+that is simultaneously resolved and open is one nobody owns, and this is the
+largest known defect in the system.
+
+**The evidence, and it is now three independent measurements.**
+
+- The editor's `map`: **3.87×** per doubling of input, 8,000 elements at 272 ms
+  against 2,000 at 18 ms (`notes/the-editor-program.md`).
+- `xgrep`'s `split`: **3.84×** per doubling, 8,000 lines at 1.92 s against
+  1,000 at 0.04 s (`notes/the-grep-program.md`). A different function in a
+  different program, arriving at the editor's figure to two significant
+  figures.
+- E-13's instrumentation: `copied=true` on every iteration of a five-element
+  build, and replacing `make_mut` with an unconditional clone survived the
+  entire suite. The two are indistinguishable today.
+
+Attributed: reading `docs/ADR.md` is below the timer's resolution and reading
+*and splitting* it is 160 ms, so `split` is essentially the whole cost of a
+grep over the documentation. Debug numbers — release does not link on the
+machine that measured them — so the ratios are the load-bearing part and the
+absolute figures want re-running.
+
+**The threshold this puts a number on.** At 3.84× per doubling, a single file
+of about **30,000 lines** takes a whole-file pass past a second on its own.
+That is an ordinary log or CSV export, so this stops being theoretical at a
+file size that is not unusual.
+
+**The candidates, and what each costs.** Not ordered, and none chosen.
+
+1. **Kill a slot at its last use** (E-13's first suggestion; ADR-006's optional
+   reuse pass, extended). The accumulator's refcount at the native call becomes
+   1, `make_mut` mutates in place, and *every* `conj` loop gets amortised
+   O(1) — including ones in user code that no library change could reach.
+   Blast radius is the compiler and every program's slot layout, so every
+   `.disasm` golden moves at once. That is a large reviewed diff rather than a
+   risk, but it is the one ADR-021 would want an argument for.
+2. **A consuming call protocol** — a native declares it consumes an argument,
+   and the VM clears the caller's slot before the call. Reaches ADR-038's call
+   protocol and ADR-034's instruction format. Narrower than 1 in what it fixes:
+   it helps the primitives, not an arbitrary loop.
+3. **Make the hot functions native.** `split` and `join` take no closure, so
+   ADR-041 part 6 does not forbid them, and they are the two that actually bit.
+   Cheap, and it fixes the *measured* case without touching the call protocol.
+   It does nothing for `map`, `filter`, `repeat` or a hand-written loop, and it
+   moves library code into the line budget.
+4. **Transients, or a persistent vector.** Both supersede ADR-041, and the
+   second supersedes ADR-011's one-representation rule too. Largest, and the
+   furthest from ETHOS constraint #3's "concrete representations and good
+   constants".
+5. **Accept it and write the limit down.** The corpus is small, and every
+   program so far has finished. This is the option that gets taken by default
+   if nothing decides, which is the reason to have the question.
+
+Whatever is chosen, ADR-021's habit applies: **pre-register the number**. Each
+candidate above predicts a specific change to the 3.84× ratio, and a fix that
+does not move it is a fix that did not work.
 
 ## No milestone — decide when evidence arrives
 

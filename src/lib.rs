@@ -5408,8 +5408,13 @@ pub mod host {
         /// new code at all.
         #[cfg(feature = "tcp")]
         Tcp(std::net::TcpStream),
+        /// ADR-059: the listener carries its own accept deadline, because
+        /// `TcpListener` has no `set_read_timeout` to carry it for us. `None`
+        /// is the blocking accept, which is still the default. This field is
+        /// the entry's whole cost inside the line budget — the polling loop
+        /// that reads it is in `adapters/tcp.rs`, outside it.
         #[cfg(feature = "tcp")]
-        Listener(std::net::TcpListener),
+        Listener(std::net::TcpListener, Option<std::time::Duration>),
     }
 
     /// The closed `:kind` vocabulary for `:type :io-error` (ADR-042 part 1).
@@ -5709,7 +5714,7 @@ pub mod host {
                 #[cfg(feature = "tcp")]
                 Host::Tcp(t) => t.read(&mut buf),
                 #[cfg(feature = "tcp")]
-                Host::Listener(_) => return Err(misuse("`io/read` cannot read from a listener")),
+                Host::Listener(..) => return Err(misuse("`io/read` cannot read from a listener")),
                 Host::Stdin => std::io::stdin().read(&mut buf),
                 Host::Stdout => return Err(misuse("`io/read` cannot read from `io/stdout`")),
             };
@@ -5734,7 +5739,7 @@ pub mod host {
                 #[cfg(feature = "tcp")]
                 Host::Tcp(t) => t.read_to_end(&mut buf),
                 #[cfg(feature = "tcp")]
-                Host::Listener(_) => {
+                Host::Listener(..) => {
                     return Err(misuse("`io/read-all` cannot read from a listener"))
                 }
                 Host::Stdin => std::io::stdin().read_to_end(&mut buf),
@@ -5791,7 +5796,7 @@ pub mod host {
                     .map(|()| n)
                     .map_err(|e| host_failed(IoOp::Write, None, &e)),
                 #[cfg(feature = "tcp")]
-                Host::Listener(_) => Err(misuse("`io/write` cannot write to a listener")),
+                Host::Listener(..) => Err(misuse("`io/write` cannot write to a listener")),
                 Host::Stdin => Err(misuse("`io/write` cannot write to `io/stdin`")),
                 Host::Stdout => unreachable!("settled above, before the mutable borrow"),
             }

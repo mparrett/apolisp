@@ -156,6 +156,90 @@ fn a_read_deadline_raises_a_network_kind_no_file_can_produce() {
     run(&mut s, "(io/close c) (io/close server) (io/close l)");
 }
 
+/// ADR-059. `:accept` + `:timeout` has been in the closed vocabulary since
+/// ADR-045 part 2 named it as one of the pairings that makes the kind
+/// dispatchable, with nothing able to raise it. This is its raiser.
+///
+/// Unlike the read deadline above, the kind is pinned exactly rather than to a
+/// set of two: this clock is the adapter's own, so there is no platform whose
+/// answer could differ.
+#[cfg(feature = "tcp")]
+#[test]
+fn an_accept_deadline_expires_rather_than_blocking_forever() {
+    let mut s = Session::new();
+    run(&mut s, r#"(def l (tcp/listen "127.0.0.1:0"))"#);
+    run(&mut s, "(tcp/set-timeout l 30)");
+    // Nothing ever connects. Before ADR-059 this call did not return.
+    assert_eq!(
+        run(
+            &mut s,
+            "(try (tcp/accept l) (catch e [(get e :operation) (get e :kind)]))"
+        ),
+        "[:accept :timeout]"
+    );
+
+    run(&mut s, "(io/close l)");
+}
+
+/// ADR-059's restore, and it needs a thread to be visible at all.
+///
+/// The obvious version of this test — time out, then connect and accept again —
+/// **passes with the restore deleted**, because a second accept re-enters the
+/// polling loop and sets non-blocking itself. It was written that way first and
+/// a mutation caught it: a true assertion about the wrong subject, which is the
+/// shape ADR-055 exists for.
+///
+/// What the restore actually protects is the path where the deadline is
+/// *cleared* and a blocking accept follows. Distinguishing "blocks until a peer
+/// arrives" from "returns instantly with `:would-block`" needs a peer that
+/// arrives late, so one connects from another thread — with nothing pending at
+/// the moment of the call, which is the only state where the two differ.
+#[cfg(feature = "tcp")]
+#[test]
+fn clearing_a_deadline_restores_the_blocking_accept() {
+    let mut s = Session::new();
+    run(&mut s, r#"(def l (tcp/listen "127.0.0.1:0"))"#);
+    run(&mut s, "(tcp/set-timeout l 20)");
+    run(&mut s, "(try (tcp/accept l) (catch e nil))");
+    run(&mut s, "(tcp/set-timeout l nil)");
+
+    let addr = run(&mut s, "(tcp/local-addr l)");
+    let addr = addr.trim_matches('"').to_string();
+    let peer = std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(80));
+        std::net::TcpStream::connect(addr).expect("the listener is still bound")
+    });
+
+    // Nothing is pending yet. A restored listener waits for the thread; one
+    // left non-blocking answers `:would-block` before the sleep is over.
+    assert_eq!(run(&mut s, "(io/open? (tcp/accept l))"), "true");
+    drop(peer.join().expect("the peer thread connected"));
+    run(&mut s, "(io/close l)");
+}
+
+/// The other half of ADR-059's restore, and the one that is quiet: a connection
+/// handed back from a timed-out listener must be *blocking*, because whether an
+/// accepted socket inherits the listener's mode is platform-specific. Where it
+/// inherits, every read on a perfectly good connection answers `:would-block`
+/// with nothing in the program to explain it.
+///
+/// Pinned with a real read rather than by asking the socket, because the
+/// language has no way to ask.
+#[cfg(feature = "tcp")]
+#[test]
+fn a_connection_accepted_after_a_deadline_reads_normally() {
+    let mut s = Session::new();
+    run(&mut s, r#"(def l (tcp/listen "127.0.0.1:0"))"#);
+    run(&mut s, "(tcp/set-timeout l 200)");
+    run(&mut s, "(def c (tcp/connect (tcp/local-addr l)))");
+    run(&mut s, "(def server (tcp/accept l))");
+    run(&mut s, r#"(io/write c "hi")"#);
+    // A blocking read waits for the two bytes. A non-blocking one raises
+    // `:would-block` on whichever side of the race it lands.
+    assert_eq!(run(&mut s, "(bytes-str (io/read server 2))"), r#""hi""#);
+    run(&mut s, "(io/close c) (io/close server) (io/close l)");
+}
+
 /// `:connection-reset` had no raiser any test provoked — it could be mapped to
 /// `:other` with the whole suite green (`notes/milestone-10-mutants.md`). It is
 /// the kind a program most wants to retry on, so a wrong classification is the

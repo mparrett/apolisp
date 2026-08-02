@@ -353,7 +353,13 @@ wrong by 2× in the flattering direction* — it extrapolated upward from a debu
 run that had already passed a second at 8,000 lines. The corrected figure is
 what makes this urgent rather than eventual: 14,500 lines is not a large file.
 
-**The candidates, and what each costs.** Not ordered, and none chosen.
+**Answered 2026-08-02 by ADR-061: candidate 1, both halves.** The candidate
+list below is kept because the reasoning for rejecting the others is the useful
+part, and because if ADR-061's C3 is refuted — `split` linear, `map` still
+quadratic — candidate 2 becomes the right answer after all and this is the list
+that says so. Predictions in `notes/the-consuming-protocol-prediction.md`.
+
+**The candidates, and what each costs.** Not ordered.
 
 1. **Kill a slot at its last use, *and* a consuming call protocol.** E-18
    measured these and they are not the two alternatives E-13 called them: with

@@ -3626,6 +3626,107 @@ a shorter one than the argument about what to do with a symlink loop.
 
 ---
 
+### ADR-061 — Copy-on-write starts paying: a dead-slot kill and a consuming call protocol
+
+*(New, 2026-08-02. Answers Q37. Upholds ADR-041 rather than superseding it, and
+extends ADR-006 and ADR-038. Rests on E-13 and E-18, which are the measurements
+that say why one half alone is inert.)*
+
+**Decision.** Two changes, and neither is optional, because E-18 measured that
+each alone leaves `Rc::make_mut` non-unique:
+
+**1. The compiler kills a slot at its last use.** A new instruction,
+`MoveKill { dst, src }`, copies `src` to `dst` and writes `Nil` into `src`. The
+lowering emits it instead of `Move` wherever liveness proves `src` is dead after
+that read. It is a new `Instr` variant of the same shape as `Move`, so ADR-034's
+asserted 16 bytes is unchanged.
+
+**2. A native receives its arguments mutably and may take them.**
+`NativeFn` becomes `fn(&mut Vm, &mut [Value]) -> Result<Value, Fault>`, and
+`native_call` takes `ex: &mut Execution` instead of `&Execution`. A collection
+builder consumes with `std::mem::replace(&mut a[0], Value::Nil)` and then owns
+the only reference. Only the builders opt in — `conj`, `assoc`, `dissoc`,
+`concat`, `vec` — and every other native is unchanged.
+
+**Why both.** E-18's table is the entry:
+
+| program | count at the slot | after the native's own clone |
+|---|---:|---:|
+| `(conj (vector) 1)` — nothing else holds it | 1 | **2** |
+| `(loop [out []] … (recur (conj out i)))` | 2 | 3 |
+
+Change 1 alone takes the loop from 3 to 2, and 2 is not 1, so `make_mut` still
+copies and nothing observable moves. Change 2 alone takes the loop from 3 to 2
+for the same reason from the other side — the live accumulator local is still
+there. Only together do they reach 1.
+
+**Why it is worth this much.** `split` over 64,000 lines is **19.09 seconds**,
+and the curve is 4.4–4.7 ns per line² across a 16× range in release, so one
+second lands at about 14,500 lines. Every `conj` loop in the language is on that
+curve, including ones a user writes that no library change could reach. This is
+the reason to prefer it over making `split` and `join` native, which fixes the
+two functions that happened to be measured and leaves `map`, `filter`, `range`
+and `repeat` exactly where they are.
+
+It also keeps ADR-041 honest. That entry chose flat `Vec` with copy-on-write and
+no transients, and E-13 found the copy-on-write half had never once fired. This
+is what makes the decision true rather than aspirational, which is a better
+outcome than superseding it for transients.
+
+**What it costs.**
+
+*Every `.disasm` golden moves.* A `Move` at a last use becomes a `MoveKill`, and
+that is most calls in most programs. This is a large reviewed diff, not a risk —
+BUILD.md's rule is a read diff, not immutability — but it should land in one
+commit that changes nothing else, so the diff is readable as exactly one
+substitution.
+
+*Liveness is a fixpoint, not a scan.* `loop`/`recur` is a backward edge, so a
+linear last-use pass is wrong: a slot read at the top of a loop body is live at
+the bottom. The analysis has to iterate to a fixpoint over the control-flow
+graph, and that is the part of this entry with real algorithmic content.
+
+*Handlers make a slot live that looks dead.* A `catch` target can be entered
+from anywhere in its region, so a slot read after the handler is live *through*
+the whole region even where no straight-line path reads it. Getting this wrong
+is the dangerous failure: a slot cleared too early yields `nil` where a value
+should be, so the program computes a wrong answer rather than crashing. That is
+the shape ADR-055's rung exists for, and this change should not land without
+mutations that flip on it.
+
+*A consuming native that throws leaves `Nil` behind.* The argument window is
+above the frame and is truncated on unwind, so nothing can observe it — but the
+claim is load-bearing enough to be worth a test rather than a sentence.
+
+*The `Image` sees smaller slot arrays.* Clearing a dead slot means a snapshot
+taken after it carries `Nil` where it used to carry a value. That is a size win
+and a behaviour change to nothing, since a dead slot is by definition never read
+— but it will move the round-trip corpus's encoded sizes, and that is the
+property to watch rather than the transcript.
+
+**The number this predicts.** `split` should go from **4.0× per doubling to
+2.0×**, and 64,000 lines from 19.09 s to under 0.1 s. Pre-registered with its
+refutation condition in `notes/the-consuming-protocol-prediction.md`, because a
+performance change with no number written down in advance is a change that will
+be reported as a success whatever it does.
+
+**Rejected.** *A last-use pass alone* — E-18; inert. *A consuming protocol
+alone* — E-18; inert in a loop, which is the only place this matters.
+*Native `split` and `join`* — cheap and real, and it buys the two functions that
+were measured rather than the property that is broken; it also moves library
+code into the line budget to work around a VM defect, which is the wrong place
+to pay. Worth reconsidering only if this entry is abandoned. *Transients or a
+persistent vector* — both supersede ADR-041, the second supersedes ADR-011 too,
+and ETHOS constraint #3 asks for concrete representations and good constants
+before it asks for new data structures. This entry *is* the good constant.
+*Changing every native to the mutable signature at once rather than opting in* —
+the signature change is expected to be nearly free, since the closures infer
+their argument type and `&mut [Value]` reborrows to `&[Value]` at every helper
+call site, but "expected" is doing work in that sentence and the opt-in costs
+nothing to keep.
+
+---
+
 ## Errata
 
 Factual corrections to entries whose **decision still stands**. A wrong reason is

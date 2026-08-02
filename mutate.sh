@@ -602,6 +602,30 @@ mutation src/adapters/tcp.rs \
   'an accepted socket is put back into blocking mode explicitly (ADR-059)' \
   'whether accept inherits the listeners mode is platform-specific, and neither macOS nor Linux inherits it — so on every platform this suite runs on, the line is unobservable and the guard is for the platform that does'
 
+# --- ADR-060: io/read-dir ----------------------------------------------------
+
+LANGIO='--test lang'
+
+# BUILD.md rule 5 at a syscall. The suite creates its files in an order chosen
+# so that creation order and sorted order differ — without which this mutation
+# would survive on any filesystem that happens to hand entries back in the order
+# they were made.
+mutation src/lib.rs \
+  '            entries.sort();' \
+  '' \
+  "$LANGIO" \
+  'a listing is sorted, so it cannot flap a golden (ADR-060, BUILD.md rule 5)'
+
+mutation src/lib.rs \
+  'if t.is_symlink() {
+                        "symlink"
+                    } else if t.is_dir() {' \
+  'if false {
+                        "symlink"
+                    } else if t.is_dir() {' \
+  "$LANGIO" \
+  'a link to a directory is :symlink and not :dir (ADR-060)'
+
 echo
 echo "=== $flipped of $total flipped, $survived_ok survived as declared"
 if [ ${#dead[@]} -gt 0 ]; then

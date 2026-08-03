@@ -3793,6 +3793,77 @@ that survived being written down; the write-ups exist to be read.
 
 ---
 
+### ADR-063 — One voice pass over the frozen write-ups
+
+*(New, 2026-08-03. Narrows ADR-057 rather than superseding it: the freeze stands,
+and this entry states what it was always a freeze **on**.)*
+
+**Decision.** The thirteen write-ups took a single copy-editing pass — **34 edits
+across 11 pages**, no page rewritten, no count, claim, date, or citation altered.
+`pager.html` and `subtraction.html` needed nothing.
+
+**ADR-057 freezes content, not characters.** Its argument is entirely about
+factual drift: a later session finds "55 entries", notices the log holds more,
+and helpfully updates it, turning an accurate historical document into an
+inaccurate current one. That failure mode requires changing a *fact*. Editing
+`and it is the record that makes X scoreable` to `and the record is what makes X
+scoreable` cannot reach it. The freeze is what stops the pages tracking the
+repository; it was never a claim that the prose was finished.
+
+**What the pass targeted.** Two constructions, found by counting rather than by
+reading impressions:
+
+| | before | after |
+|---|---|---|
+| `and that/it/this is` as a paragraph connector | 33 | **8** |
+| the "X is not Y, it is Z" antithesis | 35 | 30 |
+| `which is (exactly) why/what` | 15 | 12 |
+
+The antithesis barely moves on purpose. It is this register's sharpest device
+and most of its uses are the legitimate one — correcting a belief the reader
+actually holds. Only the decorative instances went; the aphorisms stayed.
+
+**Three things the counting got wrong before it got them right**, recorded
+because the corrections are the useful part:
+
+1. The em dash was assumed to be the problem. It is not: 53% of paragraphs
+   contain none and 1% contain three or more.
+2. A detector reported 35 violations of "don't restate the noun your pronoun
+   just stood for". Reading all 35 found **zero** — it was matching any colon
+   followed by an article, and nine of the hits were the page footer. This is
+   E-17's shape again, in the review apparatus rather than the code: a true
+   assertion applied to a subject nobody checked.
+3. Every count taken before quoted spans and the repeated footer were excluded
+   was inflated, some by half.
+
+**The one mechanical rule.** A voice pass must exclude quoted spans *by
+construction*, not by care. Six flagged instances sat inside verbatim quotations
+of `ETHOS.md` and `ADR.md`, and one sat inside inline quotation marks that a
+blockquote-only filter misses. Revising any of them would have made this
+document claim a source said something it did not.
+
+**Cost.** The pages are no longer byte-identical to what was frozen on
+2026-08-01, and their footers still read "Frozen 2026-08-01" — accurate about
+every count, and arguably misleading about the text. Left as is: adding "prose
+revised" to thirteen footers spends more of the reader's attention on the
+editing history than the editing history is worth. The second cost is
+precedent — "the freeze doesn't cover *this*" is a sentence that gets easier to
+say each time, and the defence is only that this entry exists and the next one
+would have to as well.
+
+**Rejected.** *Leaving them* — the page count made the tic measurable, and a
+corpus that argues for measuring things was not going to be the exception.
+*Rewriting for voice wholesale* — the prose is good; the defect was repetition
+of its own best move, and the fix for repetition is subtraction.
+*Regenerating the pages from the current repository* — that is the exact failure
+ADR-057 exists to prevent.
+
+The rules the pass ran under are `style-guide-narrative.md` in the `claude-author`
+repo, a delta over that project's outbound prose rubric. They are not normative
+here and apolisp does not depend on them.
+
+---
+
 ## Errata
 
 Factual corrections to entries whose **decision still stands**. A wrong reason is

@@ -381,7 +381,7 @@
 
   <p><strong>No golden file changed.</strong> Removing the redundant clause produced byte-identical bytecode across the whole corpus, which is exactly what &ldquo;this branch was unreachable&rdquo; should look like from the outside.</p>
 
-  <p>So a mutation check does not only find dead tests. It finds <em>duplicated enforcement</em> — two mechanisms implementing one rule, with no way for the suite to say which is working. Adding a test that pinned both would have preserved the ambiguity rather than resolving it.</p>
+  <p>So a mutation check finds more than dead tests. It finds <em>duplicated enforcement</em> — two mechanisms implementing one rule, with no way for the suite to say which is working. Adding a test that pinned both would have preserved the ambiguity rather than resolving it.</p>
 </section>
 
 <section>
@@ -444,7 +444,7 @@
 
   <p>The fix was small. The useful part was turning the bug into a mutant afterwards and checking that the fix is <em>observed</em> and not merely present. It now fails two tests, so the same slip cannot come back quietly.</p>
 
-  <p>Milestone 3&rsquo;s exit condition got the same treatment. &ldquo;A tail loop runs in constant space&rdquo; is not observable from outside the VM at all — a loop that quietly grew the frame stack still prints the right answer — so the VM reports its high-water marks and the test compares a hundred thousand iterations against ten. Both numbers, frames <em>and</em> slots. Frames alone would have passed an implementation that reused frames and leaked slots, which is exactly what the sibling project measured when it found that tail-call optimization fixed its stack and not its heap.</p>
+  <p>Milestone 3&rsquo;s exit condition got the same treatment. &ldquo;A tail loop runs in constant space&rdquo; is not observable from outside the VM at all — a loop that quietly grew the frame stack still prints the right answer — so the VM reports its high-water marks and the test compares a hundred thousand iterations against ten. Both numbers, frames <em>and</em> slots. Frames alone would have passed an implementation that reused frames and leaked slots — exactly what the sibling project measured when it found that tail-call optimization fixed its stack and not its heap.</p>
 </section>
 
 <section>
@@ -466,7 +466,7 @@
     <p>Self-run mutation found one survivor in milestone 2. A fresh context, given the same diff and none of the reasoning, found seven more in the same code an hour later. Running mutants on your own work is worth doing and is not a substitute for someone who does not already know what the code is supposed to do.</p>
   </div>
 
-  <p>The cost is low enough to be uninteresting: change a line, run the suite, restore. Ten minutes a milestone. The discipline is entirely in writing the prediction down first, which is what separates a result from a fishing expedition — and which is why the null result in round four is reportable at all.</p>
+  <p>The cost is low enough to be uninteresting: change a line, run the suite, restore. Ten minutes a milestone. The discipline is entirely in writing the prediction down first, — what separates a result from a fishing expedition, and what makes the null result in round four reportable at all.</p>
 
   <p>There is one procedural scar. Round two&rsquo;s fix was written <em>while a mutant was still applied</em>, and the <code>git checkout</code> that reverted the mutant reverted the fix along with it. Mutate against a clean tree, always.</p>
 </section>

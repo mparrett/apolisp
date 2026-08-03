@@ -607,7 +607,7 @@ slot_operands_stay_inside_the_frame</code></pre>
   <span class="eyebrow">The cheapest one</span>
   <h2>Ask the check to show its working, before it has ever been green</h2>
 
-  <p>Instance 5 was found by neither of the other two, and it is the only one of the six that was caught <em>before</em> it went wrong.</p>
+  <p>Instance 5 was found by neither of the other two, and is the only one of the six caught <em>before</em> it went wrong.</p>
 
   <p><code>the_language_carries_no_dependencies</code> reads <code>Cargo.toml</code>, splits out the <code>[dependencies]</code> section by hand, and asserts that every entry it finds is optional &mdash; which is the property that matters, since ADR-013 makes features host capability only, so a non-optional dependency is by definition one the language carries.</p>
 
@@ -617,7 +617,7 @@ slot_operands_stay_inside_the_frame</code></pre>
 
   <div class="note clean">
     <span class="tag">Why this is the one to reach for first</span>
-    <p>Mutation needs the code to exist and a hypothesis about how it might break. An unlike input needs the input, and someone to think of it. Asking a check to show its working needs a <code>println</code> and thirty seconds &mdash; and it is the only one of the three that works <em>before</em> a test has ever been green for the wrong reason.</p>
+    <p>Mutation needs the code to exist and a hypothesis about how it might break. An unlike input needs the input, and someone to think of it. Asking a check to show its working needs a <code>println</code> and thirty seconds &mdash; the only one of the three that works <em>before</em> a test has ever been green for the wrong reason.</p>
   </div>
 
   <p>An empty subject is the easiest failure to have and the hardest to see, because every assertion over it passes and none of them is false. A check that observed nothing and a check that observed everything print the same verdict, and only one of them is a test.</p>
@@ -627,11 +627,11 @@ slot_operands_stay_inside_the_frame</code></pre>
   <span class="eyebrow">Instance 3</span>
   <h2>A survivor is a question about which of two things is wrong</h2>
 
-  <p>The reflex reading of a surviving mutant is &ldquo;the test is too weak&rdquo;. Instance 3 is the one that does not fit, and it is worth keeping for that.</p>
+  <p>The reflex reading of a surviving mutant is &ldquo;the test is too weak&rdquo;. Instance 3 is the one that does not fit, and worth keeping for that.</p>
 
   <p><code>str-scalar-slice</code> had a <code>from &gt; to</code> branch of its own. Removing it changed no behaviour any test could see: the scan reaches the same error either way, and ADR-039 clause 3 makes the message prose rather than contract. The correct reading was not &ldquo;the test is too weak&rdquo; but <strong>&ldquo;the code is redundant&rdquo;</strong>, and deleting it was the fix.</p>
 
-  <p>Then deleting it exposed something a stronger test would never have found. Without the loop&rsquo;s early <code>break</code>, <code>s[f..t]</code> runs backwards and <strong>panics</strong> &mdash; a process abort, where ADR-039 requires a throw. That is now held by an <code>f &lt;= t</code> guard rather than by an argument about loop ordering, and it is <a href="mutations.html">the harness&rsquo;s one declared survivor</a>: kept deliberately, unreachable while the <code>break</code> stands, and reported loudly if it ever starts dying.</p>
+  <p>Then deleting it exposed something a stronger test would never have found. Without the loop&rsquo;s early <code>break</code>, <code>s[f..t]</code> runs backwards and <strong>panics</strong> &mdash; a process abort, where ADR-039 requires a throw. That is now held by an <code>f &lt;= t</code> guard rather than by an argument about loop ordering &mdash; <a href="mutations.html">the harness&rsquo;s one declared survivor</a>: kept deliberately, unreachable while the <code>break</code> stands, and reported loudly if it ever starts dying.</p>
 
   <div class="note found">
     <span class="tag">What the reflex would have cost</span>
@@ -643,7 +643,7 @@ slot_operands_stay_inside_the_frame</code></pre>
   <span class="eyebrow">The sharpest case</span>
   <h2>The comment at the line named the subject the assertion could not reach</h2>
 
-  <p>One more, filed as an erratum rather than in the note, and it is the one that makes the thesis hardest to dismiss as inattention.</p>
+  <p>One more, filed as an erratum rather than in the note, and the one that makes the thesis hardest to dismiss as inattention.</p>
 
   <p>A mutation making <code>vec-slice</code> return a <strong>list</strong> instead of a vector survived the entire suite &mdash; including three assertions written the day before, whose comment read <em>&ldquo;a list in, a vector out &mdash; the conversion is the point&rdquo;</em>.</p>
 

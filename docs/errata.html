@@ -444,7 +444,7 @@
 
   <p>Supersession keeps that trail without acquiring a governance process. The rejected alternatives are named: a <code>decisions/NNN-*.md</code> directory (more files than decisions, and a directory walk to answer anything spanning two of them), amending entries in place (loses the trail, which is the only thing the log is for), and version bumps (governance language written for a language with users, of which there are none).</p>
 
-  <p>But supersession is a heavy instrument. It is for a decision that changed. It is the wrong tool for an entry whose decision is fine and whose third paragraph contains a false sentence &mdash; and that turns out to be the common case by a factor of four.</p>
+  <p>But supersession is a heavy instrument. It is for a decision that changed. It is the wrong tool for an entry whose decision is fine and whose third paragraph contains a false sentence &mdash; the common case by a factor of four.</p>
 </section>
 
 <section>
@@ -459,7 +459,7 @@
 
   <p>That is simply false. WasmGC provides managed struct and array references; an interpreter can hold explicit frames in GC-managed arrays exactly as it can in linear memory. Linear memory stands as the decision, on entirely different grounds: Rust toolchain support, control over layout, ease of producing a canonical byte-oriented image, and not depending on host GC behaviour.</p>
 
-  <p>Leave the false reason standing and it is what a future reader picks up. It generalises so nicely &mdash; <em>managed runtime, therefore no explicit stack, therefore no snapshot</em> &mdash; that it would get applied to the next three targets without anyone re-checking it. The conclusion was never in danger. The sentence underneath it was load-bearing for everything that came after.</p>
+  <p>Leave the false reason standing and a future reader picks it up. It generalises so nicely &mdash; <em>managed runtime, therefore no explicit stack, therefore no snapshot</em> &mdash; that it would get applied to the next three targets without anyone re-checking it. The conclusion was never in danger. The sentence underneath it was load-bearing for everything that came after.</p>
 </section>
 
 <section>
@@ -540,7 +540,7 @@
     <div class="link"><span class="id">E-15</span><span class="said">True when written, false since ADR-043: an <code>Image</code> carries a chunk <em>fingerprint</em> and takes the chunk from its caller. No <code>Chunk</code> is serialized at all. The duplication reaches the compiler&rsquo;s output and stops there.</span></div>
   </div>
 
-  <p>E-12&rsquo;s substance is untouched &mdash; the proto table really does double, and that is a size statement rather than a correctness one. What went stale is the <em>consequence</em>, and E-15 says plainly why that is worth more than the correction:</p>
+  <p>E-12&rsquo;s substance is untouched &mdash; the proto table really does double, a size statement rather than a correctness one. What went stale is the <em>consequence</em>, and E-15 says plainly why that is worth more than the correction:</p>
 
   <blockquote><p>ADR-043 changed what an <code>Image</code> contains, and nothing walked the errata to see what had been asserted about it.</p></blockquote>
 
@@ -561,7 +561,7 @@
     <div class="link"><span class="id">E-17</span><span class="said">Both entries state an inventory in prose, which guarantees a correction per sitting and teaches nobody anything. <strong><code>mutate.sh</code> is the count.</strong> Neither number should be read as current, and no further erratum will be filed to move one.</span></div>
   </div>
 
-  <p>The set is forty-five now, which is exactly the point: that sentence is already the wrong kind of sentence to have written, and it is safe here only because this page is a description rather than a record anything defers to.</p>
+  <p>The set is forty-five now, which is exactly the point: that sentence is already the wrong kind of sentence to have written, and safe here only because this page is a description rather than a record anything defers to.</p>
 
   <p>E-17 does something the other sixteen do not. Rather than correct a fact, it withdraws a <em>kind</em> of fact from the log &mdash; and gives the reason in terms of what the log is for. An entry exists to carry reasoning that would otherwise be re-derived badly. A count of things in a file is not reasoning; it is a cache of something the file already knows, and a cache with no invalidation is a bug wearing documentation&rsquo;s clothes.</p>
 

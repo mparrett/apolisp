@@ -447,7 +447,7 @@
       <div>
         <h3>Seeded randomness, a virtual clock, replay</h3>
         <p>Simulators are one of the three named target workloads, and this appears in the decisions exactly once &mdash; as the word &ldquo;RNG&rdquo; in a list of things that could be feature-gated.</p>
-        <p>And it is not only a simulator concern, which is what makes losing it expensive: the serialization round-trip property compares a resumed transcript against an uninterrupted one, so an unseeded generator or a wall clock makes those differ <em>for reasons unrelated to the snapshot</em>. That is the oracle for a governing constraint flapping, which this project&rsquo;s own build document names as how oracles die.</p>
+        <p>And the concern reaches past the simulator, which is what makes losing it expensive: the serialization round-trip property compares a resumed transcript against an uninterrupted one, so an unseeded generator or a wall clock makes those differ <em>for reasons unrelated to the snapshot</em>. That is the oracle for a governing constraint flapping, which this project&rsquo;s own build document names as how oracles die.</p>
         <span class="where">One bullet, in a list of possible future crates.</span>
       </div>
     </div>
@@ -484,7 +484,7 @@
 
 <section>
   <span class="eyebrow">The product</span>
-  <h2>What the audit made was not corrections. It was three question numbers.</h2>
+  <h2>The audit produced three question numbers</h2>
 
   <p>Worth being precise about what an exercise like this yields, because it is easy to imagine it yields a list of mistakes. It did not. Nothing in the conversation was wrong, nothing in the log was wrong, and the audit changed no decision. What it produced was three entries in the open-questions file, which is a smaller-sounding output than it is.</p>
 

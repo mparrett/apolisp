@@ -427,7 +427,7 @@ reset: :connection-reset after 2 writes
 
   <p>That had been argued about and never measured. Measured, it is worse than the argument suggested: four sequence functions are nine protos and 160 lines of disassembly, which across nine corpus programs is <strong>+1,440 golden lines — 672 to 2,112, a 3.1&times; blow-up for four functions</strong>.</p>
 
-  <p>And it is entirely a consequence of ordering. Compile the unit first and append the prelude <em>after</em>, and a program&rsquo;s proto indices depend on the program alone:</p>
+  <p>Entirely a consequence of ordering. Compile the unit first and append the prelude <em>after</em>, and a program&rsquo;s proto indices depend on the program alone:</p>
 
 <pre><code><span class="dim">;; six functions added to the prelude</span>
 $ git status --short tests/corpus/
@@ -475,9 +475,9 @@ josé       |
 
   <p>The rest of what the report program had to define was sorting, and sorting needed something first. The comparison operators are numbers only, so there was no way to order two strings <em>at all</em> — and a sort that cannot order a list of names is not a sort anybody wanted.</p>
 
-  <p>So an ordering that stops where it runs out: within numbers, within strings, and a refusal by name for everything else. Not a total order over every value, because ordering a keyword against a vector is a ruling nothing needs and everything would then be stuck with. Strings order by code point, which is an order and not a collation — no locale is consulted, and that is a limit to know rather than a bug to file.</p>
+  <p>So an ordering that stops where it runs out: within numbers, within strings, and a refusal by name for everything else. Not a total order over every value, because ordering a keyword against a vector is a ruling nothing needs and everything would then be stuck with. Strings order by code point, which is an order and not a collation — no locale is consulted, a limit to know rather than a bug to file.</p>
 
-  <p>The sort is a merge sort, and that is the decision rather than the detail. The version everyone writes first — take the smallest, remove it with a filter, repeat — removes <em>every</em> element equal to the smallest rather than one of them, so it silently drops ties. It is wrong on the first input with a duplicate and looks right on every input without one.</p>
+  <p>The sort is a merge sort &mdash; the decision rather than the detail. The version everyone writes first — take the smallest, remove it with a filter, repeat — removes <em>every</em> element equal to the smallest rather than one of them, so it silently drops ties. It is wrong on the first input with a duplicate and looks right on every input without one.</p>
 
   <p>The same program, three times:</p>
 
@@ -502,7 +502,7 @@ josé       |
     <div class="stat"><b>2</b><span>operating systems</span></div>
   </div>
 
-  <p>The character of the finding has changed in every chapter, and this is the largest change yet. Chapters one and two found defects. Chapter three found holes — code that was correct and untested. This chapter found that the suite had stopped being a source of information about the language at all.</p>
+  <p>The character of the finding has changed in every chapter, and the change here is the largest yet. Chapters one and two found defects. Chapter three found holes — code that was correct and untested. This chapter found that the suite had stopped being a source of information about the language at all.</p>
 
   <p>Not through neglect. 115 tests pass, on two operating systems, across three points of the feature lattice, with a fuzzer and a soak behind them. They exercise the virtual machine, which is what they were built to do and what nine of the ten milestones were about. A suite shaped that way calls primitives directly and never needs a sequence function twice, never parses a number from a string, and never pads a column — so it cannot see that any of those are missing or wrong. The subtraction harness inherits the blind spot exactly, because it compares a build against that suite.</p>
 

@@ -437,7 +437,7 @@ chunk.protos:
   [3] g
 </code></pre>
 
-  <p>Existing indices never move, so no closure ever leaves its chunk and the question stops arising. The value representation, the closure representation, the dispatch loop, and the image are all untouched. The registry stays available for the thing that would actually force it, which is migrating an image to code assembled differently — and that is already out of scope.</p>
+  <p>Existing indices never move, so no closure ever leaves its chunk and the question stops arising. The value representation, the closure representation, the dispatch loop, and the image are all untouched. The registry stays available for the thing that would actually force it, which is migrating an image to code assembled differently — already out of scope.</p>
 
   <p>The rest of the milestone came from one sentence: <strong>a REPL session is one compilation unit.</strong> Macros persist across inputs, the gensym counter runs monotonically to the end of the session, and the reader configuration is the session&rsquo;s to change. Three subsystems, one rule. The gensym half is the load-bearing one — a counter that restarted per input could hand input 2 a name input 1 had already used, and a fresh symbol that is not fresh is the only thing gensym may not produce.</p>
 
@@ -473,7 +473,7 @@ perl -0pi -e 's/println!\("--- suppressed\\\\n\{\}"/.../'
   <span class="eyebrow">Milestone 10</span>
   <h2>Network error kinds, and a sort that was already sorted</h2>
 
-  <p>The last milestone is host adapters — terminal, TCP, JSON — and it is the first that lives outside the line budget, on the principle that substantial host capability is a Rust library behind the handle table rather than a language subsystem. That principle had cost nothing while it described an empty set. The moment it describes real files it becomes a way to move lines out of a budget by moving them into a directory, so the budget test now excludes the directory and <em>prints what it excluded</em>, with per-file counts, on every run.</p>
+  <p>The last milestone is host adapters — terminal, TCP, JSON — the first that lives outside the line budget, on the principle that substantial host capability is a Rust library behind the handle table rather than a language subsystem. That principle had cost nothing while it described an empty set. The moment it describes real files it becomes a way to move lines out of a budget by moving them into a directory, so the budget test now excludes the directory and <em>prints what it excluded</em>, with per-file counts, on every run.</p>
 
   <p>TCP is in this milestone for one reason. Three error kinds — <code>:timeout</code>, <code>:would-block</code>, <code>:connection-reset</code> — had been named two milestones earlier and deliberately left out, on the grounds that a kind nobody can raise is a guess with a colon in front of it. A file can produce none of them. An entry that defers three kinds and then never adds them has not been careful, it has been lucky.</p>
 

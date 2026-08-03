@@ -424,7 +424,7 @@
   <span class="eyebrow">What it is</span>
   <h2>A context-window constraint, so a comment costs what code costs</h2>
 
-  <p>Constraint #1 in the project&rsquo;s ethos is not an aesthetic preference:</p>
+  <p>Constraint #1 in the project&rsquo;s ethos says why:</p>
 
   <blockquote><p><strong>Legibility budget.</strong> The entire core is holdable at once &mdash; by one engineer and by one language model. This is a context-window constraint, not an aesthetic one, and it is the binding constraint on every other decision.</p></blockquote>
 
@@ -585,14 +585,14 @@ prelude.xs: 201
     <p>The same exclusion became an argument <em>for</em> taking two dependencies. Hand-writing JSON escaping and terminal capability detection would have added several hundred lines of protocol nobody reviews carefully &mdash; outside the budget, <em>so nothing would even flag the growth</em>. A boundary drawn to protect the language turns out to be, on its far side, the place where growth is invisible.</p>
   </div>
 
-  <p>The boundary is still the right one, and it is drawn on a principle rather than on convenience: substantial host capability is a Rust library behind the handle table, not a language subsystem. But &ldquo;outside the budget&rdquo; and &ldquo;unmeasured&rdquo; are not the same thing, and only one of them was intended.</p>
+  <p>The boundary is still the right one, drawn on a principle rather than on convenience: substantial host capability is a Rust library behind the handle table, not a language subsystem. But &ldquo;outside the budget&rdquo; had quietly become &ldquo;unmeasured&rdquo;, and only one of those was intended.</p>
 </section>
 
 <section>
   <span class="eyebrow">The accounting</span>
   <h2>In ten milestones it has refused nothing</h2>
 
-  <p>Here is the part that a page about a line budget is most tempted to leave out. Searching every entry in the decision log: <strong>no decision has been declined with the line budget as the deciding reason.</strong></p>
+  <p>Searching every entry in the decision log: <strong>no decision has been declined with the line budget as the deciding reason.</strong></p>
 
   <div class="stats">
     <div class="stat"><b>0</b><span>features refused</span></div>
@@ -605,7 +605,7 @@ prelude.xs: 201
 
   <p>A constraint that never binds is doing one of two things: the work genuinely fits, or the constraint is slack. Both are true here. 6,845 against a 7,500 target and an 8,500 assertion is a quarter of the artifact in room.</p>
 
-  <p>So what did it buy? Not refusals. <strong>It made every growth event a written decision with a number attached.</strong> Entries carry their cost in lines as a matter of course &mdash; <em>core goes from 6,303 to 6,561</em>, <em>6,561 to 6,616 &mdash; 55 lines, against the 25&ndash;35 predicted</em>, <em>6,616 to 6,637; prelude 195 &rarr; 201, which is longer</em>. None of that would exist without a number to state the cost against, and it is the record that makes a pre-registration&rsquo;s line prediction scoreable at all.</p>
+  <p>So what did it buy? Not refusals. <strong>It made every growth event a written decision with a number attached.</strong> Entries carry their cost in lines as a matter of course &mdash; <em>core goes from 6,303 to 6,561</em>, <em>6,561 to 6,616 &mdash; 55 lines, against the 25&ndash;35 predicted</em>, <em>6,616 to 6,637; prelude 195 &rarr; 201, which is longer</em>. None of that would exist without a number to state the cost against, and the record is what makes a pre-registration&rsquo;s line prediction scoreable at all.</p>
 
   <div class="note clean">
     <span class="tag">The honest claim</span>
@@ -615,7 +615,7 @@ prelude.xs: 201
 
 <section>
   <span class="eyebrow">The pattern</span>
-  <h2>Three failures, one shape</h2>
+  <h2>All three failures were the budget passing while it stopped measuring</h2>
 
   <p>The silent cut, the unbudgeted layer, and the free exclusion are not three unrelated mistakes. Each is the same thing: <strong>the budget went on passing while it stopped measuring what it exists to measure.</strong></p>
 

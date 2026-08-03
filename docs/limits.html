@@ -349,7 +349,7 @@
     <p>It passed under the mutant. Writing a second dead test to cover the first one is the milestone-1 failure repeated deliberately, which is a poor way to spend a budget.</p>
   </div>
 
-  <p>The fix is structural, and it is the previous chapter&rsquo;s lesson arriving in a new place: make it one mechanism instead of two that have to agree.</p>
+  <p>The fix is structural &mdash; the previous chapter&rsquo;s lesson arriving in a new place: make it one mechanism instead of two that have to agree.</p>
 
 <pre><code><span class="dim">;; the only place a frame is released — returning and unwinding share it</span>
 fn drop_frame(ex: &amp;mut Execution) -&gt; Frame {
@@ -359,7 +359,7 @@ fn drop_frame(ex: &amp;mut Execution) -&gt; Frame {
 }
 </code></pre>
 
-  <p>&ldquo;Unwinding forgets to give the slots back&rdquo; is no longer expressible as a local change. Writing it means breaking returning too, and that is caught by eight tests.</p>
+  <p>&ldquo;Unwinding forgets to give the slots back&rdquo; is no longer expressible as a local change. Writing it means breaking returning too, caught by eight tests.</p>
 
   <p>One more from this round, for its shape. A mutant that stopped merging a displaced cleanup error into the one that replaced it was caught — but not by any assertion about errors. It was caught by a check that the run finishes with an empty handler stack, which exists because dropping a handler pop is the first mutation anyone would try. The assertion was doing work no test about the feature was doing.</p>
 </section>

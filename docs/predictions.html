@@ -518,7 +518,7 @@
   <span class="eyebrow">The threshold</span>
   <h2>Name the result that would say the decision was wrong, not the number</h2>
 
-  <p>Both slice entries carry a section headed <em>&ldquo;what would refute the entry rather than a number&rdquo;</em>, and it is a different instrument from the claims above. A miscalibrated prediction is ordinary. What the threshold names is the measurement that would say the <em>choice</em> was wrong &mdash; that the ADR picked the wrong shape and should be superseded rather than merely annotated.</p>
+  <p>Both slice entries carry a section headed <em>&ldquo;what would refute the entry rather than a number&rdquo;</em>, a different instrument from the claims above. A miscalibrated prediction is ordinary. What the threshold names is the measurement that would say the <em>choice</em> was wrong &mdash; that the ADR picked the wrong shape and should be superseded rather than merely annotated.</p>
 
   <div class="tablewrap">
   <table>
@@ -533,7 +533,7 @@
   </table>
   </div>
 
-  <p>Neither threshold was met, and the second was missed by three orders of magnitude. That is a boring outcome and it is worth exactly what it cost, because of what the threshold prevents rather than what it found: once a number like 0.0288&nbsp;ms is on the table, <em>every</em> reading of it is favourable. The pre-registration fixes in advance which readings are allowed to count as vindication of the choice, so a decision that survives can be said to have survived something.</p>
+  <p>Neither threshold was met, and the second was missed by three orders of magnitude. That is a boring outcome, and worth exactly what it cost, because of what the threshold prevents rather than what it found: once a number like 0.0288&nbsp;ms is on the table, <em>every</em> reading of it is favourable. The pre-registration fixes in advance which readings are allowed to count as vindication of the choice, so a decision that survives can be said to have survived something.</p>
 
   <p>The distinction between the two instruments matters. <code>str-scalar-slice</code> got three of five predictions wrong and its threshold was never approached &mdash; so the honest summary is <strong>the decision was right and most of the reasoning about it was miscalibrated</strong>, which is a sentence that can only be written because the two were separated before the run.</p>
 </section>
@@ -553,7 +553,7 @@
 
   <p>Right answer, wrong axis. And the third claim in that file was <em>&ldquo;it will be misdiagnosed&rdquo;</em> &mdash; recorded because the symptom is a whole-file operation and the cause is a per-element clone, so the expected first explanation would be &ldquo;the VM is slow&rdquo;. That claim held, and it was held by the document making it. The misdiagnosis on record is its own.</p>
 
-  <p>The same pattern, smaller, in round two: the predicted speedup ratio at 1,600 characters landed inside the band while <em>both terms of the ratio</em> were wrong &mdash; the floor by 8&times; and the slope by about 3&times;. Being right about a ratio through two compensating errors is not a calibrated prediction; it is a coincidence that looks like one, and it is only visible because the note recorded the terms and not just the ratio.</p>
+  <p>The same pattern, smaller, in round two: the predicted speedup ratio at 1,600 characters landed inside the band while <em>both terms of the ratio</em> were wrong &mdash; the floor by 8&times; and the slope by about 3&times;. Being right about a ratio through two compensating errors is not a calibrated prediction; it is a coincidence that looks like one, visible only because the note recorded the terms and not just the ratio.</p>
 
   <div class="note found">
     <span class="tag">The habit this argues for</span>
@@ -565,7 +565,7 @@
   <span class="eyebrow">The repeat offender</span>
   <h2>Twice now, &ldquo;the code gets smaller&rdquo; has lost to prose</h2>
 
-  <p>The dullest claim in each entry is the line-count one. The project has a hard budget &mdash; 7,500 lines &mdash; so every change predicts its own cost, and this is the prediction that has been wrong the most consistently.</p>
+  <p>The dullest claim in each entry is the line-count one. The project has a hard budget &mdash; 7,500 lines &mdash; so every change predicts its own cost, and this prediction has been wrong the most consistently.</p>
 
   <div class="vs">
     <div class="row said-pred"><span class="lab">ADR-052</span><span class="said">The editor core loses 2&ndash;4 lines; the change costs 25&ndash;35 core lines.</span></div>

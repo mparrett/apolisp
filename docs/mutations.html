@@ -521,7 +521,7 @@
 
   <p>The oracle is a ladder: <code>cargo check</code>, a smoke script, a golden corpus with one snapshot per compilation phase, and a test suite written in the language itself. Rung 5 is <code>just mutate</code>, and it does not test the VM. It tests the other four rungs.</p>
 
-  <p>It is a hand-written list rather than a framework, and <a href="ADR.md">ADR-055</a> is blunt about why:</p>
+  <p>It is a hand-written list rather than a framework, and <a href="https://github.com/mparrett/apolisp/blob/main/docs/ADR.md">ADR-055</a> is blunt about why:</p>
 
   <blockquote><p>Every general mutation tool answers &ldquo;what fraction of mutants die&rdquo;, which is a number nobody acts on. What has actually paid here, eight milestones running, is a handful of mutations chosen because someone believed a specific line was load-bearing. The value is in the choosing; automating the choosing removes it.</p></blockquote>
 

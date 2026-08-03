@@ -376,7 +376,7 @@
 
   <blockquote><p>A boundary earns its place when a subsystem can be <strong>deleted or lifted out</strong>. That is a different driver from modularity, and it is the one that applies here: needing a home for code is not a reason. The test is mechanical &mdash; cut the subsystem out and see whether it still builds.</p></blockquote>
 
-  <p>Which raises the obvious question about a claim like that: who ever runs the cut? A seam described in a design document and never compiled without its other half is a seam that has already rotted, and nothing will say so. So the features exist to run it. <a href="ADR.md">ADR-013</a> is explicit that they are a harness and not a product surface:</p>
+  <p>Which raises the obvious question about a claim like that: who ever runs the cut? A seam described in a design document and never compiled without its other half is a seam that has already rotted, and nothing will say so. So the features exist to run it. <a href="https://github.com/mparrett/apolisp/blob/main/docs/ADR.md">ADR-013</a> is explicit that they are a harness and not a product surface:</p>
 
   <blockquote><p>The features are not there for users &mdash; there are none. They are the <strong>subtraction test harness</strong>: building with a host adapter cut out is how &ldquo;seams exist for subtraction&rdquo; stays a fact rather than a feeling.</p></blockquote>
 
@@ -461,7 +461,7 @@ subtract:
 
   <h3>The <code>term</code>-alone point is younger than the others, and it exists because of a bug the earlier lattice could not have</h3>
 
-  <p>Until <a href="ADR.md">ADR-051</a>, <code>Host::File</code> was gated on <code>fs</code> alone, and the only way to paint a terminal was <code>(io/open "/dev/tty" :write)</code> &mdash; which is the filesystem capability. So a build with <code>term</code> and without <code>fs</code> could read keystrokes and could not draw anything. A half-present capability, in a build nothing compiled and no test ran.</p>
+  <p>Until <a href="https://github.com/mparrett/apolisp/blob/main/docs/ADR.md">ADR-051</a>, <code>Host::File</code> was gated on <code>fs</code> alone, and the only way to paint a terminal was <code>(io/open "/dev/tty" :write)</code> &mdash; which is the filesystem capability. So a build with <code>term</code> and without <code>fs</code> could read keystrokes and could not draw anything. A half-present capability, in a build nothing compiled and no test ran.</p>
 
   <p>ADR-051 made a tty a handle like any other, so painting is <code>io/write</code> to it, so <code>Host::File</code> now has two owners and a <code>term</code>-only build has to compile that arm. The lattice gained a point that means something, and the decision record accounts for the cost honestly: one more <code>#[cfg]</code> naming two features is one more place to be wrong, mitigated by the new point failing to compile if the gate ever narrows again.</p>
 

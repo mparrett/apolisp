@@ -3727,6 +3727,72 @@ nothing to keep.
 
 ---
 
+### ADR-062 — The repo goes public, MIT, and the design conversation leaves
+
+*(New, 2026-08-03. Does not amend ADR-057 — the write-ups stay frozen and stay
+at `docs/*.html`. Qualifies ADR-056 in one direction only; see below.)*
+
+**Decision.** Four things, one act.
+
+1. **The repository becomes public**, and carries an **MIT** `LICENSE` at the
+   root. Public with no license is all-rights-reserved: readable, not reusable.
+   That is a coherent position and it is not this one.
+2. **GitHub Pages publishes the thirteen write-ups**, deployed by
+   `.github/workflows/pages.yml` — the repository's first workflow. It copies
+   `docs/*.html` into an artifact and uploads that. Jekyll never runs; the pages
+   are self-contained HTML with inline CSS and have nothing to build. The
+   normative documents are read on GitHub, which renders them.
+3. **The three `href="ADR.md"` links** in `mutations.html` and `subtraction.html`
+   now point at the GitHub blob URL. They were relative links from a page that
+   is served to a file that is not.
+4. **The original design conversation leaves the repository.** It lives at
+   `project-docs/docs/apolisp/lispy-language-vm-convo-2026-07-25.md`, byte for
+   byte. `ADR.md` E-10 and `notes/design-convo-audit-2026-07-26.md` cite it by
+   its old path; both resolve there, and this entry is the forwarding address.
+
+**Why the conversation goes and the rest of `archive/` stays.** It is 1,840
+lines of an unedited chat transcript — the one artifact here that is a record of
+a conversation rather than a document written for a reader. Publishing it is a
+different act from publishing the reviews next to it, which were written to be
+read by someone else. The reviews stay.
+
+**Why this does not reopen ADR-056.** The prose-budget test forbids exactly this
+move, and says so: *"the moment a budget can be satisfied by moving a file, it
+measures where files are rather than how much there is."* The rule is unchanged
+for anything inside `docs/`, and the defence against reusing this as a loophole
+is the number rather than the argument. **Before: 15,212 / 20,000 — 76% — and
+the transcript was 1,840 of it.** The budget was under no pressure and nothing
+was bought. (The after-number is deliberately not quoted: this entry counts
+toward it, so writing it down moves it, which is its own small lesson.) A
+later removal that *is* load-bearing will be visible as one, because it will be
+made against a total that is near the assertion instead of three-quarters of the
+way to it. `LICENSE` sits at the root and is not prose, so it does not count.
+
+**Cost.** Two costs, both accepted. The design conversation is now a repository
+away from the ADRs that cite it, and a reader who follows E-10's path finds
+nothing — the pointer is in this entry, one hop further than it was. And the
+repo now has CI where it had none, which is a category of thing that grows: the
+next person with a check to run has somewhere obvious to put it, and `just
+verify` stops being the only gate anyone thinks about. Bounded here to
+publication on purpose — this workflow builds nothing and tests nothing.
+
+**Rejected.** *A `_config.yml` excluding `*.md`, `archive/` and `notes/`,
+deployed from the branch* — decided first and reversed the same day. It needs no
+workflow, but it is a denylist: it is wrong the first time a directory appears
+under `docs/` and nobody adds it, and its behaviour cannot be checked before the
+push that makes it public. Copying `docs/*.html` is an allowlist, verifiable
+locally, and structural rather than enumerated — the argument the prose-budget
+test already makes when it refuses to exclude directories. *Moving `docs/*.html`
+into `docs/site/`* — the prose-budget test counts `.html` **only at the top level
+of `docs/`**, so that move silently drops thirteen files and 3,220 lines out of
+the budget. A restructuring that defeats the measurement while looking tidier is
+the worst option on the list, and it was the first one considered. *Deleting the
+conversation rather than relocating it* — three documents reason from it,
+including ADR-015's progression count. *Staying private* — no argument for it
+that survived being written down; the write-ups exist to be read.
+
+---
+
 ## Errata
 
 Factual corrections to entries whose **decision still stands**. A wrong reason is

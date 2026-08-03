@@ -44,6 +44,10 @@ after it is still design, and the design is meant to be read in this order.
 - **`docs/archive/`** — superseded reviews, kept for the reasoning trail. They
   discuss documents that no longer exist and recommend things later ADRs
   overruled. Do not implement from them.
+- **The original design conversation** is no longer in this repo. ADR-062 moved
+  it to `project-docs/docs/apolisp/lispy-language-vm-convo-2026-07-25.md`;
+  references to `archive/lispy-language-vm-convo-2026-07-25.md` in `ADR.md` and
+  `notes/` resolve there.
 
 ## Working rules
 

@@ -1,0 +1,48 @@
+name: Pages
+
+# What gets published is the copy step below, not a config file listing what to
+# leave out. A denylist is wrong the first time a directory is added and nobody
+# updates it; this can only ever publish the write-ups. Jekyll never runs — the
+# pages are self-contained HTML with inline CSS and have nothing to build.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/*.html"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Printing the manifest is ADR-045's rule applied to publication: a
+      # selection nobody can see is how you find out what shipped by visiting it.
+      - name: Assemble the site — the write-ups, and nothing else
+        run: |
+          mkdir -p _site
+          cp docs/*.html _site/
+          echo "publishing $(ls -1 _site | wc -l | tr -d ' ') pages:"
+          ls -1 _site
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deploy
+        uses: actions/deploy-pages@v4

@@ -14,9 +14,15 @@ check:
 smoke:
     ./smoke.sh
 
-# Rung 3 + the properties
+# Rung 3 + the properties.
+#
+# `--no-fail-fast` because cargo stops launching test *binaries* after one of
+# them fails, and the goldens are spread across several. Without it, a prelude
+# change that breaks a golden in `compile.rs` hides one it also broke in
+# `expand.rs`: the gate reports two failures, you fix two, and the third is
+# still there. Found 2026-08-03 by a change that broke exactly that trio.
 test:
-    cargo test
+    cargo test --no-fail-fast
 
 # Legibility is a governing constraint, so formatting is part of verification
 # rather than a separate ritual. Commit it on its own, never mixed with

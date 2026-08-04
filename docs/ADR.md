@@ -3864,6 +3864,57 @@ here and apolisp does not depend on them.
 
 ---
 
+### ADR-064 — `docs/GUIDE.md`, and a second kind of document
+
+*(New, 2026-08-03. Does not touch ADR-057; the frozen series stays frozen and
+stays at `docs/*.html`.)*
+
+**Decision.** `docs/GUIDE.md` is a **living** developer introduction: build,
+the eight commands, the language on one page, the gaps that cost a newcomer an
+hour, and where to read next. It is **not normative** — where it disagrees with
+`ADR.md` or `ETHOS.md`, they win and the guide is the thing that is wrong.
+
+**Two kinds of prose, and the difference is maintenance.** Until now every
+document here was either normative (`ADR.md`, `ETHOS.md`, `BUILD.md`,
+`TRAPS.md`), a dated record (`docs/*.html`, `notes/`), or an archive. A guide is
+neither: it makes claims about the language *as it is now*, so it is the first
+document in the repo with an obligation to change when the code does. ADR-057
+froze the write-ups precisely to refuse that obligation. This entry accepts it
+for exactly one file.
+
+**Markdown, not a fourteenth HTML page.** The Pages workflow publishes
+`docs/*.html`, and that glob currently means "the frozen series". A living page
+sitting inside it would inherit the frozen footer, the dated voice, and the
+reader's assumption that neither moves. Keeping the invariant — *HTML here is
+frozen, Markdown is maintained* — costs one link from `README.md` and saves the
+next reader from having to check.
+
+**Verified rather than asserted.** Every code block was run against the binary
+before the file was committed, and doing that caught two errors the prose was
+confident about: a `hash` native that does not exist, and a claim that `and`,
+`or`, and `when` are ordinary bindings when they are macros — a name check
+reported them missing, and the check was the wrong shape rather than the names
+being absent. A guide is a pile of assertions about a moving subject, which is
+E-17's shape yet again; it is written down here because the next person to edit
+it will be tempted to skip the running.
+
+**Cost.** It will rot, and nothing detects that. The line budget's prose test
+counts it, so it competes with the decision log for the same 20,000 lines, and a
+guide is exactly the kind of document that grows without anyone deciding to grow
+it. Accepted for now on the grounds that the language has one user and the guide
+is short. **The obvious repair is a test that extracts the code blocks and runs
+them**, which would turn the rot into a failing check — deliberately not built
+here, because it is a real harness with a real line cost and it should be its
+own entry rather than a rider on this one.
+
+**Rejected.** *An HTML page in the published series* — see above. *A `README.md`
+section instead of a file* — the README routes, and a guide that gets someone to
+a running program is longer than routing should be. *Nothing at all, on the
+grounds that `src/lib.rs` is the reference* — true, and it does not tell you that
+`defn` is absent, which is the first thing anyone hits.
+
+---
+
 ## Errata
 
 Factual corrections to entries whose **decision still stands**. A wrong reason is

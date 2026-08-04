@@ -4,8 +4,15 @@ A small Lisp in the Clojure dialect with its own VM, in Rust. Substrate for
 terminal applications, web services, and simulators. One user; the language may
 break on a Tuesday.
 
-Milestone 1 is in: reader, printer, and forms with span origins. Everything
-after it is still design, and the design is meant to be read in this order.
+Ten milestones are in: reader, printer, compiler, register VM, macros,
+serializable machine state, and host adapters for the terminal, TCP, and JSON.
+
+**Start here:** [`docs/GUIDE.md`](docs/GUIDE.md) — build it, run a program, and
+the language on one page. Living document (ADR-064). The
+[write-ups](https://mparrett.github.io/apolisp/) are the long account of how it
+got here; they are frozen and dated.
+
+The rest is the design, and it is meant to be read in this order.
 
 ## Normative — read to implement
 

@@ -33,8 +33,12 @@ fmt:
 fmt-check:
     cargo fmt --all -- --check
 
+#
+# Its own target directory for the reason `subtract` has three: clippy drives
+# rustc through a different wrapper, so sharing a directory with `check` and
+# `test` means each of the three invalidates the other two on every run.
 lint:
-    cargo clippy --all-targets -- -D warnings
+    CARGO_TARGET_DIR=target/clippy cargo clippy --all-targets -- -D warnings
 
 # Q10 is open and release turns on overflow checks, so the two profiles must not
 # be allowed to drift apart unobserved.
@@ -67,13 +71,22 @@ verify: fmt-check check lint test subtract
 # Before it, `Host::File` was `fs`-only and the terminal could read keys and not
 # paint; the variant is now `any(fs, term)`, and this is the only build that
 # compiles that arm without `fs` also supplying it.
+#
+# Each configuration gets its own CARGO_TARGET_DIR, and that is the whole
+# difference between this recipe taking 872 seconds and 31. Cargo keeps one set
+# of artifacts per target directory, so cycling four feature sets through one
+# directory means each invocation invalidates the last — six rebuilds from
+# scratch here, and a seventh next time `test` runs with default features. The
+# directories cost about 440 MB together, because `--no-default-features` cuts
+# the dependency tree out and these builds are almost entirely this crate.
+# Measured 2026-08-03, after `touch src/lib.rs`.
 subtract:
-    cargo clippy --no-default-features --all-targets -- -D warnings
-    cargo test --no-default-features
-    cargo clippy --no-default-features --features fs --all-targets -- -D warnings
-    cargo test --no-default-features --features fs
-    cargo clippy --no-default-features --features term --all-targets -- -D warnings
-    cargo test --no-default-features --features term
+    CARGO_TARGET_DIR=target/sub-none cargo clippy --no-default-features --all-targets -- -D warnings
+    CARGO_TARGET_DIR=target/sub-none cargo test --no-default-features
+    CARGO_TARGET_DIR=target/sub-fs cargo clippy --no-default-features --features fs --all-targets -- -D warnings
+    CARGO_TARGET_DIR=target/sub-fs cargo test --no-default-features --features fs
+    CARGO_TARGET_DIR=target/sub-term cargo clippy --no-default-features --features term --all-targets -- -D warnings
+    CARGO_TARGET_DIR=target/sub-term cargo test --no-default-features --features term
 
 # BUILD.md's ladder: `merge → soak → tag`. Two of the three legs run anywhere;
 # the leak check needs valgrind and says so rather than passing quietly.

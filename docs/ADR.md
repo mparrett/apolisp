@@ -3915,6 +3915,82 @@ grounds that `src/lib.rs` is the reference* — true, and it does not tell you t
 
 ---
 
+### ADR-065 — `defn`, `inc`, `dec`, and `cond` join the prelude
+
+*(New, 2026-08-03. Prompted by `GUIDE.md` having to explain four absences in a
+row. Does not touch ADR-018/041/049 — see "what stays out".)*
+
+**Decision.** Four names, all written in the language, none of them touching the
+VM:
+
+```clojure
+(defmacro defn [name params & body] `(def ~name (fn ~name ~params ~@body)))
+(defmacro cond [& clauses] ...)      ; pairs, tested in order, nil when none match
+(defn inc [n] (+ n 1))
+(defn dec [n] (- n 1))
+```
+
+**Why.** No entry had ever decided against them. They were absent, which is not
+the same as rejected, and `ETHOS.md` puts ergonomics last precisely by saying
+*inherit Clojure's surface rather than invent one* — an argument for having them
+rather than against. `defn` names the `fn` inside its expansion, so a function
+defined that way can still recur on itself; that is the whole reason `def` alone
+was not enough. `cond` does not know about `:else`: the keyword is simply truthy,
+so the idiom works without the macro special-casing a name.
+
+**What stays out, and why this is not the thin end.** The two remaining gaps
+`GUIDE.md` lists are settled and stay settled. `(count "text")` refuses on
+purpose — ADR-049 exists *because* `str-len` shipped a byte answer under a name
+that did not say so, and `"josé"` returning 5 misaligned every report by a space
+per non-ASCII character. `(/ 7 2)` yielding `3.5` is ADR-041 part 3, whose
+Rejected list names truncating `/` as "a silent wrong answer under the spelling
+everybody types". Both refusals are the house style working; neither is an
+omission waiting to be filled.
+
+The distinction that makes this entry safe to have written is that **these four
+add no semantics.** Each expands to forms the language already had. A name that
+would introduce a new rule — a coercion, an ordering, a unit — is a different
+argument and does not get in on this precedent.
+
+`prelude.xs` opens by warning that a prelude is "the easiest place in a project
+like this for a standard library to start growing by accident", and this entry is
+exactly that pressure arriving. The defence is the budget rather than taste: the
+prelude is core language, every line counts, and the next four names have to be
+argued for against a number that has moved.
+
+**Cost, and a refuted estimate.** Predicted ~12 lines; **actual 24**, because
+comments count under ADR-030's rule and the four additions carry three comment
+blocks. Core goes 7,176 → **7,200 of 7,500**, leaving 300 to the working target.
+That is the entry's real cost: not the names, but a fifth of the remaining
+headroom for four pieces of sugar.
+
+**Three goldens changed, all reviewed.** `tests/prelude.disasm` grows by exactly
+two globals (`inc`, `dec`) and two protos, with the other ~1,100 changed lines
+being renumbering — verified by diffing the SETGLOBAL name sets and the opcode
+sequence rather than by reading the file. `defn` and `cond` add nothing to it,
+because `set-macro!` forms are consumed at expansion and leave nothing behind.
+`aggregates.disasm` and `aggregates.expanded` changed because that corpus file
+uses `(defn square [x] (* x x))` as a *syntax sample* — it is a reader corpus and
+never runs — and a name that used to compile as a call to an unbound global now
+expands. Nothing about the program's meaning changed, because it has none.
+
+**A harness defect found on the way.** `cargo test` stops launching test
+*binaries* after one fails, and these three goldens live in two of them. The
+first run reported two failures; `expand.rs` never executed and its broken golden
+was invisible. `just test` now passes `--no-fail-fast`. This is the oracle
+failing in the most ordinary way available — not a wrong assertion, just one that
+never ran — and it had been latent for the whole project.
+
+**Rejected.** *`inc`/`dec` as Rust natives* — about eight lines each for a
+call-path saving nobody has measured a need for, against two lines of prelude.
+*Special-casing `:else` in `cond`* — a keyword the macro knows by name is a rule
+somebody has to learn; truthiness already does it. *Leaving all four out and
+letting `GUIDE.md` explain them* — the guide explaining four absences in a row is
+what prompted this, and a document apologising for the surface is evidence about
+the surface.
+
+---
+
 ## Errata
 
 Factual corrections to entries whose **decision still stands**. A wrong reason is

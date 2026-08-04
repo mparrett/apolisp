@@ -125,7 +125,8 @@ because the frame is still needed to run the cleanup.
 **Functions and macros.**
 
 ```clojure
-(def sq (fn [n] (* n n)))
+(defn sq [n] (* n n))
+(def anon (fn [n] (* n n)))          ; `defn` expands to exactly this
 (defmacro unless [test body] `(if ~test nil ~body))
 ```
 
@@ -138,9 +139,6 @@ you will lose your first hour. All of these are deliberate.
 
 | You'll reach for | Reality |
 |---|---|
-| `(defn f [x] ...)` | **No `defn`.** Write `(def f (fn [x] ...))`. |
-| `(inc n)` | **No `inc`/`dec`.** Write `(+ n 1)`. |
-| `(cond a b c d)` | **No `cond`.** Nest `if`, or use `when`. |
 | `(:key m)` | **Keywords aren't callable.** Write `(get m :key)`. |
 | `(count "text")` | **Errors on purpose** — say the unit: `str-byte-len` or `str-scalar-len`. |
 | `(/ 7 2)` | `3.5` — `/` is float division. Integer division is `quot`, remainder is `rem`. |
@@ -161,7 +159,9 @@ comparison (`< <= > >= = == not=`), `not`, `str`, `count`, `first`, `rest`,
 `io/*`. That's the whole set — 55 of them, and `apolisp run` on an unbound name
 will tell you so with a source position.
 
-The prelude adds, written in apolisp itself: `map`, `filter`, `reduce`, `range`,
+The prelude adds the rest, written in apolisp itself and compiled into every
+unit. Macros: `def`, `defn`, `defmacro`, `when`, `unless`, `and`, `or`, `cond`,
+`with-open`. Functions: `inc`, `dec`, `map`, `filter`, `reduce`, `range`,
 `repeat`, `join`, `split`, `take`, `drop`, `sort`, `sort-by`, `sort-with`,
 `merge-sorted`, `pad-left`, `pad-right`. Read it with `apolisp prelude`.
 

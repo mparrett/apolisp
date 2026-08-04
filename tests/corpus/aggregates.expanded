@@ -5,5 +5,5 @@
 [1 [2 [3]]]
 {:a 1 :b 2}
 {:nested {:deep [1 2 {:x nil}]}}
-(defn square [x] (* x x))
+(set-global! square (fn square [x] (* x x)))
 (a b c)

@@ -547,3 +547,35 @@ for v1.
 building. With no laziness, no bignum promotion, and a deliberately different
 numeric tower, the overlapping subset shrinks fast; it may be worth it for
 arithmetic and core-fn edge cases only.
+
+**Q39 — Should a keyword be callable, and if so, where is it resolved?**
+*(Filed 2026-08-03 from `GUIDE.md`. ADR-065 took the four gaps that needed no
+VM change and deliberately left this one, because it is the only one that
+touches the call path.)*
+
+`(:key m)` throws `:not-callable` today. Nothing has ever decided against it —
+it is absent, like `defn` was. The Clojure idiom is common enough that a guide
+has to warn about it, which is the same evidence that carried ADR-065.
+
+Why it is a separate question: the other four expanded to forms the language
+already had. This one adds a rule to `callee_at` (`src/lib.rs`), the single
+point where `call` and `tail_call` resolve what is in the callee slot — code
+ADR-061 has just reworked for the consuming call protocol, and code ETHOS
+constraint #3 cares about. **A benchmark decides this, not an argument.**
+
+Three shapes, cheapest to implement first, cheapest at run time last:
+
+1. **Synthesize a native closure** when the callee is a keyword. Smallest
+   change; allocates per call, in the hot path.
+2. **A `Callee::Keyword` variant.** No allocation, and the arity and error
+   messages become a third case everywhere the enum is matched.
+3. **Resolve at compile time** when the head of a call is a literal keyword,
+   emitting the `get` directly. Zero run-time cost and no VM change at all —
+   but it only covers the literal head, so `(map :key ms)` still fails, and the
+   language would then have a keyword that is callable in one position and not
+   in another. That inconsistency may be worse than the absence.
+
+The open part is not which is fastest; it is whether (3)'s partial answer is
+acceptable, or whether a callable keyword has to be a *value* to be worth
+having. Decide after measuring (1) — if it does not show up against the corpus,
+the simplest version wins and the question was cheap.

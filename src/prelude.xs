@@ -18,6 +18,11 @@
   (fn def [name value]
     `(set-global! ~name ~value)))
 
+; `fn` is named inside the expansion so a function defined this way can still
+; recur on itself, which is the whole reason `def` alone was not enough.
+(defmacro defn [name params & body]
+  `(def ~name (fn ~name ~params ~@body)))
+
 ; The conditionals every program writes, as macros over `if` — which is the
 ; only one of them the core has. `and` and `or` cannot be functions: they have
 ; to *not evaluate* what they skip.
@@ -45,6 +50,16 @@
       (first xs)
       `(let [v# ~(first xs)] (if v# v# (or ~@(rest xs)))))))
 
+; Pairs, tested in order, `nil` when none match. There is no `:else` keyword in
+; the macro: `:else` is simply truthy, so the Clojure idiom works without this
+; having to know the name.
+(defmacro cond [& clauses]
+  (if (empty? clauses)
+    nil
+    `(if ~(first clauses)
+       ~(first (rest clauses))
+       (cond ~@(rest (rest clauses))))))
+
 ; ADR-016's promise, kept where it said it would be: `with-open` is a macro
 ; over `try`/`finally`, not a primitive. A primitive that called a language
 ; closure would re-enter the dispatch loop on the Rust stack, which ADR-004
@@ -64,6 +79,15 @@
        (try
          (with-open ~(rest (rest bindings)) ~@body)
          (finally (io/close ~(first bindings)))))))
+
+; --- Numbers -----------------------------------------------------------------
+;
+; Two lines, because `(+ n 1)` in the middle of a `recur` is the one place the
+; missing name is felt. They are functions rather than macros: nothing here
+; needs to skip evaluating anything.
+
+(defn inc [n] (+ n 1))
+(defn dec [n] (- n 1))
 
 ; --- Sequences ---------------------------------------------------------------
 ;

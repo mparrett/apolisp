@@ -1,4 +1,4 @@
-proto 0  <top>  params 0  slots 52
+proto 0  <top>  params 0  slots 43
   constants
     k0  ()
     k1  1
@@ -49,18 +49,18 @@ proto 0  <top>  params 0  slots 52
     0035  CALL        r31 <- r32(3)          8:17
     0036  CALL        r28 <- r29(2)          8:10
     0037  CALL        r25 <- r26(2)          8:1
-    0038  GETGLOBAL   r40 <- defn            9:2
-    0039  GETGLOBAL   r41 <- square          9:7
-    0040  GETGLOBAL   r44 <- vector          9:14
-    0041  GETGLOBAL   r45 <- x               9:15
-    0042  CALL        r42 <- r44(1)          9:14
-    0043  GETGLOBAL   r46 <- *               9:19
-    0044  GETGLOBAL   r47 <- x               9:21
-    0045  GETGLOBAL   r48 <- x               9:23
-    0046  CALL        r43 <- r46(2)          9:18
-    0047  CALL        r39 <- r40(3)          9:1
-    0048  GETGLOBAL   r49 <- a               10:2
-    0049  GETGLOBAL   r50 <- b               10:5
-    0050  GETGLOBAL   r51 <- c               10:8
-    0051  TAILCALL    r49(2)                 10:1
-    0052  RETURN      r0                     10:1
+    0038  CLOSURE     r39 <- proto 1         generated 9:1
+    0039  SETGLOBAL   square <- r39          generated 9:1
+    0040  GETGLOBAL   r40 <- a               10:2
+    0041  GETGLOBAL   r41 <- b               10:5
+    0042  GETGLOBAL   r42 <- c               10:8
+    0043  TAILCALL    r40(2)                 10:1
+    0044  RETURN      r0                     10:1
+
+proto 1  square  params 1  slots 5
+  code
+    0000  GETGLOBAL   r2 <- *                9:19
+    0001  MOVE        r3 <- r0               9:21
+    0002  MOVE        r4 <- r0               9:23
+    0003  TAILCALL    r2(2)                  9:18
+    0004  RETURN      r1                     9:18

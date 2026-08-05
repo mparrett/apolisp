@@ -411,10 +411,16 @@ the prelude traverses with it:
 (loop [in xs out []] (if (empty? in) out (recur (rest in) (conj out (f (first in))))))
 ```
 
-`map`, `filter`, `join` and `repeat` are all this shape, so all four are still
-quadratic after ADR-061. Measured against the identical algorithm traversing by
-index — 8,000 elements at 0.09 s via `rest` against 0.00 s via `nth`, 32,000 at
-1.45 s against 0.01 s, 4.0× per doubling against flat.
+`map`, `filter` and `join` are this shape, so all three are still quadratic
+after ADR-061. Measured against the identical algorithm traversing by index —
+8,000 elements at 0.09 s via `rest` against 0.00 s via `nth`, 32,000 at 1.45 s
+against 0.01 s, 4.0× per doubling against flat.
+
+**`repeat` was listed here too and does not belong** (corrected 2026-08-05). It
+counts with an index and never calls `rest`, and it measures flat: 1.1× per
+doubling over the same range. The list was written from the shape the other
+three share rather than re-derived from `src/prelude.xs`, which is the same way
+`TRAPS.md` came to be carrying `take` and `drop` three days earlier.
 
 **This is structural rather than a defect**, which is what separates it from the
 `seq_items` half of ADR-061's work. On a flat `Vec` with no shared tails `rest`

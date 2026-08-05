@@ -139,18 +139,44 @@ keystroke: 3.7 µs via native `str-slice` against 12,605 µs via scalars at a
 a curve. Same fault line as the `str-len` entry above, one layer down: ADR-018
 and ADR-049 made the unsafe path quiet, and then made the safe path slow. Q34.
 
-**Anything built with `conj` in a loop is O(n²).** Errata E-13's copy-on-write
-does not pay yet — `Rc::make_mut` never holds a unique reference at a native
-call — so `map`, `filter`, `range`, `repeat` and `split` are all quadratic in
-output length. `join` is the same shape by a different mechanism: it
-accumulates with `str`, and each step copies the string built so far.
+**Traversing with `rest` in a loop is O(n²).** It is no longer `conj` that does
+it. ADR-061 paid off the `conj` half — E-13's copy-on-write finally pays, and a
+loop whose accumulator's last read *is* the `conj` now runs linear. What is left
+is `rest`, which builds a new collection from `xs[1..]` on every call. That is
+**Q38**, and this entry has changed hands from Q37 to it.
 
-*`take` and `drop` are no longer on this list*, and the list said they were
-until 2026-08-02: ADR-053 gave them `vec-slice` and nothing came back to strike
-them out. Check the prelude before trusting any membership here.
+Membership, measured in release 2026-08-05, ratio per doubling over 8,000 →
+32,000:
 
-Measured in release across a 16x range of sizes, and the fit is a textbook n²:
-4.4 to 4.7 ns per line² from 2,000 lines to 32,000, ratio **4.0x per doubling**.
+| | traversal | per doubling |
+|---|---|---:|
+| `map`, `filter`, `join` | `rest` | **~3.8x** |
+| `range`, `repeat` | an index | 1.1x |
+| a bare `conj` loop | — | 1.2x |
+
+`join` carries both mechanisms: it traverses with `rest` *and* accumulates with
+`str`, each step copying the string built so far.
+
+What assigns the cost to `rest` rather than to the accumulator is that a `rest`
+walk is quadratic with no `conj` in it at all — 0.116 s to 1.446 s over the same
+range — while the identical walk by index is flat, and `map` rewritten to index
+with `nth` is flat too.
+
+*Membership here has now been wrong twice.* `take` and `drop` were listed until
+2026-08-02, after ADR-053 gave them `vec-slice`. `repeat` was listed until
+2026-08-05 and has never used `rest` at all. Re-derive from `src/prelude.xs`
+rather than trusting this table.
+
+**Where `conj` itself is still quadratic** is a `try` *inside* the loop body:
+ADR-061's liveness refuses to kill a slot anywhere inside a handler region, so
+the accumulator stays live and `make_mut` copies. Measured 2026-08-05, 4,000 →
+32,000 at 0.050 s → 1.629 s, **4.0x per doubling**. A loop *inside* a `try` is
+fine — `loop` lowers to its own function (ADR-047), so the analysis never sees
+the enclosing handler.
+
+The whole-file table below was measured 2026-08-02, **before ADR-061 landed**,
+and has not been re-measured. It attributed the cost to `conj`; the shape it
+records is real and the mechanism named for it is now the wrong one.
 
 | lines in one file | whole-file pass |
 |---:|---:|
@@ -159,12 +185,11 @@ Measured in release across a 16x range of sizes, and the fit is a textbook n²:
 | 32,000 | 4.84 s |
 | 64,000 | **19.1 s** |
 
-**One second lands at about 14,500 lines**, and an ordinary 64,000-line log
-takes nineteen. That is the number to remember; an earlier version of this
-entry said 30,000 and was wrong by 2x in the flattering direction.
+An earlier version of that entry put the one-second threshold at 30,000 lines
+and was wrong by 2x in the flattering direction.
 
-Owned by **Q37**. It is not Q6: that number is retired, and was still being
-cited as open by five documents including this one.
+Not Q6: that number is retired, and was still being cited as open by five
+documents including this one.
 
 **A `recur` from a `catch` is allowed here, and is not in Clojure.** This VM
 pops a handler record when it dispatches to it, so a catch body runs with no

@@ -4834,19 +4834,13 @@ pub mod prim {
                  `str-scalar-len` (ADR-018, ADR-049)"
                     .to_string(),
             )),
-            other => Err(fault(
-                Kind::Type,
-                format!("`count` needs a collection, not a {}", kind_name(other)),
-            )),
+            other => Err(wants("count", "a collection", other)),
         });
         vm.native("first", 1, false, |_, a| match &a[0] {
             Value::Nil => Ok(Value::Nil),
             Value::List(l) => Ok(l.0.first().cloned().unwrap_or(Value::Nil)),
             Value::Vec(x) => Ok(x.0.first().cloned().unwrap_or(Value::Nil)),
-            other => Err(fault(
-                Kind::Type,
-                format!("`first` needs a sequence, not a {}", kind_name(other)),
-            )),
+            other => Err(wants("first", "a sequence", other)),
         });
         // Always a list, whatever it was given: `rest` is the sequence
         // operation, and a list is what a sequence prints as.
@@ -4855,12 +4849,7 @@ pub mod prim {
                 Value::Nil => Vec::new(),
                 Value::List(l) => l.0.iter().skip(1).cloned().collect(),
                 Value::Vec(x) => x.0.iter().skip(1).cloned().collect(),
-                other => {
-                    return Err(fault(
-                        Kind::Type,
-                        format!("`rest` needs a sequence, not a {}", kind_name(other)),
-                    ))
-                }
+                other => return Err(wants("rest", "a sequence", other)),
             };
             Ok(Value::List(Rc::new(ListObj(items))))
         });
@@ -4886,12 +4875,7 @@ pub mod prim {
                 }
                 Value::List(l) => nth_or(&l.0, &a[1], missing),
                 Value::Vec(x) => nth_or(&x.0, &a[1], missing),
-                other => {
-                    return Err(fault(
-                        Kind::Type,
-                        format!("`get` needs a collection, not a {}", kind_name(other)),
-                    ))
-                }
+                other => return Err(wants("get", "a collection", other)),
             })
         });
         vm.native("contains?", 2, false, |_, a| {
@@ -4902,12 +4886,7 @@ pub mod prim {
                 // surprises people who expect it to search a vector.
                 Value::List(l) => in_range(l.0.len(), &a[1]),
                 Value::Vec(x) => in_range(x.0.len(), &a[1]),
-                other => {
-                    return Err(fault(
-                        Kind::Type,
-                        format!("`contains?` needs a collection, not a {}", kind_name(other)),
-                    ))
-                }
+                other => return Err(wants("contains?", "a collection", other)),
             }))
         });
         vm.native("empty?", 1, false, |_, a| {
@@ -4916,12 +4895,7 @@ pub mod prim {
                 Value::List(l) => l.0.is_empty(),
                 Value::Vec(x) => x.0.is_empty(),
                 Value::Map(m) => m.0.is_empty(),
-                other => {
-                    return Err(fault(
-                        Kind::Type,
-                        format!("`empty?` needs a collection, not a {}", kind_name(other)),
-                    ))
-                }
+                other => return Err(wants("empty?", "a collection", other)),
             }))
         });
         // Where the copy-on-write lives (ADR-041 part 1). A list grows at the
@@ -5015,12 +4989,7 @@ pub mod prim {
                     }
                     Value::Vec(out)
                 }
-                other => {
-                    return Err(fault(
-                        Kind::Type,
-                        format!("`assoc` needs a map or vector, not a {}", kind_name(other)),
-                    ))
-                }
+                other => return Err(wants("assoc", "a map or vector", other)),
             })
         });
         vm.native("dissoc", 1, true, |_, a| {
@@ -5033,12 +5002,7 @@ pub mod prim {
                         .retain(|(k, _)| !a[1..].iter().any(|d| equal(k, d)));
                     Value::Map(out)
                 }
-                other => {
-                    return Err(fault(
-                        Kind::Type,
-                        format!("`dissoc` needs a map, not a {}", kind_name(other)),
-                    ))
-                }
+                other => return Err(wants("dissoc", "a map", other)),
             })
         });
         vm.native("keys", 1, false, |_, a| map_part(&a[0], "keys", true));
@@ -5055,10 +5019,7 @@ pub mod prim {
                 .cell(*id)
                 .cloned()
                 .ok_or_else(|| fault(Kind::Internal, "cell is no longer live".to_string())),
-            other => Err(fault(
-                Kind::Type,
-                format!("`cell-get` needs a cell, not a {}", kind_name(other)),
-            )),
+            other => Err(wants("cell-get", "a cell", other)),
         });
 
         // --- strings and bytes (ADR-018, ADR-041 part 5) ----------------------
@@ -5258,17 +5219,11 @@ pub mod prim {
                     format!("`bytes-str`: not valid UTF-8 at byte {}", e.valid_up_to()),
                 )),
             },
-            other => Err(fault(
-                Kind::Type,
-                format!("`bytes-str` needs bytes, not a {}", kind_name(other)),
-            )),
+            other => Err(wants("bytes-str", "bytes", other)),
         });
         vm.native("bytes-len", 1, false, |_, a| match &a[0] {
             Value::Bytes(b) => Ok(Value::Int(b.0.len() as i64)),
-            other => Err(fault(
-                Kind::Type,
-                format!("`bytes-len` needs bytes, not a {}", kind_name(other)),
-            )),
+            other => Err(wants("bytes-len", "bytes", other)),
         });
 
         vm.native("println", 0, true, |vm, a| {
@@ -5288,15 +5243,7 @@ pub mod prim {
                 None => "G".to_string(),
                 Some(Value::Str(s)) => s.0.clone(),
                 Some(Value::Sym(s)) => vm.interner.name(s.0).to_string(),
-                Some(other) => {
-                    return Err(fault(
-                        Kind::Type,
-                        format!(
-                            "`gensym` needs a string or symbol prefix, not a {}",
-                            crate::value::kind_name(other)
-                        ),
-                    ))
-                }
+                Some(other) => return Err(wants("gensym", "a string or symbol prefix", other)),
             };
             let name = vm.gensym_name(&prefix);
             Ok(vm.interner.sym(&name))
@@ -5318,15 +5265,7 @@ pub mod prim {
                     Value::List(l) => out.extend(l.0.iter().cloned()),
                     Value::Vec(x) => out.extend(x.0.iter().cloned()),
                     Value::Nil => {}
-                    other => {
-                        return Err(fault(
-                            Kind::Type,
-                            format!(
-                                "`concat` needs lists or vectors, not a {}",
-                                crate::value::kind_name(other)
-                            ),
-                        ))
-                    }
+                    other => return Err(wants("concat", "lists or vectors", other)),
                 }
             }
             Ok(Value::List(Rc::new(ListObj(out))))
@@ -5357,13 +5296,7 @@ pub mod prim {
         vm.native("vec", 1, false, |_, a| match &a[0] {
             Value::List(l) => Ok(Value::Vec(Rc::new(VecObj(l.0.clone())))),
             Value::Vec(x) => Ok(Value::Vec(x.clone())),
-            other => Err(fault(
-                Kind::Type,
-                format!(
-                    "`vec` needs a list or vector, not a {}",
-                    crate::value::kind_name(other)
-                ),
-            )),
+            other => Err(wants("vec", "a list or vector", other)),
         });
         vm.native("vector", 0, true, |_, a| {
             Ok(Value::Vec(Rc::new(VecObj(a.to_vec()))))
@@ -5385,6 +5318,24 @@ pub mod prim {
 
     // --- collection helpers ---------------------------------------------------
 
+    /// The one phrasing of "wrong type", for every primitive that refuses one.
+    ///
+    /// `what` completes "needs ___", so it carries its own article: "a
+    /// sequence", "bytes", "a map or vector". That reads oddly at the call site
+    /// and is what makes the message read correctly, which is the trade this
+    /// helper exists to make once instead of nineteen times.
+    ///
+    /// `ETHOS.md` puts error quality outside the priority order — it is the
+    /// feedback loop the rest depends on — and before this the wording was
+    /// decided at nineteen separate sites, none of which any golden pinned. One
+    /// function is one place to pin.
+    fn wants(op: &str, what: &str, got: &Value) -> Fault {
+        fault(
+            Kind::Type,
+            format!("`{op}` needs {what}, not a {}", kind_name(got)),
+        )
+    }
+
     /// The elements of a sequence, **borrowed**.
     ///
     /// This returned `Vec<Value>` — a clone of the whole collection — until
@@ -5401,20 +5352,14 @@ pub mod prim {
             Value::Nil => Ok(&[]),
             Value::List(l) => Ok(&l.0),
             Value::Vec(x) => Ok(&x.0),
-            other => Err(fault(
-                Kind::Type,
-                format!("`{op}` needs a sequence, not a {}", kind_name(other)),
-            )),
+            other => Err(wants(op, "a sequence", other)),
         }
     }
 
     fn string<'a>(v: &'a Value, op: &str) -> Result<&'a str, Fault> {
         match v {
             Value::Str(s) => Ok(&s.0),
-            other => Err(fault(
-                Kind::Type,
-                format!("`{op}` needs a string, not a {}", kind_name(other)),
-            )),
+            other => Err(wants(op, "a string", other)),
         }
     }
 
@@ -5425,10 +5370,7 @@ pub mod prim {
                 Kind::Type,
                 format!("`{op}` needs a non-negative index, not {i}"),
             )),
-            other => Err(fault(
-                Kind::Type,
-                format!("`{op}` needs an integer index, not a {}", kind_name(other)),
-            )),
+            other => Err(wants(op, "an integer index", other)),
         }
     }
 
@@ -5455,12 +5397,7 @@ pub mod prim {
         let pairs = match v {
             Value::Nil => Vec::new(),
             Value::Map(m) => m.0.clone(),
-            other => {
-                return Err(fault(
-                    Kind::Type,
-                    format!("`{op}` needs a map, not a {}", kind_name(other)),
-                ))
-            }
+            other => return Err(wants(op, "a map", other)),
         };
         let items = pairs
             .into_iter()
@@ -5521,10 +5458,7 @@ pub mod prim {
         match v {
             Value::Int(i) => Ok(Num::Int(*i)),
             Value::Float(f) => Ok(Num::Float(*f)),
-            other => Err(fault(
-                Kind::Type,
-                format!("`{op}` needs a number, not a {}", kind_name(other)),
-            )),
+            other => Err(wants(op, "a number", other)),
         }
     }
 

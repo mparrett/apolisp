@@ -44,7 +44,7 @@ defers to. Then, as needed:
 just verify       # the gate: fmt, check, clippy, tests, subtraction build, Value size
 just subtract     # ADR-013's harness: build and test with a host capability cut out
 just test         # rung 3 and the properties
-just smoke        # rung 2 — NONZERO ON PURPOSE while any stage is pending
+just smoke        # rung 2 — read, expand, compile, run end to end; nonzero is a failure
 just bless        # regenerate goldens; then read every hunk before committing
 just lines        # constraint #1, per file and per layer
 just hooks        # install the advisory pre-commit hook (warns, never blocks)

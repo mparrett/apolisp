@@ -4,9 +4,11 @@
 dated, this file is meant to track the language. If something here is wrong, it
 is a defect — fix it. See ADR-064.
 
-Every code block below was run against the binary on 2026-08-03. If you change
+Every code block below was run against the binary on 2026-08-05. If you change
 the language and a block here goes stale, that is the same class of problem as a
-stale golden.
+stale golden. Counts of things are deliberately absent — a tally nobody can act
+on is the part that rots first, and `apolisp prelude` and `just lines` print the
+current ones.
 
 **What this is not.** A tutorial for learning Lisp, and not a reference — the
 reference is `src/lib.rs`, which is one file and is meant to be read. This is
@@ -104,7 +106,8 @@ An error prints and the session continues:
 **Special forms** — the entire set:
 
 ```clojure
-(def name value)                    ; bind a global
+(set-global! name value)            ; bind a global — `def` is a macro over this
+(set-cell! cell value)              ; write through a cell
 (fn [a b] body)                     ; a function
 (if test then else)
 (let [a 1 b 2] body)                ; sequential binding
@@ -117,6 +120,11 @@ An error prints and the session continues:
 (quasiquote form)  `form            ; with ~ and ~@ inside
 (set-macro! name)                   ; the macro primitive
 ```
+
+Note what is *not* here: `def` and `defmacro` are prelude macros over
+`set-global!` and `set-macro!`, not special forms. ADR-027 made that a decision
+rather than an accident — run `apolisp expand` on any file and watch `(def x 1)`
+become `(set-global! x 1)`.
 
 `recur` is how you loop, and a self-call in tail position is optimised — but a
 call in tail position inside a `try` with a `finally` is **not** a tail call,
@@ -155,9 +163,15 @@ Natives (in Rust) cover the primitives: arithmetic (`+ - * / quot rem`),
 comparison (`< <= > >= = == not=`), `not`, `str`, `count`, `first`, `rest`,
 `nth`, `conj`, `get`, `assoc`, `dissoc`, `keys`, `vals`, `contains?`, `empty?`,
 `concat`, `vec`, `vector`, `list`, `hash-map`, `vec-slice`, `compare`,
-`gensym`, `cell`, `cell-get`, `println`, the `str-*` and `bytes-*` families, and
-`io/*`. That's the whole set — 55 of them, and `apolisp run` on an unbound name
-will tell you so with a source position.
+`gensym`, `cell`, `cell-get`, `println`, `parse-number`, the `str-*` and
+`bytes-*` families, and `io/*`. That is the whole core set; `apolisp run` on an
+unbound name will tell you so with a source position.
+
+The host adapters add more, and they are on by default: `json/encode`,
+`json/decode`, `tcp/connect`, `tcp/listen`, `tcp/accept`, `tcp/local-addr`,
+`tcp/set-timeout`, `term/open`, `term/size`, `term/raw-mode`, `term/read-key`.
+These sit outside the line budget (ADR-045) and each is behind a cargo feature,
+so a subtracted build drops the names and keeps the language.
 
 The prelude adds the rest, written in apolisp itself and compiled into every
 unit. Macros: `def`, `defn`, `defmacro`, `when`, `unless`, `and`, `or`, `cond`,
@@ -222,8 +236,8 @@ Read in this order, and only as far as you need:
 | `docs/ADR.md` | Every settled decision, with cost and rejected alternatives. Append-only. Check the status line before trusting a body. |
 | `docs/BUILD.md` | The line budget and the milestone you're on. |
 | `docs/QUESTIONS.md` | What is deliberately undecided. If your task needs one of these, it's a question, not a judgment call. |
-| [The write-ups](https://mparrett.github.io/apolisp/) | Thirteen essays on the verification loop. Frozen, dated, and the best account of why any of this looks the way it does. |
+| [The write-ups](https://mparrett.github.io/apolisp/) | Essays on the verification loop. Frozen, dated, and the best account of why any of this looks the way it does. |
 
-If you are changing the language rather than using it, `CLAUDE.md` (symlinked as
-`AGENTS.md`) is the short version of the rules, and the first one is that a
-decision not in `ADR.md` has not been made.
+If you are changing the language rather than using it, `AGENTS.md` (with
+`CLAUDE.md` as a symlink to it) is the short version of the rules, and the first
+one is that a decision not in `ADR.md` has not been made.

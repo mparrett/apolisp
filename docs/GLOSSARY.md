@@ -337,7 +337,10 @@ running it, then recording whether it was refuted (`BUILD.md`).
 one engineer and one language model. A context-window constraint, not taste.
 
 **line budget** — The per-layer table in `BUILD.md` that operationalizes it.
-~5,200 lines of core; tests, adapters, and tooling sit outside it.
+Tests, adapters, and tooling sit outside it. `just lines` prints the current
+total and the per-layer breakdown; this entry deliberately does not, because the
+number it used to carry went stale the moment ADR-030 moved the budget and
+stayed wrong for four milestones.
 
 **seam** — A boundary that exists so a subsystem can be **deleted or lifted out**,
 never so code has a home. Inline `mod` blocks are the seams (ADR-015).

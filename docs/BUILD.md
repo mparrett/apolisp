@@ -307,7 +307,8 @@ was the leg that kept it hypothetical.
 
 - **Release-build divergence.** `cargo test --release`. The goldens run the
   *binary*, so under `--release` they pin the release artifact rather than
-  re-running library code. Nothing has diverged: 108 tests, both profiles.
+  re-running library code. Nothing has diverged: 108 tests, both profiles, as of
+  2026-08-02.
 - **Reader fuzzing.** `the_reader_survives_arbitrary_input` in `tests/reader.rs`,
   which is in the ordinary suite at a small round count and cranked by
   `APOLISP_FUZZ_ROUNDS` for the soak. Two generators — token soup and corpus
@@ -343,7 +344,8 @@ that socket error classification would be where macOS and Linux parted, since
 that is the newest code and the one place `TRAPS.md` already records a platform
 split. Both give `:would-block` for a read deadline, both classify a write to a
 closed peer as `:connection-reset`, and both take exactly two writes to get
-there. 108 tests, three feature-lattice points, no diff. So the `:would-block`
+there. 108 tests, three feature-lattice points, no diff, as of 2026-08-02. So
+the `:would-block`
 **or** `:timeout` tolerance in `tests/adapters.rs` is carrying Windows alone —
 it is not a macOS-versus-Linux hedge, and no run has ever taken the branch that
 needs it.

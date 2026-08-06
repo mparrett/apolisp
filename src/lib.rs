@@ -2441,7 +2441,10 @@ pub mod compile {
             // catch reads it — and getting that wrong yields `nil` where a
             // value should be, which is a wrong answer rather than a crash
             // (ADR-061). Refusing to analyse it is sound; the cost is that a
-            // `conj` loop inside a `try` stays quadratic.
+            // `conj` whose accumulator is read inside a handler region stays
+            // quadratic — a `try` *in* the loop body, measured 4x per doubling.
+            // A loop *inside* a `try` is unaffected: ADR-047 lowers it to its
+            // own function, so the enclosing handler never reaches this pass.
             Core::Try(_) | Core::Recur(_) => all_reads(e, live),
         }
     }
